@@ -78,3 +78,32 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
 
     logger.info("Downloaded %d/%d media for item %s", len(downloaded), len(media_urls), item_id)
     return {"status": "success", "downloaded": len(downloaded), "total": len(media_urls)}
+
+
+def download_video(url: str, output_dir: str, max_quality: str = "720") -> str | None:
+    """Download video using yt-dlp. Returns output file path or None."""
+    import subprocess
+    from pathlib import Path
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_template = str(Path(output_dir) / "%(title)s.%(ext)s")
+
+    try:
+        result = subprocess.run(
+            [
+                "yt-dlp",
+                "--no-playlist",
+                "-f", f"bestvideo[height<={max_quality}]+bestaudio/best[height<={max_quality}]",
+                "--merge-output-format", "mp4",
+                "-o", output_template,
+                "--max-filesize", "500M",
+                url,
+            ],
+            capture_output=True, text=True, timeout=600,
+        )
+        if result.returncode == 0:
+            for f in Path(output_dir).glob("*.mp4"):
+                return str(f)
+        return None
+    except Exception:
+        return None

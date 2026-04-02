@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from pydantic import BaseModel
@@ -51,6 +52,20 @@ def create_item(
     if item_data.url and platform == SourcePlatform.generic:
         platform = _detect_platform(item_data.url)
 
+    # Check for duplicate URL
+    if item_data.url:
+        existing = db.exec(
+            select(KnowledgeItem).where(
+                KnowledgeItem.user_id == current_user.id,
+                KnowledgeItem.url == item_data.url,
+            )
+        ).first()
+        if existing:
+            raise HTTPException(
+                409,
+                detail={"message": "You already saved this URL", "existing_id": str(existing.id)},
+            )
+
     item = KnowledgeItem(
         user_id=current_user.id,
         url=item_data.url,
@@ -72,6 +87,14 @@ def create_item(
         indexer.index_item(item)
     except Exception:
         pass  # Search indexing is best-effort
+
+    # Run automation rules
+    try:
+        from fourdpocket.workers.rule_engine import run_rules_for_item
+
+        run_rules_for_item(item, db)
+    except Exception:
+        pass  # Rules are best-effort
 
     return item
 
@@ -227,6 +250,41 @@ def remove_tag_from_item(
     db.commit()
 
 
+@router.get("/timeline")
+def get_timeline(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get items grouped by date for timeline view."""
+    from datetime import timedelta
+    from collections import defaultdict
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == user.id,
+            KnowledgeItem.created_at >= since,
+        ).order_by(KnowledgeItem.created_at.desc())
+    ).all()
+
+    # Group by date
+    grouped = defaultdict(list)
+    for item in items:
+        date_key = item.created_at.strftime("%Y-%m-%d") if item.created_at else "unknown"
+        grouped[date_key].append({
+            "id": str(item.id),
+            "title": item.title,
+            "url": item.url,
+            "source_platform": item.source_platform,
+            "item_type": item.item_type,
+            "summary": item.summary,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+        })
+
+    return [{"date": date, "items": items} for date, items in sorted(grouped.items(), reverse=True)]
+
+
 @router.post("/{item_id}/archive", status_code=202)
 def archive_item(
     item_id: uuid.UUID,
@@ -298,6 +356,40 @@ def get_related_items(
         return []
 
 
+@router.patch("/{item_id}/reading-progress")
+def update_reading_progress(
+    item_id: str,
+    body: dict,  # {"progress": 0-100}
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Update reading progress for read-it-later mode."""
+    item = db.exec(select(KnowledgeItem).where(KnowledgeItem.id == item_id, KnowledgeItem.user_id == user.id)).first()
+    if not item:
+        raise HTTPException(404)
+    progress = max(0, min(100, body.get("progress", 0)))
+    item.reading_progress = progress
+    db.commit()
+    return {"status": "updated", "reading_progress": progress}
+
+
+@router.get("/reading-queue")
+def get_reading_queue(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get items in reading queue (has content, not fully read)."""
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == user.id,
+            KnowledgeItem.content.is_not(None),
+            KnowledgeItem.is_archived == False,
+            (KnowledgeItem.reading_progress == None) | (KnowledgeItem.reading_progress < 100),
+        ).order_by(KnowledgeItem.created_at.desc()).limit(50)
+    ).all()
+    return items
+
+
 class BulkActionRequest(BaseModel):
     item_ids: list[uuid.UUID]
     action: str  # "tag", "archive", "delete", "favorite", "unfavorite", "enrich"
@@ -343,3 +435,37 @@ def bulk_action(
 
     db.commit()
     return {"processed": processed, "total": len(data.item_ids)}
+
+
+@router.post("/{item_id}/download-video")
+def download_item_video(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download video for a YouTube/TikTok item."""
+    item = db.exec(select(KnowledgeItem).where(KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id)).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.source_platform not in (SourcePlatform.youtube, SourcePlatform.tiktok):
+        raise HTTPException(status_code=400, detail="Video download only supported for YouTube and TikTok")
+    if not item.url:
+        raise HTTPException(status_code=400, detail="No URL to download")
+
+    from fourdpocket.config import get_settings
+    settings = get_settings()
+    output_dir = str(Path(settings.storage.base_path).expanduser() / str(current_user.id) / "videos")
+
+    from fourdpocket.workers.media_downloader import download_video
+    video_path = download_video(item.url, output_dir)
+
+    if not video_path:
+        raise HTTPException(status_code=500, detail="Video download failed")
+
+    media = list(item.media) if item.media else []
+    media.append({"type": "video", "path": video_path})
+    item.media = media
+    db.add(item)
+    db.commit()
+
+    return {"status": "downloaded", "path": video_path}

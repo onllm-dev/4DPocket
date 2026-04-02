@@ -247,6 +247,54 @@ def accept_share(
     return recipient
 
 
+@router.get("/history")
+def share_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get sharing history — what you've shared with whom."""
+    shares = db.exec(
+        select(Share).where(Share.owner_id == current_user.id).order_by(Share.created_at.desc())
+    ).all()
+
+    history = []
+    for share in shares:
+        recipients = db.exec(
+            select(ShareRecipient).where(ShareRecipient.share_id == share.id)
+        ).all()
+
+        # Get item/collection title
+        title = "Unknown"
+        if share.item_id:
+            item = db.get(KnowledgeItem, share.item_id)
+            title = item.title if item else "Deleted item"
+        elif share.collection_id:
+            from fourdpocket.models.collection import Collection
+            coll = db.get(Collection, share.collection_id)
+            title = coll.name if coll else "Deleted collection"
+
+        recipient_info = []
+        for r in recipients:
+            u = db.get(User, r.user_id)
+            recipient_info.append({
+                "user_id": str(r.user_id),
+                "display_name": u.display_name or u.username if u else "Unknown",
+                "role": r.role,
+                "accepted": r.accepted,
+            })
+
+        history.append({
+            "share_id": str(share.id),
+            "share_type": share.share_type,
+            "title": title,
+            "has_public_link": share.public_token is not None,
+            "recipients": recipient_info,
+            "created_at": share.created_at.isoformat() if share.created_at else None,
+        })
+
+    return history
+
+
 # Public link access — no authentication required
 
 public_router = APIRouter(prefix="/public", tags=["sharing"])

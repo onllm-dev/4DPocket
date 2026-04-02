@@ -12,6 +12,7 @@ import {
   Camera,
   Loader2,
   CheckSquare,
+  RefreshCw,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -38,7 +39,14 @@ export default function KnowledgeBase() {
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [showBulkTagInput, setShowBulkTagInput] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const qc = useQueryClient();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await qc.invalidateQueries({ queryKey: ["items"] });
+    setTimeout(() => setRefreshing(false), 500);
+  };
 
   const filters =
     platform !== "All" ? { source_platform: platform.toLowerCase() } : {};
@@ -93,6 +101,13 @@ export default function KnowledgeBase() {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={handleRefresh}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 text-gray-500 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
             onClick={() => {
               setSelecting((v) => !v);
               setSelected(new Set());
@@ -131,6 +146,13 @@ export default function KnowledgeBase() {
           </button>
         </div>
       </div>
+
+      {refreshing && (
+        <div className="flex items-center justify-center py-3">
+          <Loader2 className="w-5 h-5 animate-spin text-sky-600" />
+          <span className="text-sm text-gray-400 ml-2">Refreshing...</span>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap mb-6">
         {PLATFORMS.map((p) => (

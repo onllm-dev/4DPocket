@@ -129,6 +129,67 @@ def delete_tag(
     db.commit()
 
 
+@router.get("/suggestions/merge")
+def suggest_tag_merges(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Suggest tags that could be merged (similar names)."""
+    tags = db.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+    suggestions = []
+
+    from difflib import SequenceMatcher
+
+    seen = set()
+    for i, t1 in enumerate(tags):
+        for t2 in tags[i + 1 :]:
+            pair_key = (min(str(t1.id), str(t2.id)), max(str(t1.id), str(t2.id)))
+            if pair_key in seen:
+                continue
+            ratio = SequenceMatcher(None, t1.name.lower(), t2.name.lower()).ratio()
+            if 0.7 < ratio < 1.0:
+                seen.add(pair_key)
+                suggestions.append({
+                    "tag_a": {"id": str(t1.id), "name": t1.name, "usage_count": t1.usage_count},
+                    "tag_b": {"id": str(t2.id), "name": t2.name, "usage_count": t2.usage_count},
+                    "similarity": round(ratio, 2),
+                })
+
+    suggestions.sort(key=lambda x: x["similarity"], reverse=True)
+    return suggestions[:20]
+
+
+@router.post("/merge")
+def merge_tags(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Merge source tag into target tag. All items with source get target instead."""
+    source = db.exec(
+        select(Tag).where(Tag.id == body["source_tag_id"], Tag.user_id == current_user.id)
+    ).first()
+    target = db.exec(
+        select(Tag).where(Tag.id == body["target_tag_id"], Tag.user_id == current_user.id)
+    ).first()
+    if not source or not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+
+    source_links = db.exec(select(ItemTag).where(ItemTag.tag_id == source.id)).all()
+    for link in source_links:
+        existing = db.exec(
+            select(ItemTag).where(ItemTag.item_id == link.item_id, ItemTag.tag_id == target.id)
+        ).first()
+        if not existing:
+            db.add(ItemTag(item_id=link.item_id, tag_id=target.id, confidence=link.confidence))
+        db.delete(link)
+
+    target.usage_count = (target.usage_count or 0) + (source.usage_count or 0)
+    db.delete(source)
+    db.commit()
+    return {"status": "merged", "target_tag": target.name, "items_moved": len(source_links)}
+
+
 @router.get("/{tag_id}/items", response_model=list[ItemRead])
 def list_tag_items(
     tag_id: uuid.UUID,

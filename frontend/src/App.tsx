@@ -19,6 +19,9 @@ const Admin = lazy(() => import("./pages/Admin"));
 const SharedWithMe = lazy(() => import("./pages/SharedWithMe"));
 const Feed = lazy(() => import("./pages/Feed"));
 const PublicShare = lazy(() => import("./pages/PublicShare"));
+const Rules = lazy(() => import("./pages/Rules"));
+const Timeline = lazy(() => import("./pages/Timeline"));
+const Highlights = lazy(() => import("./pages/Highlights"));
 
 function LoadingFallback() {
   return (
@@ -60,6 +63,9 @@ export default function App() {
           <Route path="/admin" element={<SuspenseWrap><Admin /></SuspenseWrap>} />
           <Route path="/shared" element={<SuspenseWrap><SharedWithMe /></SuspenseWrap>} />
           <Route path="/feed" element={<SuspenseWrap><Feed /></SuspenseWrap>} />
+          <Route path="/rules" element={<SuspenseWrap><Rules /></SuspenseWrap>} />
+          <Route path="/timeline" element={<SuspenseWrap><Timeline /></SuspenseWrap>} />
+          <Route path="/highlights" element={<SuspenseWrap><Highlights /></SuspenseWrap>} />
         </Route>
       </Route>
 

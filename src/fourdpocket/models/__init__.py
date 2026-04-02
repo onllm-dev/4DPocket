@@ -12,19 +12,25 @@ from fourdpocket.models.rule import Rule
 from fourdpocket.models.share import Share, ShareRecipient
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
+from fourdpocket.models.highlight import Highlight
+from fourdpocket.models.rss_feed import RSSFeed
+from fourdpocket.models.saved_filter import SavedFilter
 
 __all__ = [
     "Collection",
     "CollectionItem",
     "Comment",
     "Embedding",
+    "Highlight",
     "InstanceSettings",
     "ItemTag",
     "ItemType",
     "KnowledgeFeed",
     "KnowledgeItem",
     "Note",
+    "RSSFeed",
     "Rule",
+    "SavedFilter",
     "Share",
     "ShareMode",
     "ShareRecipient",

@@ -232,6 +232,25 @@ def reorder_collection_items(
     return {"status": "reordered"}
 
 
+@router.get("/{collection_id}/smart-items")
+def get_smart_collection_items(
+    collection_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get items matching a smart collection's query."""
+    collection = db.get(Collection, collection_id)
+    if not collection or collection.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+    if not collection.is_smart or not collection.smart_query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart collection")
+
+    from fourdpocket.search.sqlite_fts import search
+
+    results = search(db, collection.smart_query, user_id=current_user.id, limit=50)
+    return results
+
+
 @router.get("/{collection_id}/items", response_model=list[ItemRead])
 def list_collection_items(
     collection_id: uuid.UUID,
@@ -251,3 +270,50 @@ def list_collection_items(
         .order_by(col(CollectionItem.position).asc())
     ).all()
     return items
+
+
+@router.get("/{collection_id}/rss")
+def get_collection_rss(
+    collection_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate an RSS feed XML for a collection."""
+    from fastapi.responses import Response
+
+    collection = db.exec(
+        select(Collection).where(Collection.id == collection_id, Collection.user_id == current_user.id)
+    ).first()
+    if not collection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+
+    # Get collection items
+    coll_items = db.exec(
+        select(CollectionItem).where(CollectionItem.collection_id == collection.id)
+        .order_by(CollectionItem.position)
+    ).all()
+    item_ids = [ci.item_id for ci in coll_items]
+    items = db.exec(select(KnowledgeItem).where(KnowledgeItem.id.in_(item_ids))).all() if item_ids else []
+
+    # Build RSS XML
+    rss_items = ""
+    for item in items:
+        pub_date = item.created_at.strftime("%a, %d %b %Y %H:%M:%S +0000") if item.created_at else ""
+        rss_items += f"""    <item>
+      <title><![CDATA[{item.title or "Untitled"}]]></title>
+      <link>{item.url or ""}</link>
+      <description><![CDATA[{item.summary or item.description or ""}]]></description>
+      <pubDate>{pub_date}</pubDate>
+      <guid>{item.id}</guid>
+    </item>\n"""
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{collection.name}</title>
+    <description>{collection.description or ""}</description>
+    <lastBuildDate>{datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")}</lastBuildDate>
+{rss_items}  </channel>
+</rss>"""
+
+    return Response(content=xml, media_type="application/rss+xml")
