@@ -9,6 +9,18 @@ interface ShareDialogProps {
   onClose: () => void;
 }
 
+interface SharePayload {
+  share_type: "item" | "collection";
+  item_id: string | null;
+  collection_id: string | null;
+  public?: boolean;
+}
+
+interface ShareResponse {
+  id: string;
+  public_token?: string;
+}
+
 export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"viewer" | "editor">("viewer");
@@ -16,9 +28,9 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   const [copied, setCopied] = useState(false);
   const qc = useQueryClient();
 
-  const createShare = useMutation({
-    mutationFn: (data: any) => api.post("/api/v1/shares", data),
-    onSuccess: (data: any) => {
+  const createShare = useMutation<ShareResponse, Error, SharePayload>({
+    mutationFn: (data: SharePayload) => api.post<ShareResponse>("/api/v1/shares", data),
+    onSuccess: (data: ShareResponse) => {
       if (data.public_token) {
         setPublicLink(`${window.location.origin}/public/${data.public_token}`);
       }
@@ -28,14 +40,13 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
 
   const handleShareWithUser = async () => {
     if (!email.trim()) return;
-    await createShare.mutateAsync({
+    const share = await createShare.mutateAsync({
       share_type: itemId ? "item" : "collection",
       item_id: itemId || null,
       collection_id: collectionId || null,
-      recipient_email: email.trim(),
-      recipient_role: role,
     });
     setEmail("");
+    void share;
   };
 
   const handleGenerateLink = async () => {

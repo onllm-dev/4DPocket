@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlmodel import Session, select, func, col, delete as sql_delete
+from sqlmodel import Session, col, select
+from sqlmodel import delete as sql_delete
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.base import ItemType, SourcePlatform
@@ -266,20 +267,22 @@ def remove_tag_from_item(
 
 @router.get("/timeline")
 def get_timeline(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Get items grouped by date for timeline view."""
-    from datetime import timedelta
     from collections import defaultdict
+    from datetime import timedelta
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
     items = db.exec(
         select(KnowledgeItem).where(
             KnowledgeItem.user_id == user.id,
             KnowledgeItem.created_at >= since,
-        ).order_by(KnowledgeItem.created_at.desc())
+        ).order_by(KnowledgeItem.created_at.desc()).offset(offset).limit(limit)
     ).all()
 
     # Group by date
@@ -361,7 +364,11 @@ def get_related_items(
                     "id": str(related_item.id),
                     "title": related_item.title,
                     "url": related_item.url,
-                    "source_platform": related_item.source_platform.value if related_item.source_platform else "generic",
+                    "source_platform": (
+                        related_item.source_platform.value
+                        if related_item.source_platform
+                        else "generic"
+                    ),
                     "score": r.score,
                     "signals": r.signals,
                 })
@@ -372,15 +379,19 @@ def get_related_items(
 
 @router.patch("/{item_id}/reading-progress")
 def update_reading_progress(
-    item_id: str,
+    item_id: uuid.UUID,
     body: dict,  # {"progress": 0-100}
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Update reading progress for read-it-later mode."""
-    item = db.exec(select(KnowledgeItem).where(KnowledgeItem.id == item_id, KnowledgeItem.user_id == user.id)).first()
+    item = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id, KnowledgeItem.user_id == user.id
+        )
+    ).first()
     if not item:
-        raise HTTPException(404)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     progress = max(0, min(100, body.get("progress", 0)))
     item.reading_progress = progress
     db.commit()
@@ -397,8 +408,9 @@ def get_reading_queue(
         select(KnowledgeItem).where(
             KnowledgeItem.user_id == user.id,
             KnowledgeItem.content.is_not(None),
-            KnowledgeItem.is_archived == False,
-            (KnowledgeItem.reading_progress == None) | (KnowledgeItem.reading_progress < 100),
+            not KnowledgeItem.is_archived,
+            (KnowledgeItem.reading_progress.is_(None))
+            | (KnowledgeItem.reading_progress < 100),
         ).order_by(KnowledgeItem.created_at.desc()).limit(50)
     ).all()
     return items
@@ -467,17 +479,29 @@ def download_item_video(
     current_user: User = Depends(get_current_user),
 ):
     """Download video for a YouTube/TikTok item."""
-    item = db.exec(select(KnowledgeItem).where(KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id)).first()
+    item = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id
+        )
+    ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     if item.source_platform not in (SourcePlatform.youtube, SourcePlatform.tiktok):
-        raise HTTPException(status_code=400, detail="Video download only supported for YouTube and TikTok")
+        raise HTTPException(
+            status_code=400,
+            detail="Video download only supported for YouTube and TikTok",
+        )
     if not item.url:
         raise HTTPException(status_code=400, detail="No URL to download")
 
     from fourdpocket.config import get_settings
+
     settings = get_settings()
-    output_dir = str(Path(settings.storage.base_path).expanduser() / str(current_user.id) / "videos")
+    output_dir = str(
+        Path(settings.storage.base_path).expanduser()
+        / str(current_user.id)
+        / "videos"
+    )
 
     from fourdpocket.workers.media_downloader import download_video
     video_path = download_video(item.url, output_dir)

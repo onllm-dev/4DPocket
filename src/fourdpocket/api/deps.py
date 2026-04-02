@@ -2,17 +2,25 @@
 
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
-from fourdpocket.api.auth_utils import decode_access_token, hash_password, create_access_token
+from fourdpocket.api.auth_utils import decode_access_token, hash_password
 from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_session
-from fourdpocket.models.user import User
 from fourdpocket.models.base import UserRole
+from fourdpocket.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+
+def _get_token_from_request(
+    token: str | None = Depends(oauth2_scheme),
+    cookie_token: str | None = Cookie(default=None, alias="4dp_token"),
+) -> str | None:
+    """Support token from either Bearer header or httpOnly cookie."""
+    return token or cookie_token
 
 
 def get_db():
@@ -20,7 +28,7 @@ def get_db():
 
 
 def get_current_user(
-    token: str | None = Depends(oauth2_scheme),
+    token: str | None = Depends(_get_token_from_request),
     db: Session = Depends(get_db),
 ) -> User:
     settings = get_settings()
@@ -51,10 +59,10 @@ def get_current_user(
 
     try:
         payload = decode_access_token(token)
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
+            detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

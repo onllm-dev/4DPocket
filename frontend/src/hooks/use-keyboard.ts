@@ -8,10 +8,14 @@ export function useKeyboardShortcuts() {
     const handler = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input
       const target = e.target as HTMLElement;
+      const tagName = target.tagName.toUpperCase();
+      const type = target.getAttribute("type") || "";
       if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT" ||
+        target.isContentEditable ||
+        (tagName === "INPUT" && (type === "search" || type === "email" || type === "text"))
       ) {
         return;
       }

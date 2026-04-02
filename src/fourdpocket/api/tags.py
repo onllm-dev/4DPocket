@@ -4,7 +4,8 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select, col
+from pydantic import BaseModel
+from sqlmodel import Session, col, select
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.item import ItemRead, KnowledgeItem
@@ -59,11 +60,15 @@ def create_tag(
 def list_tags(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     tags = db.exec(
         select(Tag)
         .where(Tag.user_id == current_user.id)
         .order_by(col(Tag.usage_count).desc())
+        .offset(offset)
+        .limit(limit)
     ).all()
     return tags
 
@@ -159,18 +164,23 @@ def suggest_tag_merges(
     return suggestions[:20]
 
 
+class TagMergeRequest(BaseModel):
+    source_tag_id: uuid.UUID
+    target_tag_id: uuid.UUID
+
+
 @router.post("/merge")
 def merge_tags(
-    body: dict,
+    body: TagMergeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Merge source tag into target tag. All items with source get target instead."""
     source = db.exec(
-        select(Tag).where(Tag.id == body["source_tag_id"], Tag.user_id == current_user.id)
+        select(Tag).where(Tag.id == body.source_tag_id, Tag.user_id == current_user.id)
     ).first()
     target = db.exec(
-        select(Tag).where(Tag.id == body["target_tag_id"], Tag.user_id == current_user.id)
+        select(Tag).where(Tag.id == body.target_tag_id, Tag.user_id == current_user.id)
     ).first()
     if not source or not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")

@@ -50,11 +50,11 @@ export default function Register() {
       await login.mutateAsync({ email, password });
       navigate("/");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Registration failed";
-      if (message.includes("409")) {
+      const isConflict = err instanceof Error && err.message.includes("409");
+      if (isConflict) {
         setError("Email or username already registered");
       } else {
-        setError(message);
+        setError(err instanceof Error ? err.message : "Registration failed");
       }
     }
   };

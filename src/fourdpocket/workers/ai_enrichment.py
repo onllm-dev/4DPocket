@@ -35,16 +35,17 @@ def enrich_item(item_id: str, user_id: str) -> dict:
 
         uid = uuid.UUID(user_id)
 
-        # Step 1: Auto-tag
+        # Step 1: Auto-tag (content sanitized before LLM call)
         try:
+            from fourdpocket.ai.sanitizer import sanitize_for_prompt
             from fourdpocket.ai.tagger import auto_tag_item
 
             tags = auto_tag_item(
                 item_id=item.id,
                 user_id=uid,
-                title=item.title or "",
-                content=item.content,
-                description=item.description,
+                title=sanitize_for_prompt(item.title or "", max_length=2000),
+                content=sanitize_for_prompt(item.content or "", max_length=4000),
+                description=sanitize_for_prompt(item.description or "", max_length=1000),
                 db=db,
             )
             results["steps"]["tagging"] = {
@@ -104,13 +105,22 @@ def enrich_item(item_id: str, user_id: str) -> dict:
                         user_id=uid,
                         embedding=embedding,
                         metadata={
-                            "item_type": item.item_type.value if item.item_type else "",
-                            "source_platform": item.source_platform.value if item.source_platform else "",
+                            "item_type": (
+                                item.item_type.value if item.item_type else ""
+                            ),
+                            "source_platform": (
+                                item.source_platform.value
+                                if item.source_platform
+                                else ""
+                            ),
                         },
                     )
                     results["steps"]["embedding"] = {"status": "success"}
                 else:
-                    results["steps"]["embedding"] = {"status": "skipped", "reason": "empty embedding"}
+                    results["steps"]["embedding"] = {
+                        "status": "skipped",
+                        "reason": "empty embedding",
+                    }
             else:
                 results["steps"]["embedding"] = {"status": "skipped", "reason": "no content"}
 

@@ -27,10 +27,13 @@ def create_access_token(user_id: uuid.UUID, expires_delta: timedelta | None = No
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.auth.token_expire_minutes)
 
-    expire = datetime.now(timezone.utc) + expires_delta
+    now = datetime.now(timezone.utc)
+    expire = now + expires_delta
     payload = {
         "sub": str(user_id),
         "exp": expire,
+        "iat": now,
+        "iss": "4dpocket",
     }
     return jwt.encode(payload, settings.auth.secret_key, algorithm=settings.auth.algorithm)
 

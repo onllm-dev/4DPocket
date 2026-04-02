@@ -1,7 +1,9 @@
-import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck } from "lucide-react";
+import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
+import { useCurrentUser } from "@/hooks/use-auth";
 
 interface AdminUser {
   id: string;
@@ -22,15 +24,21 @@ interface InstanceSettingsData {
 }
 
 export default function Admin() {
+  const navigate = useNavigate();
+  const { data: currentUser } = useCurrentUser();
+
+  // All hooks called unconditionally before any returns (React rules of hooks)
   const qc = useQueryClient();
   const { data: users, isLoading: usersLoading } = useQuery<AdminUser[]>({
     queryKey: ["admin", "users"],
     queryFn: () => api.get("/api/v1/admin/users"),
+    enabled: !!currentUser && currentUser.role === "admin",
   });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<InstanceSettingsData>({
     queryKey: ["admin", "settings"],
     queryFn: () => api.get("/api/v1/admin/settings"),
+    enabled: !!currentUser && currentUser.role === "admin",
   });
 
   const updateSettings = useMutation({
@@ -44,6 +52,27 @@ export default function Admin() {
       api.patch(`/api/v1/admin/users/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
+
+  // Role guard: redirect non-admins
+  if (currentUser && currentUser.role !== "admin") {
+    return (
+      <div className="animate-fade-in max-w-4xl mx-auto px-4 md:px-6 py-16 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <ShieldX className="w-16 h-16 text-red-400" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Access Denied</h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            You need admin privileges to access this page.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 cursor-pointer"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto px-4 md:px-6">

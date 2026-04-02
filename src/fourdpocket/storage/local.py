@@ -18,7 +18,7 @@ class LocalStorage:
         """Resolve path and ensure it stays within the storage directory."""
         resolved = (self._base / relative_path).resolve()
         if not str(resolved).startswith(str(self._base.resolve())):
-            raise ValueError("Path traversal detected")
+            raise PermissionError("Path traversal detected: access denied")
         return resolved
 
     def _user_path(self, user_id: uuid.UUID, category: str) -> Path:

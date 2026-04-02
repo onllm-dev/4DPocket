@@ -3,8 +3,21 @@ import { Share2, Inbox } from "lucide-react";
 import { api } from "@/api/client";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 
+type SharedItem = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  url: string | null;
+  source_platform: string;
+  item_type: string;
+  summary: string | null;
+  media: Array<{ type: string; url: string; role: string }>;
+  is_favorite: boolean;
+  created_at: string;
+};
+
 export default function SharedWithMe() {
-  const { data: items, isLoading } = useQuery<any[]>({
+  const { data: items, isLoading } = useQuery<SharedItem[]>({
     queryKey: ["shared-with-me"],
     queryFn: () => api.get("/api/v1/shared-with-me"),
   });
@@ -30,7 +43,7 @@ export default function SharedWithMe() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((item: any) => (
+          {items.map((item) => (
             <BookmarkCard key={item.id} item={item} variant="grid" />
           ))}
         </div>

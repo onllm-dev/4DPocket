@@ -1,6 +1,6 @@
 """Automation rules CRUD endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -37,9 +37,20 @@ class RuleRead(BaseModel):
 def list_rules(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ) -> list[RuleRead]:
-    rules = db.exec(select(Rule).where(Rule.user_id == user.id)).all()
-    return [RuleRead(id=str(r.id), name=r.name, condition=r.condition, action=r.action, is_active=r.is_active) for r in rules]
+    rules = db.exec(select(Rule).where(Rule.user_id == user.id).offset(offset).limit(limit)).all()
+    return [
+        RuleRead(
+            id=str(r.id),
+            name=r.name,
+            condition=r.condition,
+            action=r.action,
+            is_active=r.is_active,
+        )
+        for r in rules
+    ]
 
 
 @router.post("", status_code=201)
@@ -48,11 +59,23 @@ def create_rule(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RuleRead:
-    rule = Rule(user_id=user.id, name=body.name, condition=body.condition, action=body.action, is_active=body.is_active)
+    rule = Rule(
+        user_id=user.id,
+        name=body.name,
+        condition=body.condition,
+        action=body.action,
+        is_active=body.is_active,
+    )
     db.add(rule)
     db.commit()
     db.refresh(rule)
-    return RuleRead(id=str(rule.id), name=rule.name, condition=rule.condition, action=rule.action, is_active=rule.is_active)
+    return RuleRead(
+        id=str(rule.id),
+        name=rule.name,
+        condition=rule.condition,
+        action=rule.action,
+        is_active=rule.is_active,
+    )
 
 
 @router.patch("/{rule_id}")
@@ -69,7 +92,13 @@ def update_rule(
         setattr(rule, field, value)
     db.commit()
     db.refresh(rule)
-    return RuleRead(id=str(rule.id), name=rule.name, condition=rule.condition, action=rule.action, is_active=rule.is_active)
+    return RuleRead(
+        id=str(rule.id),
+        name=rule.name,
+        condition=rule.condition,
+        action=rule.action,
+        is_active=rule.is_active,
+    )
 
 
 @router.delete("/{rule_id}", status_code=204)

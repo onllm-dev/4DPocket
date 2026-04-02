@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlmodel import Session, select, col
+from sqlmodel import Session, col, select
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.collection import (
@@ -43,11 +43,15 @@ def create_collection(
 def list_collections(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     collections = db.exec(
         select(Collection)
         .where(Collection.user_id == current_user.id)
         .order_by(col(Collection.created_at).desc())
+        .offset(offset)
+        .limit(limit)
     ).all()
     return collections
 
@@ -237,17 +241,23 @@ def get_smart_collection_items(
     collection_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     """Get items matching a smart collection's query."""
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     if not collection.is_smart or not collection.smart_query:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart collection")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart collection"
+        )
 
     from fourdpocket.search.sqlite_fts import search
 
-    results = search(db, collection.smart_query, user_id=current_user.id, limit=50)
+    results = search(
+        db, collection.smart_query, user_id=current_user.id, limit=limit, offset=offset
+    )
     return results
 
 
@@ -256,6 +266,8 @@ def list_collection_items(
     collection_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -268,6 +280,8 @@ def list_collection_items(
         .join(CollectionItem, CollectionItem.item_id == KnowledgeItem.id)
         .where(CollectionItem.collection_id == collection_id)
         .order_by(col(CollectionItem.position).asc())
+        .offset(offset)
+        .limit(limit)
     ).all()
     return items
 
@@ -282,7 +296,9 @@ def get_collection_rss(
     from fastapi.responses import Response
 
     collection = db.exec(
-        select(Collection).where(Collection.id == collection_id, Collection.user_id == current_user.id)
+        select(Collection).where(
+            Collection.id == collection_id, Collection.user_id == current_user.id
+        )
     ).first()
     if not collection:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
@@ -293,12 +309,20 @@ def get_collection_rss(
         .order_by(CollectionItem.position)
     ).all()
     item_ids = [ci.item_id for ci in coll_items]
-    items = db.exec(select(KnowledgeItem).where(KnowledgeItem.id.in_(item_ids))).all() if item_ids else []
+    items = (
+        db.exec(select(KnowledgeItem).where(KnowledgeItem.id.in_(item_ids))).all()
+        if item_ids
+        else []
+    )
 
     # Build RSS XML
     rss_items = ""
     for item in items:
-        pub_date = item.created_at.strftime("%a, %d %b %Y %H:%M:%S +0000") if item.created_at else ""
+        pub_date = (
+            item.created_at.strftime("%a, %d %b %Y %H:%M:%S +0000")
+            if item.created_at
+            else ""
+        )
         rss_items += f"""    <item>
       <title><![CDATA[{item.title or "Untitled"}]]></title>
       <link>{item.url or ""}</link>
@@ -312,7 +336,8 @@ def get_collection_rss(
   <channel>
     <title>{collection.name}</title>
     <description>{collection.description or ""}</description>
-    <lastBuildDate>{datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")}</lastBuildDate>
+    <lastBuildDate>{datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")}
+</lastBuildDate>
 {rss_items}  </channel>
 </rss>"""
 

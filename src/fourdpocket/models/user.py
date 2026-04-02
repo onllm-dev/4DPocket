@@ -1,5 +1,6 @@
 """User model and schemas."""
 
+import re
 import uuid
 from datetime import datetime
 
@@ -32,16 +33,22 @@ class User(SQLModel, table=True):
 
 
 class UserCreate(BaseModel):
-    email: str
+    email: EmailStr
     username: str
     password: str
     display_name: str | None = None
 
     @field_validator("password")
     @classmethod
-    def password_min_length(cls, v: str) -> str:
+    def password_complexity(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
         return v
 
 

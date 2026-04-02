@@ -45,8 +45,12 @@ function applyTheme(theme: Theme) {
 
 // Apply theme on load
 if (typeof window !== "undefined") {
-  const stored = JSON.parse(
-    localStorage.getItem("4dp-ui-preferences") || "{}"
-  );
-  applyTheme(stored?.state?.theme || "system");
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem("4dp-ui-preferences") || "{}"
+    );
+    applyTheme(stored?.state?.theme || "system");
+  } catch {
+    applyTheme("system");
+  }
 }

@@ -6,7 +6,7 @@ from sqlmodel import Session, col, select
 
 from fourdpocket.models.feed import KnowledgeFeed
 from fourdpocket.models.item import KnowledgeItem
-from fourdpocket.models.share import Share
+from fourdpocket.models.share import Share, ShareRecipient
 
 
 def subscribe(
@@ -47,7 +47,7 @@ def unsubscribe(
 def get_feed_items(
     db: Session, subscriber_id: uuid.UUID, limit: int = 20, offset: int = 0
 ) -> list[KnowledgeItem]:
-    """Get items from users the subscriber follows."""
+    """Get items from users the subscriber follows, including private shares they've been given."""
     publisher_ids = db.exec(
         select(KnowledgeFeed.publisher_id).where(
             KnowledgeFeed.subscriber_id == subscriber_id
@@ -57,18 +57,24 @@ def get_feed_items(
     if not publisher_ids:
         return []
 
-    public_item_ids = select(Share.item_id).where(
+    # Items from publishers that are either public shares OR
+    # private shares with this user as recipient
+    accessible_shares = select(Share.item_id).where(
         Share.owner_id.in_(publisher_ids),
         Share.item_id.is_not(None),
-        Share.public_token.is_not(None),
+    ).where(
+        (Share.public_token.is_not(None)) |  # public shares
+        (Share.id.in_(  # OR private shares this user is a recipient of
+            select(ShareRecipient.share_id).where(ShareRecipient.user_id == subscriber_id)
+        ))
     )
 
     items = db.exec(
         select(KnowledgeItem)
         .where(
             KnowledgeItem.user_id.in_(publisher_ids),
-            KnowledgeItem.is_archived == False,
-            KnowledgeItem.id.in_(public_item_ids),
+            KnowledgeItem.is_archived.is_(False),
+            KnowledgeItem.id.in_(accessible_shares),
         )
         .order_by(col(KnowledgeItem.created_at).desc())
         .offset(offset)

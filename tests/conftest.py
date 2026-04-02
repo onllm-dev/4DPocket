@@ -74,13 +74,13 @@ def auth_headers_fixture(client):
         json={
             "email": "test@example.com",
             "username": "testuser",
-            "password": "testpass123",
+            "password": "TestPass123!",
             "display_name": "Test User",
         },
     )
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "test@example.com", "password": "testpass123"},
+        data={"username": "test@example.com", "password": "TestPass123!"},
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -94,13 +94,13 @@ def second_user_headers_fixture(client):
         json={
             "email": "user2@example.com",
             "username": "seconduser",
-            "password": "testpass456",
+            "password": "TestPass456!",
             "display_name": "Second User",
         },
     )
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "user2@example.com", "password": "testpass456"},
+        data={"username": "user2@example.com", "password": "TestPass456!"},
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

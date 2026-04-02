@@ -1,13 +1,13 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { getToken } from "@/api/client";
+import { isLoggedIn } from "@/api/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 export function AuthGuard() {
-  const token = getToken();
+  const loggedIn = isLoggedIn();
   const { isLoading, isError } = useCurrentUser();
 
-  if (!token) {
+  if (!loggedIn) {
     return <Navigate to="/login" replace />;
   }
 

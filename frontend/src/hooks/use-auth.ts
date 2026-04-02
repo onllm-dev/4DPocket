@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getToken, clearToken } from "@/api/client";
+import { api, isLoggedIn } from "@/api/client";
 
 interface User {
   id: string;
@@ -17,8 +17,8 @@ export function useCurrentUser() {
   return useQuery<User>({
     queryKey: ["currentUser"],
     queryFn: () => api.get("/api/v1/auth/me"),
-    enabled: !!getToken(),
-    retry: false,
+    enabled: isLoggedIn(),
+    retry: (failureCount, err) => failureCount < 1 && !(err instanceof Error && err.message.startsWith("401")),
   });
 }
 
@@ -26,8 +26,7 @@ export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const token = await api.login(data.email, data.password);
-      return token;
+      await api.login(data.email, data.password);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["currentUser"] });
@@ -45,9 +44,10 @@ export function useRegister() {
 export function useLogout() {
   const qc = useQueryClient();
   return () => {
-    clearToken();
-    qc.clear();
-    window.location.href = "/login";
+    api.logout().finally(() => {
+      qc.clear();
+      window.location.href = "/login";
+    });
   };
 }
 
