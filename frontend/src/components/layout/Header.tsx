@@ -41,6 +41,8 @@ export function Header() {
         <span>Add</span>
       </button>
 
+      <div className="flex-1" />
+
       <button
         onClick={cycleTheme}
         className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer text-gray-600 dark:text-gray-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
