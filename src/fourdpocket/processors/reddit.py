@@ -1,4 +1,4 @@
-"""Reddit processor — extract posts and comments via JSON API."""
+"""Reddit processor - extract posts and comments via JSON API."""
 
 import json
 import logging

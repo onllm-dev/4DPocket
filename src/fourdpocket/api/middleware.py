@@ -1,4 +1,4 @@
-"""API middleware — rate limiting and request ID."""
+"""API middleware - rate limiting and request ID."""
 
 import time
 import uuid

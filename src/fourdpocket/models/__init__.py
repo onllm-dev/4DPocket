@@ -1,4 +1,4 @@
-"""Models package — import all models for Alembic discovery."""
+"""Models package - import all models for Alembic discovery."""
 
 from fourdpocket.models.base import ItemType, ShareMode, SourcePlatform, UserRole
 from fourdpocket.models.collection import Collection, CollectionItem

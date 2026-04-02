@@ -25,7 +25,7 @@ def run_backup() -> str | None:
     # Only backup SQLite databases
     db_url = settings.database.url
     if "sqlite" not in db_url:
-        logger.info("Backup skipped — only SQLite databases are backed up automatically")
+        logger.info("Backup skipped - only SQLite databases are backed up automatically")
         return None
 
     # Extract DB path from URL

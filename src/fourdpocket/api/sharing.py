@@ -253,7 +253,7 @@ def share_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get sharing history — what you've shared with whom."""
+    """Get sharing history - what you've shared with whom."""
     shares = db.exec(
         select(Share).where(Share.owner_id == current_user.id).order_by(Share.created_at.desc())
     ).all()
@@ -296,7 +296,7 @@ def share_history(
     return history
 
 
-# Public link access — no authentication required
+# Public link access - no authentication required
 
 public_router = APIRouter(prefix="/public", tags=["sharing"])
 

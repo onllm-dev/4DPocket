@@ -128,7 +128,7 @@ def detect_knowledge_gaps(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Detect potential knowledge gaps — topics with few items that could use more."""
+    """Detect potential knowledge gaps - topics with few items that could use more."""
     from fourdpocket.models.tag import Tag, ItemTag
     from collections import Counter
 
@@ -160,7 +160,7 @@ def detect_knowledge_gaps(
                 "count": tag.usage_count,
                 "parent_tag": None,
                 "parent_count": None,
-                "suggestion": f"You have {tag.usage_count} items tagged '{tag.name}' — consider creating sub-tags for better organization",
+                "suggestion": f"You have {tag.usage_count} items tagged '{tag.name}' - consider creating sub-tags for better organization",
             })
 
     return gaps[:20]

@@ -1,4 +1,4 @@
-"""Substack processor — extract articles via httpx + readability."""
+"""Substack processor - extract articles via httpx + readability."""
 
 import logging
 import re

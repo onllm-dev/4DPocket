@@ -1,4 +1,4 @@
-"""Processors package — import all processors to trigger registration."""
+"""Processors package - import all processors to trigger registration."""
 
 from fourdpocket.processors.generic_url import GenericURLProcessor  # noqa: F401
 from fourdpocket.processors.github import GitHubProcessor  # noqa: F401

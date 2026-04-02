@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>Self-hosted, AI-powered personal knowledge base</strong><br/>
-  Inspired by Doraemon's 4D Pocket — a magical, bottomless pocket where anything you've ever saved is instantly retrievable.
+  Inspired by Doraemon's 4D Pocket - a magical, bottomless pocket where anything you've ever saved is instantly retrievable.
 </p>
 
 <p align="center">
@@ -28,9 +28,9 @@
 
 ## The Idea
 
-Everyone saves things — bookmarks, articles, videos, code snippets, social media posts — across dozens of platforms. Then can never find them again.
+Everyone saves things - bookmarks, articles, videos, code snippets, social media posts - across dozens of platforms. Then can never find them again.
 
-**4DPocket** is different. It's not a bookmark manager — it's a **magic library**. Throw anything in — URLs, notes, YouTube videos, Reddit threads, GitHub repos, tweets, PDFs, images — and the pocket **understands** it, **connects** it to what you already know, and **serves** it back when you need it.
+**4DPocket** is different. It's not a bookmark manager - it's a **magic library**. Throw anything in - URLs, notes, YouTube videos, Reddit threads, GitHub repos, tweets, PDFs, images - and the pocket **understands** it, **connects** it to what you already know, and **serves** it back when you need it.
 
 Just like Doraemon reaches into his 4D Pocket and pulls out the perfect gadget for any situation, you reach into yours and pull out exactly the knowledge you need.
 
@@ -42,16 +42,16 @@ Just like Doraemon reaches into his 4D Pocket and pulls out the perfect gadget f
 | **Retrieval-First** | Everything is designed around getting things *out* fast. Search is instant, smart, and forgiving. |
 | **Local-First** | Runs entirely on your machine by default. Your data never leaves unless you choose external APIs. |
 | **Zero-Friction Capture** | Save anything in 1-2 actions. Paste a URL and everything is handled automatically. |
-| **Smart by Default** | AI auto-tags, auto-summarizes, auto-connects. You don't organize — the pocket organizes itself. |
+| **Smart by Default** | AI auto-tags, auto-summarizes, auto-connects. You don't organize - the pocket organizes itself. |
 | **Private by Default** | Each user's knowledge base is their own. Sharing is explicit, granular, and revocable. |
 
 ---
 
 ## Features
 
-### Universal Capture — 17 Platform Processors
+### Universal Capture - 17 Platform Processors
 
-Save a URL and 4DPocket automatically detects the platform and deeply extracts content — not just metadata, but the actual knowledge.
+Save a URL and 4DPocket automatically detects the platform and deeply extracts content - not just metadata, but the actual knowledge.
 
 | Platform | What's Extracted |
 |----------|-----------------|
@@ -75,63 +75,63 @@ Save a URL and 4DPocket automatically detects the platform and deeply extracts c
 
 ### AI-Powered Smart Organization
 
-The brain of 4DPocket — what transforms it from a link saver into a knowledge base that thinks.
+The brain of 4DPocket - what transforms it from a link saver into a knowledge base that thinks.
 
-- **Auto-Tagging** — AI reads extracted content and assigns tags with confidence scores (0-1). High-confidence tags are applied automatically, lower ones are suggested.
-- **Smart Tag Hierarchy** — Tags auto-organize into parent-child trees. `python` nests under `programming/python`, `react` under `frontend/react`.
-- **Auto-Summarization** — Every saved item gets a 2-3 sentence AI summary.
-- **Related Items** — The moment you save something, 4DPocket shows you what's related in your library using semantic similarity (0.5 weight), shared tags (0.3), and same-source analysis (0.2).
-- **Multi-Provider AI** — Works with Ollama (local), Groq, or NVIDIA APIs. No vendor lock-in.
-- **Prompt Injection Protection** — All user content is sanitized before reaching AI models. XML delimiters isolate user data from system instructions.
+- **Auto-Tagging** - AI reads extracted content and assigns tags with confidence scores (0-1). High-confidence tags are applied automatically, lower ones are suggested.
+- **Smart Tag Hierarchy** - Tags auto-organize into parent-child trees. `python` nests under `programming/python`, `react` under `frontend/react`.
+- **Auto-Summarization** - Every saved item gets a 2-3 sentence AI summary.
+- **Related Items** - The moment you save something, 4DPocket shows you what's related in your library using semantic similarity (0.5 weight), shared tags (0.3), and same-source analysis (0.2).
+- **Multi-Provider AI** - Works with Ollama (local), Groq, or NVIDIA APIs. No vendor lock-in.
+- **Prompt Injection Protection** - All user content is sanitized before reaching AI models. XML delimiters isolate user data from system instructions.
 
 ### Powerful Search
 
-- **Full-Text Search** — SQLite FTS5 (zero-config) or Meilisearch (optional upgrade). Typo-tolerant, instant results.
-- **Semantic Search** — Vector similarity search using sentence-transformers + ChromaDB. Find "that article about React performance" even if those exact words aren't in the title.
-- **Search Filters** — Filter by platform, content type, tags, date ranges. Command palette (Cmd+K) for instant access.
+- **Full-Text Search** - SQLite FTS5 (zero-config) or Meilisearch (optional upgrade). Typo-tolerant, instant results.
+- **Semantic Search** - Vector similarity search using sentence-transformers + ChromaDB. Find "that article about React performance" even if those exact words aren't in the title.
+- **Search Filters** - Filter by platform, content type, tags, date ranges. Command palette (Cmd+K) for instant access.
 
 ### Multi-User Knowledge Bases
 
 Every user gets their own isolated pocket. Knowledge is private by default, shareable by choice.
 
-- **Per-User Isolation** — Items, tags, collections, AI enrichments are all scoped to the user.
-- **Selective Sharing** — Share individual items, entire collections, or tag-based groups with specific users.
-- **Public Links** — Generate public URLs for sharing outside your instance (with optional expiry).
-- **Knowledge Feeds** — Follow other users' public items. Their saves appear in your feed.
-- **Comments** — Discuss shared items with collaborators.
-- **Roles** — Admin (full instance management), User (full knowledge base), Guest (view shared only).
+- **Per-User Isolation** - Items, tags, collections, AI enrichments are all scoped to the user.
+- **Selective Sharing** - Share individual items, entire collections, or tag-based groups with specific users.
+- **Public Links** - Generate public URLs for sharing outside your instance (with optional expiry).
+- **Knowledge Feeds** - Follow other users' public items. Their saves appear in your feed.
+- **Comments** - Discuss shared items with collaborators.
+- **Roles** - Admin (full instance management), User (full knowledge base), Guest (view shared only).
 
 ### Admin Control Panel
 
-- **User Management** — List, activate/deactivate, change roles for all users.
-- **Registration Control** — Toggle registration on/off, set mode (open/invite/disabled).
-- **Instance Settings** — Configure instance name, default user role, max users.
+- **User Management** - List, activate/deactivate, change roles for all users.
+- **Registration Control** - Toggle registration on/off, set mode (open/invite/disabled).
+- **Instance Settings** - Configure instance name, default user role, max users.
 
 ### Automation Rules
 
-- **Condition-Action Rules** — "If saved from reddit.com, auto-tag 'reddit' and add to 'Reddit Saves' collection."
-- **CRUD API** — Create, read, update, delete rules via REST API.
+- **Condition-Action Rules** - "If saved from reddit.com, auto-tag 'reddit' and add to 'Reddit Saves' collection."
+- **CRUD API** - Create, read, update, delete rules via REST API.
 
 ### Import & Export
 
-- **Import From** — Chrome bookmarks (HTML), Pocket export (HTML), generic JSON.
-- **Export To** — JSON, HTML bookmarks (Netscape format), CSV, Markdown.
+- **Import From** - Chrome bookmarks (HTML), Pocket export (HTML), generic JSON.
+- **Export To** - JSON, HTML bookmarks (Netscape format), CSV, Markdown.
 
-### PWA — Works Everywhere
+### PWA - Works Everywhere
 
 4DPocket is a Progressive Web App. Install it on any device.
 
-- **Installable** — Add to home screen on Android, iOS, desktop.
-- **Offline Support** — Service worker caches static assets for offline access.
-- **Share Target** — Share URLs directly from your phone's share sheet to 4DPocket.
-- **Responsive** — Optimized for mobile (bottom nav, touch-friendly), tablet (collapsible sidebar), and desktop (full sidebar, keyboard shortcuts).
-- **Dark Mode** — System-aware with manual toggle.
+- **Installable** - Add to home screen on Android, iOS, desktop.
+- **Offline Support** - Service worker caches static assets for offline access.
+- **Share Target** - Share URLs directly from your phone's share sheet to 4DPocket.
+- **Responsive** - Optimized for mobile (bottom nav, touch-friendly), tablet (collapsible sidebar), and desktop (full sidebar, keyboard shortcuts).
+- **Dark Mode** - System-aware with manual toggle.
 
 ### Keyboard-First UX
 
-- **Command Palette** — `Cmd+K` / `Ctrl+K` to search anything, navigate pages, find items instantly.
-- **Shortcuts** — `n` to add new item, `/` to open search.
-- **Bulk Actions** — Select multiple items, then bulk tag, archive, or delete.
+- **Command Palette** - `Cmd+K` / `Ctrl+K` to search anything, navigate pages, find items instantly.
+- **Shortcuts** - `n` to add new item, `/` to open search.
+- **Bulk Actions** - Select multiple items, then bulk tag, archive, or delete.
 
 ---
 
@@ -154,7 +154,7 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173 — no login needed in single-user mode.
+Open http://localhost:5173 - no login needed in single-user mode.
 
 ### Docker
 

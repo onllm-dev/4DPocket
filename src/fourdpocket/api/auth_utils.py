@@ -1,4 +1,4 @@
-"""Authentication utilities — password hashing and JWT tokens."""
+"""Authentication utilities - password hashing and JWT tokens."""
 
 import uuid
 from datetime import datetime, timedelta, timezone

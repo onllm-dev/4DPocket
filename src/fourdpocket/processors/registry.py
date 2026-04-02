@@ -1,4 +1,4 @@
-"""Processor registry — URL pattern matching and processor discovery."""
+"""Processor registry - URL pattern matching and processor discovery."""
 
 import re
 

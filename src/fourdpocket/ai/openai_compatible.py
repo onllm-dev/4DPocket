@@ -1,4 +1,4 @@
-"""OpenAI-compatible chat provider — works with Ollama, Groq, and NVIDIA."""
+"""OpenAI-compatible chat provider - works with Ollama, Groq, and NVIDIA."""
 
 import json
 import logging

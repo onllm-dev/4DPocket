@@ -85,7 +85,7 @@ export default function AddItem() {
           Toss it into your pocket
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-          Save anything — it'll be there when you need it.
+          Save anything - it'll be there when you need it.
         </p>
       </div>
 

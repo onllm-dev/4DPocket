@@ -44,7 +44,7 @@ app = FastAPI(
 settings = get_settings()
 if "*" in settings.server.cors_origins:
     logger.warning(
-        "CORS is configured with wildcard '*' — this is insecure for production deployments"
+        "CORS is configured with wildcard '*' - this is insecure for production deployments"
     )
 app.add_middleware(
     CORSMiddleware,

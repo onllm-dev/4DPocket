@@ -38,7 +38,7 @@ def get_session():
 
 
 def init_db():
-    import fourdpocket.models  # noqa: F401 — ensure all models are registered
+    import fourdpocket.models  # noqa: F401 - ensure all models are registered
 
     engine = get_engine()
     SQLModel.metadata.create_all(engine)

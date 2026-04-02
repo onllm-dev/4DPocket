@@ -1,4 +1,4 @@
-"""GitHub processor — repos, issues, PRs, gists via REST API."""
+"""GitHub processor - repos, issues, PRs, gists via REST API."""
 
 import base64
 import json

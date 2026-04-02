@@ -1,4 +1,4 @@
-"""Background task for AI enrichment — tagging, summarization, embeddings."""
+"""Background task for AI enrichment - tagging, summarization, embeddings."""
 
 import logging
 import uuid

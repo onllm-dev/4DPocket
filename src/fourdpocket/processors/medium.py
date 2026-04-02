@@ -1,4 +1,4 @@
-"""Medium processor — extract articles via httpx + readability."""
+"""Medium processor - extract articles via httpx + readability."""
 
 import logging
 import re

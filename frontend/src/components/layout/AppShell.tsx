@@ -16,8 +16,8 @@ export function AppShell() {
         <Header />
         <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6 animate-fade-in">
           <Outlet />
-          <Footer />
         </main>
+        <Footer />
       </div>
       <BottomNav />
       <CommandPalette />

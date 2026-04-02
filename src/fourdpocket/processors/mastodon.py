@@ -1,4 +1,4 @@
-"""Mastodon processor — extract posts via ActivityPub instance API."""
+"""Mastodon processor - extract posts via ActivityPub instance API."""
 
 import logging
 import re

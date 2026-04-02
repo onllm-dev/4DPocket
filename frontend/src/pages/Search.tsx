@@ -53,7 +53,7 @@ export default function Search() {
       enabled: semantic && query.length >= 2,
     });
 
-  // Full-text search (existing hook) — but we need filter support too
+  // Full-text search (existing hook) - but we need filter support too
   const fulltextUrl = query.length >= 2
     ? `/api/v1/search?q=${encodeURIComponent(query)}${selectedPlatform ? `&source_platform=${selectedPlatform}` : ""}${selectedType ? `&item_type=${selectedType}` : ""}`
     : "";

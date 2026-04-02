@@ -1,4 +1,4 @@
-"""Generic URL processor — fallback for any URL."""
+"""Generic URL processor - fallback for any URL."""
 
 import httpx
 from readability import Document
@@ -11,7 +11,7 @@ from fourdpocket.processors.registry import register_processor
 class GenericURLProcessor(BaseProcessor):
     """Extract content from any URL using readability and metadata parsing."""
 
-    url_patterns = []  # matches nothing — used as fallback
+    url_patterns = []  # matches nothing - used as fallback
     priority = -1  # lowest priority
 
     async def process(self, url: str, **kwargs) -> ProcessorResult:
@@ -37,7 +37,7 @@ class GenericURLProcessor(BaseProcessor):
         content_type = response.headers.get("content-type", "")
         raw_html = response.text
 
-        # Non-HTML content — just save metadata
+        # Non-HTML content - just save metadata
         if "text/html" not in content_type and "application/xhtml" not in content_type:
             return ProcessorResult(
                 title=url,

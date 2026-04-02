@@ -1,4 +1,4 @@
-"""PDF processor — full-text extraction via PyMuPDF."""
+"""PDF processor - full-text extraction via PyMuPDF."""
 
 import io
 import logging

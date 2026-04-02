@@ -40,8 +40,8 @@ export default function Dashboard() {
           {statsLoading
             ? "Loading your pocket..."
             : totalItems === 0
-            ? "Your pocket is empty — time to fill it up!"
-            : `Your pocket has ${totalItems} item${totalItems === 1 ? "" : "s"} — reach in and explore.`}
+            ? "Your pocket is empty - time to fill it up!"
+            : `Your pocket has ${totalItems} item${totalItems === 1 ? "" : "s"} - reach in and explore.`}
         </p>
       </div>
 

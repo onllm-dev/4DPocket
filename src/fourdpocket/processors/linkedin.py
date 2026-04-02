@@ -1,4 +1,4 @@
-"""LinkedIn processor — extract public posts and articles via httpx + readability."""
+"""LinkedIn processor - extract public posts and articles via httpx + readability."""
 
 import logging
 

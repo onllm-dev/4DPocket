@@ -1,4 +1,4 @@
-"""Stack Overflow processor — extract questions and answers via SE API."""
+"""Stack Overflow processor - extract questions and answers via SE API."""
 
 import logging
 import re

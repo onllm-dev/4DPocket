@@ -1,4 +1,4 @@
-"""Smart tag hierarchy — auto-nesting based on domain knowledge."""
+"""Smart tag hierarchy - auto-nesting based on domain knowledge."""
 
 import logging
 import uuid

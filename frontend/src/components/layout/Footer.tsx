@@ -14,7 +14,7 @@ export function Footer() {
           4DPocket v0.1.0
         </span>
         <span className="italic text-gray-400 dark:text-gray-500 hidden sm:block">
-          Reach into your pocket — anything's possible.
+          Reach into your pocket - anything's possible.
         </span>
         <span className="flex items-center gap-1">
           Built with{" "}

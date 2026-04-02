@@ -1,4 +1,4 @@
-"""Search indexer facade — delegates to configured backend."""
+"""Search indexer facade - delegates to configured backend."""
 
 import logging
 import uuid
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class SearchIndexer:
-    """Facade for search indexing — delegates to SQLite FTS5 or Meilisearch."""
+    """Facade for search indexing - delegates to SQLite FTS5 or Meilisearch."""
 
     def __init__(self, db: Session):
         self._db = db

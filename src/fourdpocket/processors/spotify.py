@@ -1,4 +1,4 @@
-"""Spotify processor — extract track, album, and playlist metadata via oEmbed."""
+"""Spotify processor - extract track, album, and playlist metadata via oEmbed."""
 
 import logging
 import re

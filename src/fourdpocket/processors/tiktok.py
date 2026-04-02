@@ -1,4 +1,4 @@
-"""TikTok processor — extract video metadata via yt-dlp."""
+"""TikTok processor - extract video metadata via yt-dlp."""
 
 import logging
 

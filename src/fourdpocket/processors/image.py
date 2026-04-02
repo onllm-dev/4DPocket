@@ -1,4 +1,4 @@
-"""Image processor — EXIF extraction and OCR."""
+"""Image processor - EXIF extraction and OCR."""
 
 import io
 import logging

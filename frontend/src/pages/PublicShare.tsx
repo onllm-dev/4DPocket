@@ -109,7 +109,7 @@ export default function PublicShare() {
 
       <footer className="border-t border-gray-200 dark:border-gray-800 py-6 mt-12">
         <div className="max-w-3xl mx-auto px-4 text-center text-xs text-gray-400">
-          Shared via <span className="font-semibold text-sky-600">4DPocket</span> — AI-powered personal knowledge base
+          Shared via <span className="font-semibold text-sky-600">4DPocket</span> - AI-powered personal knowledge base
         </div>
       </footer>
     </div>

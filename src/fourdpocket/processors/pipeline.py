@@ -1,4 +1,4 @@
-"""Extraction pipeline — orchestrates URL processing and item creation."""
+"""Extraction pipeline - orchestrates URL processing and item creation."""
 
 import asyncio
 import logging
@@ -43,10 +43,10 @@ class ExtractionPipeline:
         """Run the full extraction pipeline for a URL.
 
         Steps:
-        1. Route — match URL to processor
-        2. Process — extract content
-        3. Create item — save to DB
-        4. Index — push to search engine
+        1. Route - match URL to processor
+        2. Process - extract content
+        3. Create item - save to DB
+        4. Index - push to search engine
         """
         # 1. Route
         processor = match_processor(url)

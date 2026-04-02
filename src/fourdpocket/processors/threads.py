@@ -1,4 +1,4 @@
-"""Threads processor — extract posts via OG metadata scraping."""
+"""Threads processor - extract posts via OG metadata scraping."""
 
 import logging
 import re

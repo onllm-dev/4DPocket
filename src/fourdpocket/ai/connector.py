@@ -1,4 +1,4 @@
-"""Related items engine — finds connections between knowledge items."""
+"""Related items engine - finds connections between knowledge items."""
 
 import logging
 import uuid
@@ -30,7 +30,7 @@ def find_related(
     Signals:
     1. Shared tags (weight 0.3)
     2. Same source/author (weight 0.2)
-    3. Semantic similarity (weight 0.5) — requires ChromaDB
+    3. Semantic similarity (weight 0.5) - requires ChromaDB
 
     Returns top N related items sorted by combined score.
     """
@@ -118,7 +118,7 @@ def find_related_on_save(
     db: Session,
     limit: int = 5,
 ) -> list[RelatedItem]:
-    """Fast variant for on-save — uses only semantic similarity."""
+    """Fast variant for on-save - uses only semantic similarity."""
     try:
         from fourdpocket.search.semantic import query_similar
         similar = query_similar(item_id, user_id, limit=limit)

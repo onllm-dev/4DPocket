@@ -1,4 +1,4 @@
-"""AI provider factory — creates providers from configuration."""
+"""AI provider factory - creates providers from configuration."""
 
 import logging
 

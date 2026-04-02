@@ -1,4 +1,4 @@
-"""Meilisearch search backend — optional upgrade from SQLite FTS5."""
+"""Meilisearch search backend - optional upgrade from SQLite FTS5."""
 
 import logging
 import uuid

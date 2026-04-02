@@ -1,4 +1,4 @@
-"""Root API router — includes all sub-routers."""
+"""Root API router - includes all sub-routers."""
 
 from fastapi import APIRouter
 

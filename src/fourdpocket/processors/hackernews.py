@@ -1,4 +1,4 @@
-"""Hacker News processor — extract items via Algolia API."""
+"""Hacker News processor - extract items via Algolia API."""
 
 import logging
 import re

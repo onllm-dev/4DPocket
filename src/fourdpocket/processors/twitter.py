@@ -1,4 +1,4 @@
-"""Twitter/X processor — extract tweets via fxtwitter API."""
+"""Twitter/X processor - extract tweets via fxtwitter API."""
 
 import json
 import logging

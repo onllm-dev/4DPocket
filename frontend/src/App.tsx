@@ -38,7 +38,7 @@ function SuspenseWrap({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public routes — no auth required */}
+      {/* Public routes - no auth required */}
       <Route
         path="/login"
         element={<SuspenseWrap><Login /></SuspenseWrap>}
@@ -48,7 +48,7 @@ export default function App() {
         element={<SuspenseWrap><Register /></SuspenseWrap>}
       />
 
-      {/* Protected routes — require authentication */}
+      {/* Protected routes - require authentication */}
       <Route element={<AuthGuard />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<SuspenseWrap><Dashboard /></SuspenseWrap>} />
@@ -69,7 +69,7 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Public share route — no auth required */}
+      {/* Public share route - no auth required */}
       <Route path="/public/:token" element={<SuspenseWrap><PublicShare /></SuspenseWrap>} />
     </Routes>
   );

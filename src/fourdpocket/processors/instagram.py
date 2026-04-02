@@ -1,4 +1,4 @@
-"""Instagram processor — extract posts via instaloader."""
+"""Instagram processor - extract posts via instaloader."""
 
 import json
 import logging
