@@ -1,0 +1,68 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, getToken, clearToken } from "@/api/client";
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: string;
+  is_active: boolean;
+  bio: string | null;
+  created_at: string;
+}
+
+export function useCurrentUser() {
+  return useQuery<User>({
+    queryKey: ["currentUser"],
+    queryFn: () => api.get("/api/v1/auth/me"),
+    enabled: !!getToken(),
+    retry: false,
+  });
+}
+
+export function useLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { email: string; password: string }) => {
+      const token = await api.login(data.email, data.password);
+      return token;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["currentUser"] });
+    },
+  });
+}
+
+export function useRegister() {
+  return useMutation({
+    mutationFn: (data: { username: string; email: string; password: string; display_name?: string }) =>
+      api.register(data.email, data.password, data.display_name),
+  });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  return () => {
+    clearToken();
+    qc.clear();
+    window.location.href = "/login";
+  };
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { display_name?: string; bio?: string; avatar_url?: string }) =>
+      api.patch("/api/v1/auth/me", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["currentUser"] }),
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: { current_password: string; new_password: string }) =>
+      api.post("/api/v1/auth/password", data),
+  });
+}

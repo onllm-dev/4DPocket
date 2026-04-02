@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func, col
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.item import ItemRead, KnowledgeItem
@@ -49,3 +49,57 @@ def search_items(
     # Preserve search result ordering
     item_map = {item.id: item for item in items}
     return [item_map[iid] for iid in item_ids if iid in item_map]
+
+
+@router.get("/semantic", response_model=list[ItemRead])
+def semantic_search(
+    q: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=10, ge=1, le=50),
+):
+    """Semantic vector search using embeddings."""
+    try:
+        from fourdpocket.search.semantic import search_by_text
+        results = search_by_text(q, current_user.id, limit=limit)
+        if not results:
+            return []
+        item_ids = [uuid.UUID(r["item_id"]) for r in results]
+        items = db.exec(
+            select(KnowledgeItem).where(
+                KnowledgeItem.id.in_(item_ids),
+                KnowledgeItem.user_id == current_user.id,
+            )
+        ).all()
+        item_map = {item.id: item for item in items}
+        return [item_map[iid] for iid in item_ids if iid in item_map]
+    except Exception:
+        return []
+
+
+@router.get("/filters")
+def get_search_filters(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return available search filter facets."""
+    from fourdpocket.models.tag import Tag
+    from fourdpocket.models.base import ItemType, SourcePlatform
+
+    platform_counts = db.exec(
+        select(KnowledgeItem.source_platform, func.count()).where(
+            KnowledgeItem.user_id == current_user.id
+        ).group_by(KnowledgeItem.source_platform)
+    ).all()
+
+    tags = db.exec(
+        select(Tag.name, Tag.slug, Tag.usage_count).where(
+            Tag.user_id == current_user.id
+        ).order_by(col(Tag.usage_count).desc()).limit(50)
+    ).all()
+
+    return {
+        "platforms": [{"name": str(p), "count": c} for p, c in platform_counts],
+        "types": [t.value for t in ItemType],
+        "tags": [{"name": n, "slug": s, "count": c} for n, s, c in tags],
+    }

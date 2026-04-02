@@ -5,6 +5,7 @@ from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.comment import Comment
 from fourdpocket.models.embedding import Embedding
 from fourdpocket.models.feed import KnowledgeFeed
+from fourdpocket.models.instance_settings import InstanceSettings
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.note import Note
 from fourdpocket.models.rule import Rule
@@ -17,6 +18,7 @@ __all__ = [
     "CollectionItem",
     "Comment",
     "Embedding",
+    "InstanceSettings",
     "ItemTag",
     "ItemType",
     "KnowledgeFeed",

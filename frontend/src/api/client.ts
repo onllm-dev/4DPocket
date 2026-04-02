@@ -12,7 +12,7 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-// Create base fetch wrapper with auth
+// Create base fetch wrapper with auth + 401 redirect
 export async function apiFetch(
   url: string,
   options: RequestInit = {}
@@ -25,7 +25,15 @@ export async function apiFetch(
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  return fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
+
+  // Auto-redirect to login on 401
+  if (res.status === 401 && !url.includes("/auth/")) {
+    clearToken();
+    window.location.href = "/login";
+  }
+
+  return res;
 }
 
 // API helper functions
@@ -74,10 +82,12 @@ export const api = {
   async register(
     email: string,
     password: string,
-    displayName?: string
+    displayName?: string,
+    username?: string,
   ): Promise<unknown> {
     return this.post("/api/v1/auth/register", {
       email,
+      username: username || email.split("@")[0],
       password,
       display_name: displayName,
     });

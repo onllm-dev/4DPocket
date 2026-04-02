@@ -4,12 +4,14 @@
 def test_register_user(client):
     response = client.post("/api/v1/auth/register", json={
         "email": "new@example.com",
+        "username": "newuser",
         "password": "password123",
         "display_name": "New User",
     })
     assert response.status_code == 201
     data = response.json()
     assert data["email"] == "new@example.com"
+    assert data["username"] == "newuser"
     assert data["display_name"] == "New User"
     assert "password" not in data
     assert "password_hash" not in data
@@ -18,6 +20,7 @@ def test_register_user(client):
 def test_register_first_user_is_admin(client):
     response = client.post("/api/v1/auth/register", json={
         "email": "first@example.com",
+        "username": "firstuser",
         "password": "password123",
     })
     assert response.status_code == 201
@@ -27,10 +30,12 @@ def test_register_first_user_is_admin(client):
 def test_register_duplicate_email(client):
     client.post("/api/v1/auth/register", json={
         "email": "dup@example.com",
+        "username": "dupuser1",
         "password": "password123",
     })
     response = client.post("/api/v1/auth/register", json={
         "email": "dup@example.com",
+        "username": "dupuser2",
         "password": "password456",
     })
     assert response.status_code == 409
@@ -39,6 +44,7 @@ def test_register_duplicate_email(client):
 def test_login_correct_credentials(client):
     client.post("/api/v1/auth/register", json={
         "email": "login@example.com",
+        "username": "loginuser",
         "password": "mypassword",
     })
     response = client.post("/api/v1/auth/login", data={
@@ -54,6 +60,7 @@ def test_login_correct_credentials(client):
 def test_login_wrong_password(client):
     client.post("/api/v1/auth/register", json={
         "email": "wrong@example.com",
+        "username": "wronguser",
         "password": "correct",
     })
     response = client.post("/api/v1/auth/login", data={

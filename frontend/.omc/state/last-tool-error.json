@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/prakersh/projects/4dpocket && uv run uvicorn fourdpocket.main:app --host 0.0.0.0 --port 4040 2>&1\",\"timeout\":15000,\"description\":\"Start 4DPocket server\"}",
+  "error": "Exit code 1\nINFO:     Started server process [36055]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 4040): address already in use\nINFO:     Waiting for application shutdown.\nINFO:     Application shutdown complete.",
+  "timestamp": "2026-04-02T16:57:51.261Z",
+  "retry_count": 1
+}

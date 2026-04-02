@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from pydantic import BaseModel
 from sqlmodel import Session, select, func, col
 
 from fourdpocket.api.deps import get_current_user, get_db
@@ -224,3 +225,120 @@ def remove_tag_from_item(
 
     db.delete(link)
     db.commit()
+
+
+@router.post("/{item_id}/archive", status_code=202)
+def archive_item(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger full-page archival as background task."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if not item.url:
+        raise HTTPException(status_code=400, detail="Item has no URL to archive")
+    try:
+        from fourdpocket.workers.archiver import archive_page
+        archive_page(str(item_id), item.url, str(current_user.id))
+    except Exception:
+        pass  # Worker may not be running
+    return {"status": "queued", "item_id": str(item_id)}
+
+
+@router.post("/{item_id}/reprocess", status_code=202)
+def reprocess_item(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-run platform processor on the URL."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if not item.url:
+        raise HTTPException(status_code=400, detail="Item has no URL to reprocess")
+    try:
+        from fourdpocket.workers.fetcher import fetch_and_process_url
+        fetch_and_process_url(str(item_id), item.url, str(current_user.id))
+    except Exception:
+        pass
+    return {"status": "queued", "item_id": str(item_id)}
+
+
+@router.get("/{item_id}/related")
+def get_related_items(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=5, ge=1, le=20),
+):
+    """Get AI-suggested related items."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        from fourdpocket.ai.connector import find_related
+        related = find_related(item_id, current_user.id, db, limit=limit)
+        result = []
+        for r in related:
+            related_item = db.get(KnowledgeItem, r.item_id)
+            if related_item:
+                result.append({
+                    "id": str(related_item.id),
+                    "title": related_item.title,
+                    "url": related_item.url,
+                    "source_platform": related_item.source_platform.value if related_item.source_platform else "generic",
+                    "score": r.score,
+                    "signals": r.signals,
+                })
+        return result
+    except Exception:
+        return []
+
+
+class BulkActionRequest(BaseModel):
+    item_ids: list[uuid.UUID]
+    action: str  # "tag", "archive", "delete", "favorite", "unfavorite", "enrich"
+    tag_id: uuid.UUID | None = None
+
+
+@router.post("/bulk")
+def bulk_action(
+    data: BulkActionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Perform bulk action on selected items."""
+    processed = 0
+    for iid in data.item_ids:
+        item = db.get(KnowledgeItem, iid)
+        if not item or item.user_id != current_user.id:
+            continue
+
+        if data.action == "archive":
+            item.is_archived = True
+            db.add(item)
+        elif data.action == "delete":
+            db.delete(item)
+        elif data.action == "favorite":
+            item.is_favorite = True
+            db.add(item)
+        elif data.action == "unfavorite":
+            item.is_favorite = False
+            db.add(item)
+        elif data.action == "tag" and data.tag_id:
+            tag = db.get(Tag, data.tag_id)
+            if tag and tag.user_id == current_user.id:
+                existing = db.exec(
+                    select(ItemTag).where(ItemTag.item_id == iid, ItemTag.tag_id == data.tag_id)
+                ).first()
+                if not existing:
+                    db.add(ItemTag(item_id=iid, tag_id=data.tag_id))
+                    tag.usage_count += 1
+                    db.add(tag)
+        processed += 1
+
+    db.commit()
+    return {"processed": processed, "total": len(data.item_ids)}

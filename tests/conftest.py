@@ -73,6 +73,7 @@ def auth_headers_fixture(client):
         "/api/v1/auth/register",
         json={
             "email": "test@example.com",
+            "username": "testuser",
             "password": "testpass123",
             "display_name": "Test User",
         },
@@ -92,6 +93,7 @@ def second_user_headers_fixture(client):
         "/api/v1/auth/register",
         json={
             "email": "user2@example.com",
+            "username": "seconduser",
             "password": "testpass456",
             "display_name": "Second User",
         },

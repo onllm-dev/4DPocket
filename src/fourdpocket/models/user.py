@@ -19,9 +19,12 @@ class User(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(index=True, unique=True)
+    username: str = Field(index=True, unique=True)
     password_hash: str
     display_name: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None
+    is_active: bool = Field(default=True)
     role: UserRole = Field(default=UserRole.user)
     settings: dict = Field(default_factory=dict, sa_column=Column(JSON, default="{}"))
     created_at: datetime = Field(default_factory=utc_now)
@@ -30,6 +33,7 @@ class User(SQLModel, table=True):
 
 class UserCreate(BaseModel):
     email: str
+    username: str
     password: str
     display_name: str | None = None
 
@@ -37,8 +41,11 @@ class UserCreate(BaseModel):
 class UserRead(BaseModel):
     id: uuid.UUID
     email: str
+    username: str
     display_name: str | None
     avatar_url: str | None
+    bio: str | None
+    is_active: bool
     role: UserRole
     created_at: datetime
 
@@ -48,3 +55,4 @@ class UserRead(BaseModel):
 class UserUpdate(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None

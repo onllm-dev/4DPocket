@@ -31,6 +31,7 @@ def get_current_user(
         if user is None:
             user = User(
                 email="admin@localhost",
+                username="admin",
                 password_hash=hash_password("admin"),
                 display_name="Admin",
                 role=UserRole.admin,
@@ -64,6 +65,9 @@ def get_current_user(
     user = db.get(User, uuid.UUID(user_id))
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    if user.is_active is False:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 
     return user
 
