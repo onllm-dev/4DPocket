@@ -1,9 +1,10 @@
 """Sharing API endpoints."""
 
+import time
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -299,12 +300,27 @@ def share_history(
 
 public_router = APIRouter(prefix="/public", tags=["sharing"])
 
+_public_token_attempts: dict[str, list[float]] = {}
+
+
+def _check_public_rate_limit(client_ip: str) -> None:
+    """Rate limit public token access to 10 attempts per minute per IP."""
+    now = time.time()
+    attempts = _public_token_attempts.get(client_ip, [])
+    attempts = [t for t in attempts if now - t < 60]
+    if len(attempts) >= 10:
+        raise HTTPException(429, "Too many attempts. Try again later.")
+    attempts.append(now)
+    _public_token_attempts[client_ip] = attempts
+
 
 @public_router.get("/{token}")
 def get_public_share(
     token: str,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    _check_public_rate_limit(request.client.host if request.client else "unknown")
     share = validate_public_token(db=db, token=token)
     if not share:
         raise HTTPException(

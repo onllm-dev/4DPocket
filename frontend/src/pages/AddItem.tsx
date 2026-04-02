@@ -38,8 +38,8 @@ export default function AddItem() {
   if (shareState === "saving") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6">
-        <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
-        <p className="text-gray-600 dark:text-gray-400 text-sm">Saving to your Pocket...</p>
+        <Loader2 className="h-10 w-10 animate-spin text-[#0096C7]" />
+        <p className="text-gray-600 dark:text-gray-400 text-sm">Tossing it into your pocket...</p>
       </div>
     );
   }
@@ -47,8 +47,10 @@ export default function AddItem() {
   if (shareState === "success") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6">
-        <CheckCircle className="h-10 w-10 text-green-500" />
-        <p className="text-gray-900 dark:text-gray-100 font-medium">Saved to your Pocket!</p>
+        <div className="animate-pocket-drop">
+          <CheckCircle className="h-10 w-10 text-[#0096C7]" />
+        </div>
+        <p className="text-gray-900 dark:text-gray-100 font-medium">Dropped into your pocket!</p>
         <p className="text-gray-500 dark:text-gray-400 text-sm">Redirecting...</p>
       </div>
     );
@@ -60,7 +62,7 @@ export default function AddItem() {
         <p className="text-red-500 font-medium">Failed to save. Please try again.</p>
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-sky-600 hover:underline cursor-pointer"
+          className="text-sm text-[#0096C7] hover:underline cursor-pointer"
         >
           Go back
         </button>
@@ -72,11 +74,20 @@ export default function AddItem() {
     <div className="animate-fade-in p-6 max-w-2xl mx-auto">
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 p-2 -ml-2 rounded-xl hover:bg-sky-50 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer"
       >
         <ArrowLeft className="h-4 w-4" />
         Back
       </button>
+
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+          Toss it into your pocket
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+          Save anything — it'll be there when you need it.
+        </p>
+      </div>
 
       <div className="flex items-center justify-center min-h-[50vh]">
         <BookmarkForm onClose={() => navigate(-1)} />

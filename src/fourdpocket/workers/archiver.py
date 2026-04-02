@@ -4,6 +4,7 @@ import logging
 import shutil
 import subprocess
 import uuid
+from urllib.parse import urlparse
 
 from fourdpocket.workers import huey
 
@@ -24,6 +25,10 @@ def archive_page(item_id: str, url: str, user_id: str) -> dict:
     from fourdpocket.db.session import get_engine
     from fourdpocket.models.item import KnowledgeItem
     from fourdpocket.storage.local import LocalStorage
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid URL scheme: {parsed.scheme!r}")
 
     logger.info("Archiving page %s for item %s", url, item_id)
     storage = LocalStorage()

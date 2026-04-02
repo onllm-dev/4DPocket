@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
@@ -390,9 +391,18 @@ def get_reading_queue(
     return items
 
 
+class BulkAction(str, Enum):
+    tag = "tag"
+    archive = "archive"
+    delete = "delete"
+    favorite = "favorite"
+    unfavorite = "unfavorite"
+    enrich = "enrich"
+
+
 class BulkActionRequest(BaseModel):
+    action: BulkAction
     item_ids: list[uuid.UUID]
-    action: str  # "tag", "archive", "delete", "favorite", "unfavorite", "enrich"
     tag_id: uuid.UUID | None = None
 
 

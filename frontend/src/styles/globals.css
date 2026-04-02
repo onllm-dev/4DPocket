@@ -12,6 +12,13 @@
 }
 
 :root {
+  --color-primary: #0096C7;
+  --color-primary-light: #38BDF8;
+  --color-primary-dark: #0077A8;
+  --color-accent-yellow: #FCD34D;
+  --color-accent-red: #EF4444;
+  --color-bg-light: #F0F9FF;
+  --color-bg-dark: #0C1222;
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
@@ -37,6 +44,7 @@
   --muted-foreground: 215 20.2% 65.1%;
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
+  --tw-bg-dark: #0C1222;
 }
 
 html {
@@ -67,8 +75,30 @@ code, pre {
   animation: fadeIn 0.3s ease-out;
 }
 
+@keyframes pocket-drop {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(20px) scale(0.95); opacity: 0.8; }
+  100% { transform: translateY(40px) scale(0.8); opacity: 0; }
+}
+
+.animate-pocket-drop {
+  animation: pocket-drop 0.6s ease-in forwards;
+}
+
+@keyframes pocket-open {
+  0% { transform: scale(0.8) translateY(10px); opacity: 0; }
+  60% { transform: scale(1.05) translateY(-4px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.animate-pocket-open {
+  animation: pocket-open 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-pocket-drop,
+  .animate-pocket-open {
     animation: none;
   }
 }

@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from fourdpocket.api.middleware import RateLimitMiddleware, RequestIDMiddleware
 from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_engine, init_db
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -39,6 +42,10 @@ app = FastAPI(
 )
 
 settings = get_settings()
+if "*" in settings.server.cors_origins:
+    logger.warning(
+        "CORS is configured with wildcard '*' — this is insecure for production deployments"
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.server.cors_origins,

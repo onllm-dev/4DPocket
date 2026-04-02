@@ -14,6 +14,13 @@ class LocalStorage:
             base_path = get_settings().storage.base_path
         self._base = Path(base_path)
 
+    def _safe_path(self, relative_path: str) -> Path:
+        """Resolve path and ensure it stays within the storage directory."""
+        resolved = (self._base / relative_path).resolve()
+        if not str(resolved).startswith(str(self._base.resolve())):
+            raise ValueError("Path traversal detected")
+        return resolved
+
     def _user_path(self, user_id: uuid.UUID, category: str) -> Path:
         path = self._base / str(user_id) / category
         path.mkdir(parents=True, exist_ok=True)
@@ -33,21 +40,21 @@ class LocalStorage:
 
     def get_file(self, relative_path: str) -> bytes:
         """Read a file by its relative path."""
-        file_path = self._base / relative_path
+        file_path = self._safe_path(relative_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {relative_path}")
         return file_path.read_bytes()
 
     def delete_file(self, relative_path: str) -> None:
         """Delete a file by its relative path."""
-        file_path = self._base / relative_path
+        file_path = self._safe_path(relative_path)
         if file_path.exists():
             file_path.unlink()
 
     def get_absolute_path(self, relative_path: str) -> Path:
         """Get the absolute path for a relative storage path."""
-        return self._base / relative_path
+        return self._safe_path(relative_path)
 
     def file_exists(self, relative_path: str) -> bool:
         """Check if a file exists."""
-        return (self._base / relative_path).exists()
+        return self._safe_path(relative_path).exists()

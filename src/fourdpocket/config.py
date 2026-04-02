@@ -20,6 +20,7 @@ def _get_or_create_secret_key() -> str:
     key = secrets.token_urlsafe(32)
     key_file.parent.mkdir(parents=True, exist_ok=True)
     key_file.write_text(key)
+    key_file.chmod(0o600)  # Owner read/write only
     return key
 
 

@@ -1,11 +1,48 @@
 """Base processor interface and result dataclass."""
 
 import enum
+import ipaddress
+import socket
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 import httpx
 from lxml import html as lxml_html
+
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),  # AWS metadata
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _is_safe_url(url: str) -> bool:
+    """Check if URL is safe to fetch (not targeting internal networks)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for family, _, _, _, sockaddr in addr_info:
+                ip = ipaddress.ip_address(sockaddr[0])
+                for network in _BLOCKED_NETWORKS:
+                    if ip in network:
+                        return False
+        except socket.gaierror:
+            return False
+        return True
+    except Exception:
+        return False
 
 
 class ProcessorStatus(str, enum.Enum):
@@ -53,6 +90,8 @@ class BaseProcessor(ABC):
         self, url: str, timeout: float = 30.0, follow_redirects: bool = True
     ) -> httpx.Response:
         """Fetch a URL with proper headers and timeout."""
+        if not _is_safe_url(url):
+            raise ValueError(f"URL blocked: targets internal network")
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (compatible; 4DPocket/0.1; "

@@ -49,9 +49,9 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
     return (
       <Link
         to={`/item/${item.id}`}
-        className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer group"
+        className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-sky-50/50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer group"
       >
-        <PlatformIcon className="w-4 h-4 text-gray-400 group-hover:text-sky-500 transition-colors" />
+        <PlatformIcon className="w-4 h-4 text-gray-400 group-hover:text-[#0096C7] transition-colors" />
         <span className="text-sm truncate flex-1 text-gray-700 dark:text-gray-300">
           {item.title || item.url || "Untitled"}
         </span>
@@ -67,13 +67,13 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
     return (
       <Link
         to={`/item/${item.id}`}
-        className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
+        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
       >
         {thumbnail ? (
-          <img src={thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+          <img src={thumbnail} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
         ) : (
-          <div className="w-16 h-16 rounded-lg bg-sky-50 dark:bg-sky-950 flex items-center justify-center flex-shrink-0">
-            <PlatformIcon className="w-6 h-6 text-sky-500" />
+          <div className="w-16 h-16 rounded-xl bg-sky-50 dark:bg-sky-950 flex items-center justify-center flex-shrink-0">
+            <PlatformIcon className="w-6 h-6 text-[#0096C7]" />
           </div>
         )}
         <div className="flex-1 min-w-0">
@@ -81,7 +81,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
             <PlatformIcon className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform}</span>
           </div>
-          <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+          <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100 group-hover:text-[#0096C7] dark:group-hover:text-sky-400 transition-colors">
             {item.title || item.url || "Untitled"}
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
@@ -89,8 +89,8 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <button onClick={toggleFavorite} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-            <Star className={`w-4 h-4 ${item.is_favorite ? "fill-amber-400 text-amber-400" : "text-gray-300 dark:text-gray-600"}`} />
+          <button onClick={toggleFavorite} className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+            <Star className={`w-4 h-4 ${item.is_favorite ? "fill-[#FCD34D] text-[#FCD34D]" : "text-gray-300 dark:text-gray-600"}`} />
           </button>
           <span className="text-xs text-gray-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />
@@ -105,7 +105,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   return (
     <Link
       to={`/item/${item.id}`}
-      className="flex flex-col rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
+      className="flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
     >
       {thumbnail ? (
         <div className="aspect-video bg-gray-100 dark:bg-gray-800 overflow-hidden">
@@ -122,11 +122,11 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
             <PlatformIcon className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform}</span>
           </div>
-          <button onClick={toggleFavorite} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-            <Star className={`w-4 h-4 ${item.is_favorite ? "fill-amber-400 text-amber-400" : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400"}`} />
+          <button onClick={toggleFavorite} className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+            <Star className={`w-4 h-4 ${item.is_favorite ? "fill-[#FCD34D] text-[#FCD34D]" : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400"}`} />
           </button>
         </div>
-        <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-gray-900 dark:text-gray-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+        <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-gray-900 dark:text-gray-100 group-hover:text-[#0096C7] dark:group-hover:text-sky-400 transition-colors">
           {item.title || item.url || "Untitled"}
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 flex-1">

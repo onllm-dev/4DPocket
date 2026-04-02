@@ -10,7 +10,7 @@ export function AppShell() {
   useKeyboardShortcuts();
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="flex h-screen bg-sky-50/30 dark:bg-[#0C1222] text-gray-900 dark:text-gray-100">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header />

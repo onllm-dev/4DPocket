@@ -489,13 +489,7 @@ has:transcript lang:python
 - Bulk export selected items
 - Select all / select by filter
 
-#### 4.2.9 SSO / OIDC Authentication
-- OpenID Connect (OIDC) support for enterprise SSO
-- OAuth2 providers: Google, GitHub, Microsoft
-- LDAP integration (optional)
-- *Better than Karakeep*: We add LDAP + multiple OAuth2 providers out of the box
-
-#### 4.2.10 Multi-Language Support (i18n)
+#### 4.2.9 Multi-Language Support (i18n)
 - UI translated into multiple languages
 - Community translation support (Weblate or Crowdin)
 - Auto-detect user browser language
@@ -1225,7 +1219,6 @@ secret_key = "auto-generated"
 - [ ] Browser extension (Chrome + Firefox) with highlight capture
 - [ ] macOS menubar app
 - [ ] CLI tool (`4dp` command)
-- [ ] OIDC/SSO + LDAP support
 - [ ] Read-it-later mode with TTS + progress tracking
 - [ ] Knowledge gaps detection + stale content flagging
 - [ ] Cross-platform connection detection (link graph)
@@ -1273,7 +1266,7 @@ Everything Karakeep has, we have:
 | Rules engine | Same + AI-powered conditions + incoming webhooks | Enhanced |
 | Import (Chrome, Pocket, Linkwarden, Omnivore, TSM) | Same + Raindrop.io + Pinboard | Enhanced |
 | Browser bookmark sync (Floccus) | Same | Parity |
-| SSO support | Same + LDAP + multiple OAuth2 providers | Enhanced |
+| SSO support | Removed from scope | N/A |
 | REST API | Same (OpenAPI auto-docs) + sharing & feed APIs | Enhanced |
 | Bulk actions | Same + bulk AI re-process | Enhanced |
 | Multi-language (i18n) | Same | Parity |
