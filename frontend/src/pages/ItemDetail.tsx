@@ -1,4 +1,5 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useRef } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Star,
@@ -15,9 +16,14 @@ import {
   Hash,
   Camera,
   AlertCircle,
+  Share2,
+  Send,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { formatDate } from "@/lib/utils";
+import { ShareDialog } from "@/components/sharing/ShareDialog";
 
 function getPlatformIcon(platform: string) {
   const icons: Record<string, React.ReactNode> = {
@@ -35,9 +41,50 @@ function getPlatformIcon(platform: string) {
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: item, isLoading, isError } = useItem(id ?? "");
   const updateItem = useUpdateItem();
   const deleteItem = useDeleteItem();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: relatedItems } = useQuery<Array<{
+    id: string;
+    title: string;
+    source_platform: string;
+    score: number;
+  }>>({
+    queryKey: ["items", id, "related"],
+    queryFn: () => api.get(`/api/v1/items/${id}/related`),
+    enabled: !!id,
+  });
+
+  const { data: comments } = useQuery<Array<{
+    id: string;
+    content: string;
+    user_display_name: string;
+    created_at: string;
+  }>>({
+    queryKey: ["items", id, "comments"],
+    queryFn: () => api.get(`/api/v1/items/${id}/comments`),
+    enabled: !!id,
+  });
+
+  const addComment = useMutation({
+    mutationFn: (content: string) =>
+      api.post(`/api/v1/items/${id}/comments`, { content }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["items", id, "comments"] });
+      setCommentText("");
+    },
+  });
+
+  const handleAddComment = () => {
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+    addComment.mutate(trimmed);
+  };
 
   if (isLoading) {
     return (
@@ -157,6 +204,14 @@ export default function ItemDetail() {
             <Archive className="h-5 w-5" />
           </button>
           <button
+            onClick={() => setShareOpen(true)}
+            title="Share"
+            className="p-2.5 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-900/20 text-gray-400 hover:text-sky-600 hover:shadow-md transition-all duration-200 cursor-pointer"
+          >
+            <Share2 className="h-5 w-5" />
+            <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-sm sm:font-medium hidden sm:inline">Share</span>
+          </button>
+          <button
             onClick={handleDelete}
             title="Delete"
             className="p-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:shadow-md transition-all duration-200 cursor-pointer"
@@ -243,10 +298,91 @@ export default function ItemDetail() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
           Related Items
         </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-          Coming soon...
-        </p>
+        {relatedItems && relatedItems.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 md:grid-cols-3 sm:overflow-visible">
+            {relatedItems.map((related) => (
+              <Link
+                key={related.id}
+                to={`/item/${related.id}`}
+                className="flex-shrink-0 w-48 sm:w-auto flex flex-col gap-1 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-sky-200 dark:hover:border-sky-800 hover:shadow-md transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-sky-600">
+                    {getPlatformIcon(related.source_platform)}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium truncate">
+                    {related.source_platform}
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
+                  {related.title || "Untitled"}
+                </p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+            No related items found.
+          </p>
+        )}
       </div>
+
+      <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-4">
+          Comments
+        </h2>
+        <div className="flex gap-2 mb-5 w-full">
+          <input
+            ref={commentInputRef}
+            type="text"
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
+            placeholder="Add a comment..."
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
+          />
+          <button
+            onClick={handleAddComment}
+            disabled={!commentText.trim() || addComment.isPending}
+            className="p-2.5 rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 transition-all duration-200 cursor-pointer flex-shrink-0"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+        {comments && comments.length > 0 ? (
+          <div className="space-y-3 w-full">
+            {comments.map((comment) => (
+              <div
+                key={comment.id}
+                className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    {comment.user_display_name}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {formatDate(comment.created_at)}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {comment.content}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+            No comments yet. Be the first!
+          </p>
+        )}
+      </div>
+
+      {shareOpen && (
+        <ShareDialog
+          itemId={id}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

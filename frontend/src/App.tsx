@@ -17,6 +17,8 @@ const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SharedWithMe = lazy(() => import("./pages/SharedWithMe"));
+const Feed = lazy(() => import("./pages/Feed"));
+const PublicShare = lazy(() => import("./pages/PublicShare"));
 
 function LoadingFallback() {
   return (
@@ -57,8 +59,12 @@ export default function App() {
           <Route path="/add" element={<SuspenseWrap><AddItem /></SuspenseWrap>} />
           <Route path="/admin" element={<SuspenseWrap><Admin /></SuspenseWrap>} />
           <Route path="/shared" element={<SuspenseWrap><SharedWithMe /></SuspenseWrap>} />
+          <Route path="/feed" element={<SuspenseWrap><Feed /></SuspenseWrap>} />
         </Route>
       </Route>
+
+      {/* Public share route — no auth required */}
+      <Route path="/public/:token" element={<SuspenseWrap><PublicShare /></SuspenseWrap>} />
     </Routes>
   );
 }

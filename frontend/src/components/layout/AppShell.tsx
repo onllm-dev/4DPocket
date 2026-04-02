@@ -3,8 +3,12 @@ import { BottomNav } from "./BottomNav";
 import { Footer } from "./Footer";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
+import { CommandPalette } from "@/components/common/CommandPalette";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard";
 
 export function AppShell() {
+  useKeyboardShortcuts();
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       <Sidebar />
@@ -16,6 +20,7 @@ export function AppShell() {
         </main>
       </div>
       <BottomNav />
+      <CommandPalette />
     </div>
   );
 }

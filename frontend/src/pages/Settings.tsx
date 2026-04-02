@@ -7,11 +7,26 @@ import {
   List,
   Info,
   Sparkles,
+  Download,
+  Share2,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
 
 type Theme = "light" | "dark" | "system";
 type ViewMode = "grid" | "list";
+
+interface ApiSettings {
+  ai_provider: string;
+  auto_tag: boolean;
+  auto_summarize: boolean;
+  tag_confidence_threshold: number;
+  media_download: boolean;
+  default_share_mode: string;
+  theme: string;
+  view_mode: string;
+}
 
 const THEMES: { value: Theme; label: string; icon: React.ReactNode }[] = [
   { value: "light", label: "Light", icon: <Sun className="h-4 w-4" /> },
@@ -24,8 +39,33 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: React.ReactNode }[] = 
   { value: "list", label: "List", icon: <List className="h-4 w-4" /> },
 ];
 
+const AI_PROVIDERS = ["openai", "anthropic", "ollama", "groq"];
+const SHARE_MODES = ["private", "public"];
+
 export default function Settings() {
+  const qc = useQueryClient();
   const { theme, viewMode, setTheme, setViewMode } = useUIStore();
+
+  const { data: settings } = useQuery<ApiSettings>({
+    queryKey: ["settings"],
+    queryFn: () => api.get("/api/v1/settings"),
+  });
+
+  const updateSettings = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      api.patch("/api/v1/settings", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+  });
+
+  function handleThemeChange(value: Theme) {
+    setTheme(value);
+    updateSettings.mutate({ theme: value });
+  }
+
+  function handleViewModeChange(value: ViewMode) {
+    setViewMode(value);
+    updateSettings.mutate({ view_mode: value });
+  }
 
   return (
     <div className="animate-fade-in p-6 max-w-2xl mx-auto">
@@ -37,6 +77,7 @@ export default function Settings() {
       </div>
 
       <div className="space-y-6">
+        {/* Appearance */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
           <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4">
             Appearance
@@ -50,7 +91,7 @@ export default function Settings() {
               {THEMES.map((t) => (
                 <button
                   key={t.value}
-                  onClick={() => setTheme(t.value)}
+                  onClick={() => handleThemeChange(t.value)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex-1 justify-center cursor-pointer ${
                     theme === t.value
                       ? "bg-sky-600 text-white"
@@ -72,7 +113,7 @@ export default function Settings() {
               {VIEW_MODES.map((m) => (
                 <button
                   key={m.value}
-                  onClick={() => setViewMode(m.value)}
+                  onClick={() => handleViewModeChange(m.value)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex-1 justify-center cursor-pointer ${
                     viewMode === m.value
                       ? "bg-sky-600 text-white"
@@ -87,28 +128,207 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* AI Settings */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-sky-600" />
             <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-              AI Provider
+              AI Settings
             </h2>
           </div>
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                Provider
-              </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                Server-side configuration
-              </p>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                  AI Provider
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  Backend model provider
+                </p>
+              </div>
+              <select
+                value={settings?.ai_provider ?? ""}
+                onChange={(e) =>
+                  updateSettings.mutate({ ai_provider: e.target.value })
+                }
+                className="text-sm bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 rounded-lg border-none outline-none cursor-pointer"
+              >
+                {AI_PROVIDERS.map((p) => (
+                  <option key={p} value={p}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
-            <span className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg">
-              Configured on server
-            </span>
+
+            <div className="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
+              <div>
+                <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                  Auto-tag
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  Automatically tag new items with AI
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={settings?.auto_tag ?? false}
+                onClick={() =>
+                  updateSettings.mutate({ auto_tag: !(settings?.auto_tag) })
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                  settings?.auto_tag
+                    ? "bg-sky-600"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                    settings?.auto_tag ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
+              <div>
+                <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                  Auto-summarize
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  Generate summaries for new items
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={settings?.auto_summarize ?? false}
+                onClick={() =>
+                  updateSettings.mutate({
+                    auto_summarize: !(settings?.auto_summarize),
+                  })
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                  settings?.auto_summarize
+                    ? "bg-sky-600"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                    settings?.auto_summarize ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="py-2 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                    Tag confidence threshold
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    Minimum confidence to apply a tag
+                  </p>
+                </div>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {Math.round((settings?.tag_confidence_threshold ?? 0.7) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings?.tag_confidence_threshold ?? 0.7}
+                onChange={(e) =>
+                  updateSettings.mutate({
+                    tag_confidence_threshold: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full accent-sky-600 cursor-pointer"
+              />
+            </div>
           </div>
         </div>
 
+        {/* Media */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Download className="h-4 w-4 text-sky-600" />
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              Media
+            </h2>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                Download media
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                Save images and videos locally
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={settings?.media_download ?? false}
+              onClick={() =>
+                updateSettings.mutate({
+                  media_download: !(settings?.media_download),
+                })
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                settings?.media_download
+                  ? "bg-sky-600"
+                  : "bg-gray-200 dark:bg-gray-700"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                  settings?.media_download ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Sharing */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Share2 className="h-4 w-4 text-sky-600" />
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              Sharing
+            </h2>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                Default share mode
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                Default visibility for shared items
+              </p>
+            </div>
+            <select
+              value={settings?.default_share_mode ?? "private"}
+              onChange={(e) =>
+                updateSettings.mutate({ default_share_mode: e.target.value })
+              }
+              className="text-sm bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 rounded-lg border-none outline-none cursor-pointer"
+            >
+              {SHARE_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* About */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Info className="h-4 w-4 text-sky-600" />

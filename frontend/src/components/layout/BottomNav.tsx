@@ -1,11 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, Search, FolderOpen, Settings } from "lucide-react";
+import { Home, BookOpen, Search, Rss, Settings } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Home", icon: Home },
   { path: "/knowledge", label: "Library", icon: BookOpen },
   { path: "/search", label: "Search", icon: Search },
-  { path: "/collections", label: "Collections", icon: FolderOpen },
+  { path: "/feed", label: "Feed", icon: Rss },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

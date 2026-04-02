@@ -1,25 +1,30 @@
 import { Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, FolderOpen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 
+interface Stats {
+  total_items: number;
+  items_this_week: number;
+  total_tags: number;
+  total_notes: number;
+  total_collections: number;
+  platforms: Record<string, number>;
+  top_tags: Array<{ name: string; count: number }>;
+}
+
 export default function Dashboard() {
-  const { data, isLoading } = useItems();
+  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
+    queryKey: ["stats"],
+    queryFn: () => api.get("/api/v1/stats"),
+  });
+
+  const { data, isLoading: itemsLoading } = useItems();
 
   const allItems = data?.pages.flat() ?? [];
   const recentItems = allItems.slice(0, 8);
-
-  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const thisWeekCount = allItems.filter(
-    (item) => new Date(item.created_at).getTime() > oneWeekAgo
-  ).length;
-
-  const uniqueTags = new Set(
-    allItems.flatMap((item) => {
-      const meta = item.item_metadata as Record<string, unknown>;
-      return Array.isArray(meta?.tags) ? (meta.tags as string[]) : [];
-    })
-  );
 
   return (
     <div className="animate-fade-in p-6 max-w-6xl mx-auto">
@@ -35,7 +40,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 hover:shadow-md transition-all duration-200">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-sky-50 dark:bg-sky-900/20">
@@ -46,10 +51,10 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {isLoading ? (
+            {statsLoading ? (
               <span className="inline-block w-12 h-8 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
             ) : (
-              allItems.length
+              stats?.total_items ?? 0
             )}
           </div>
         </div>
@@ -64,10 +69,10 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {isLoading ? (
+            {statsLoading ? (
               <span className="inline-block w-12 h-8 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
             ) : (
-              thisWeekCount
+              stats?.items_this_week ?? 0
             )}
           </div>
         </div>
@@ -82,10 +87,28 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {isLoading ? (
+            {statsLoading ? (
               <span className="inline-block w-12 h-8 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
             ) : (
-              uniqueTags.size
+              stats?.total_tags ?? 0
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 hover:shadow-md transition-all duration-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+              <FolderOpen className="h-5 w-5 text-amber-600" />
+            </div>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Collections
+            </span>
+          </div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            {statsLoading ? (
+              <span className="inline-block w-12 h-8 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            ) : (
+              stats?.total_collections ?? 0
             )}
           </div>
         </div>
@@ -103,7 +126,7 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {isLoading ? (
+      {itemsLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div

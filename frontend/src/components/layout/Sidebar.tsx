@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User } from "lucide-react";
+import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 
@@ -11,6 +11,7 @@ const navItems = [
   { path: "/tags", label: "Tags", icon: Tags },
   { path: "/notes", label: "Notes", icon: FileText },
   { path: "/shared", label: "Shared with Me", icon: Share2 },
+  { path: "/feed", label: "Feed", icon: Rss },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

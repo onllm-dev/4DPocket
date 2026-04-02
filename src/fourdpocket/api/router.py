@@ -15,6 +15,7 @@ from fourdpocket.api.search import router as search_router
 from fourdpocket.api.settings import router as settings_router
 from fourdpocket.api.stats import router as stats_router
 from fourdpocket.api.sharing import public_router, router as sharing_router
+from fourdpocket.api.rules import router as rules_router
 from fourdpocket.api.tags import router as tags_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -35,3 +36,4 @@ api_router.include_router(public_router)
 api_router.include_router(admin_router)
 api_router.include_router(settings_router)
 api_router.include_router(stats_router)
+api_router.include_router(rules_router)
