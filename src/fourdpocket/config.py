@@ -7,6 +7,22 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _get_or_create_secret_key() -> str:
+    """Get secret key from env, file, or generate and persist one."""
+    import os
+
+    env_key = os.environ.get("FDP_AUTH__SECRET_KEY")
+    if env_key:
+        return env_key
+    key_file = Path.home() / ".4dpocket" / "secret_key"
+    if key_file.exists():
+        return key_file.read_text().strip()
+    key = secrets.token_urlsafe(32)
+    key_file.parent.mkdir(parents=True, exist_ok=True)
+    key_file.write_text(key)
+    return key
+
+
 class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_DATABASE__")
 
@@ -17,7 +33,7 @@ class DatabaseSettings(BaseSettings):
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_AUTH__")
 
-    secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
+    secret_key: str = Field(default_factory=_get_or_create_secret_key)
     algorithm: str = "HS256"
     token_expire_minutes: int = 10080  # 7 days
     mode: str = "single"  # "single" or "multi"

@@ -249,10 +249,9 @@ export default function ItemDetail() {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
             Content
           </h2>
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: item.content }}
-          />
+          <div className="prose dark:prose-invert max-w-none text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+            {item.content}
+          </div>
         </div>
       )}
 

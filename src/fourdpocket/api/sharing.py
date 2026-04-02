@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole, ShareType
+from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
 from fourdpocket.sharing.share_manager import (
     add_recipient,
@@ -251,7 +252,7 @@ def accept_share(
 public_router = APIRouter(prefix="/public", tags=["sharing"])
 
 
-@public_router.get("/{token}", response_model=PublicShareRead)
+@public_router.get("/{token}")
 def get_public_share(
     token: str,
     db: Session = Depends(get_db),
@@ -262,6 +263,26 @@ def get_public_share(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Public share not found or expired",
         )
+    if share.item_id:
+        item = db.get(KnowledgeItem, share.item_id)
+        if not item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared item not found")
+        tag_links = db.exec(select(ItemTag).where(ItemTag.item_id == item.id)).all()
+        tag_ids = [tl.tag_id for tl in tag_links]
+        tags = db.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
+        owner = db.get(User, item.user_id)
+        return {
+            "id": str(item.id),
+            "title": item.title,
+            "url": item.url,
+            "description": item.description,
+            "content": item.content,
+            "summary": item.summary,
+            "source_platform": item.source_platform,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+            "tags": [t.name for t in tags],
+            "owner_display_name": owner.display_name or owner.username if owner else "Unknown",
+        }
     return PublicShareRead(
         share_type=share.share_type,
         item_id=share.item_id,

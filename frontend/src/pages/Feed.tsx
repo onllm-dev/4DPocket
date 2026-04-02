@@ -1,5 +1,6 @@
 import { Rss, Loader2, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
 
@@ -39,9 +40,10 @@ export default function Feed() {
       ) : (
         <div className="space-y-4">
           {items.map((item) => (
-            <div
+            <Link
               key={item.id}
-              className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+              to={`/item/${item.id}`}
+              className="block rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 hover:shadow-md transition-all duration-200"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -58,12 +60,12 @@ export default function Feed() {
                   </div>
                 </div>
                 {item.url && (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:text-sky-700 flex-shrink-0">
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-sky-600 hover:text-sky-700 flex-shrink-0">
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

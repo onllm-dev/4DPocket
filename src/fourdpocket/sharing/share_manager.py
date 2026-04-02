@@ -56,7 +56,7 @@ def add_recipient(
         share_id=share_id,
         user_id=user_id,
         role=role,
-        accepted=True,  # auto-accept for now
+        accepted=False,
     )
     db.add(recipient)
     db.commit()

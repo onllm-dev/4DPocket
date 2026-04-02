@@ -82,12 +82,12 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@example.com"
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as "viewer" | "editor")}
-              className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm cursor-pointer"
+              className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 cursor-pointer"
             >
               <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
@@ -114,7 +114,7 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
                 type="text"
                 value={publicLink}
                 readOnly
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs font-mono"
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs font-mono text-gray-900 dark:text-gray-100"
               />
               <button
                 onClick={copyLink}

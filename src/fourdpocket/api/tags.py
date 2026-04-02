@@ -16,7 +16,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 
 def _slugify(name: str) -> str:
     slug = name.lower().strip()
-    slug = re.sub(r"[^\w\s/-]", "", slug)
+    slug = re.sub(r"[^\w\s-]", "", slug)
     slug = re.sub(r"[\s]+", "-", slug)
     return slug
 

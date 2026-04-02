@@ -73,7 +73,7 @@ export function CommandPalette() {
 
   const allItems = [
     ...filteredNav.map((n) => ({ type: "nav" as const, ...n })),
-    ...results.map((r) => ({ type: "result" as const, label: r.title, path: `/items/${r.id}`, id: r.id })),
+    ...results.map((r) => ({ type: "result" as const, label: r.title, path: `/item/${r.id}`, id: r.id })),
   ];
 
   const handleSelect = useCallback(
@@ -161,7 +161,7 @@ export function CommandPalette() {
               {results.map((r, i) => (
                 <button
                   key={r.id}
-                  onClick={() => handleSelect(`/items/${r.id}`)}
+                  onClick={() => handleSelect(`/item/${r.id}`)}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                     activeIndex === filteredNav.length + i
                       ? "bg-sky-50 dark:bg-sky-950 text-sky-600"

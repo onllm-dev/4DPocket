@@ -35,6 +35,9 @@ export default function KnowledgeBase() {
   const { viewMode, setViewMode } = useUIStore();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [showBulkTagInput, setShowBulkTagInput] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const qc = useQueryClient();
 
   const filters =
@@ -64,9 +67,10 @@ export default function KnowledgeBase() {
   };
 
   const handleBulkTag = () => {
-    const tag = prompt("Enter tag name:");
-    if (!tag?.trim()) return;
-    bulkAction.mutate({ action: "tag", item_ids: Array.from(selected), tag_name: tag.trim() });
+    if (!bulkTagInput.trim()) return;
+    bulkAction.mutate({ action: "tag", item_ids: Array.from(selected), tag_name: bulkTagInput.trim() });
+    setBulkTagInput("");
+    setShowBulkTagInput(false);
   };
 
   const handleBulkArchive = () => {
@@ -74,8 +78,8 @@ export default function KnowledgeBase() {
   };
 
   const handleBulkDelete = () => {
-    if (!confirm(`Delete ${selected.size} item(s)?`)) return;
     bulkAction.mutate({ action: "delete", item_ids: Array.from(selected) });
+    setConfirmDelete(false);
   };
 
   return (
@@ -223,12 +227,36 @@ export default function KnowledgeBase() {
       )}
 
       {selecting && selected.size > 0 && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl px-4 py-3 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{selected.size} selected</span>
-          <button onClick={handleBulkTag} className="px-3 py-1.5 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-sm font-medium hover:bg-sky-200 dark:hover:bg-sky-900/50 transition-all cursor-pointer">Tag</button>
-          <button onClick={handleBulkArchive} className="px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all cursor-pointer">Archive</button>
-          <button onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer">Delete</button>
-          <button onClick={() => { setSelecting(false); setSelected(new Set()); }} className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm cursor-pointer">Cancel</button>
+          {showBulkTagInput ? (
+            <>
+              <input
+                type="text"
+                value={bulkTagInput}
+                onChange={(e) => setBulkTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleBulkTag()}
+                placeholder="Tag name..."
+                autoFocus
+                className="px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+              <button onClick={handleBulkTag} disabled={!bulkTagInput.trim()} className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-all cursor-pointer disabled:opacity-50">Apply</button>
+              <button onClick={() => { setShowBulkTagInput(false); setBulkTagInput(""); }} className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm cursor-pointer">Cancel</button>
+            </>
+          ) : confirmDelete ? (
+            <>
+              <span className="text-sm text-red-600 dark:text-red-400">Delete {selected.size} item(s)?</span>
+              <button onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-all cursor-pointer">Confirm</button>
+              <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm cursor-pointer">Cancel</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setShowBulkTagInput(true)} className="px-3 py-1.5 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-sm font-medium hover:bg-sky-200 dark:hover:bg-sky-900/50 transition-all cursor-pointer">Tag</button>
+              <button onClick={handleBulkArchive} className="px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all cursor-pointer">Archive</button>
+              <button onClick={() => setConfirmDelete(true)} className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer">Delete</button>
+              <button onClick={() => { setSelecting(false); setSelected(new Set()); }} className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm cursor-pointer">Cancel</button>
+            </>
+          )}
         </div>
       )}
     </div>

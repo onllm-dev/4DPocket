@@ -91,6 +91,7 @@ export default function Collections() {
               Cancel
             </button>
           </div>
+          {createCollection.isError && <p className="text-sm text-red-500 mt-2">Failed to create collection. Please try again.</p>}
         </form>
       )}
 

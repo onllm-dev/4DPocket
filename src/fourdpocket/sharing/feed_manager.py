@@ -6,6 +6,7 @@ from sqlmodel import Session, col, select
 
 from fourdpocket.models.feed import KnowledgeFeed
 from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.share import Share
 
 
 def subscribe(
@@ -56,11 +57,18 @@ def get_feed_items(
     if not publisher_ids:
         return []
 
+    public_item_ids = select(Share.item_id).where(
+        Share.owner_id.in_(publisher_ids),
+        Share.item_id.is_not(None),
+        Share.public_token.is_not(None),
+    )
+
     items = db.exec(
         select(KnowledgeItem)
         .where(
             KnowledgeItem.user_id.in_(publisher_ids),
             KnowledgeItem.is_archived == False,
+            KnowledgeItem.id.in_(public_item_ids),
         )
         .order_by(col(KnowledgeItem.created_at).desc())
         .offset(offset)

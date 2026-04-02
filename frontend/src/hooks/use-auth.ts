@@ -38,7 +38,7 @@ export function useLogin() {
 export function useRegister() {
   return useMutation({
     mutationFn: (data: { username: string; email: string; password: string; display_name?: string }) =>
-      api.register(data.email, data.password, data.display_name),
+      api.register(data.email, data.password, data.display_name, data.username),
   });
 }
 

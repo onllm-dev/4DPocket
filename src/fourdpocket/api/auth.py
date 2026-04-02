@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import Session, func, select
 
 from fourdpocket.api.auth_utils import create_access_token, hash_password, verify_password
@@ -97,15 +97,22 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+ALLOWED_PROFILE_FIELDS = {"display_name", "avatar_url", "bio"}
+
+
 @router.patch("/me", response_model=UserRead)
 def update_me(
     data: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    update_dict = data.model_dump(exclude_unset=True)
-    for key, value in update_dict.items():
-        setattr(current_user, key, value)
+    update_data = {
+        k: v
+        for k, v in data.model_dump(exclude_unset=True).items()
+        if k in ALLOWED_PROFILE_FIELDS
+    }
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
@@ -115,6 +122,13 @@ def update_me(
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
 
 
 @router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)

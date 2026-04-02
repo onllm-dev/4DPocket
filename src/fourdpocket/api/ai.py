@@ -14,7 +14,7 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 @router.get("/status")
-def ai_status():
+def ai_status(_: User = Depends(get_current_user)):
     """Check AI provider availability."""
     settings = get_settings()
     return {

@@ -46,7 +46,7 @@ export default function Admin() {
   });
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto">
+    <div className="animate-fade-in max-w-4xl mx-auto px-4 md:px-6">
       <div className="flex items-center gap-3 mb-6">
         <Shield className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Admin Panel</h1>
@@ -65,7 +65,7 @@ export default function Admin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Registration</p>
-                <p className="text-xs text-gray-500">Allow new users to register</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Allow new users to register</p>
               </div>
               <button
                 onClick={() => updateSettings.mutate({ registration_enabled: !settings.registration_enabled })}
@@ -81,7 +81,7 @@ export default function Admin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Registration Mode</p>
-                <p className="text-xs text-gray-500">open / invite / disabled</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">open / invite / disabled</p>
               </div>
               <div className="flex gap-1">
                 {["open", "invite", "disabled"].map((mode) => (
@@ -153,7 +153,7 @@ export default function Admin() {
                   <select
                     value={user.role}
                     onChange={(e) => updateUser.mutate({ id: user.id, role: e.target.value })}
-                    className="text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-2 py-1.5 cursor-pointer"
+                    className="text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1.5 cursor-pointer"
                   >
                     <option value="user">User</option>
                     <option value="admin">Admin</option>

@@ -108,6 +108,7 @@ export default function Notes() {
               Cancel
             </button>
           </div>
+          {createNote.isError && <p className="text-sm text-red-500 mt-2">Failed to save note. Please try again.</p>}
         </form>
       )}
 

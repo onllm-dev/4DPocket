@@ -16,6 +16,9 @@ from fourdpocket.models.base import ItemType, SourcePlatform
 router = APIRouter(tags=["import-export"])
 
 
+MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
+
+
 @router.post("/import/{source}")
 def import_bookmarks(
     source: str,
@@ -24,7 +27,10 @@ def import_bookmarks(
     current_user: User = Depends(get_current_user),
 ):
     """Import bookmarks from external sources."""
-    content = file.file.read().decode("utf-8", errors="replace")
+    raw = file.file.read(MAX_IMPORT_SIZE + 1)
+    if len(raw) > MAX_IMPORT_SIZE:
+        raise HTTPException(413, "Import file too large (max 10MB)")
+    content = raw.decode("utf-8", errors="replace")
     imported = 0
 
     if source == "chrome":
@@ -79,6 +85,8 @@ def _import_json(json_str: str, user_id, db: Session) -> int:
     """Import from generic JSON array."""
     data = json.loads(json_str)
     items = data if isinstance(data, list) else data.get("items", [])
+    if len(items) > 10000:
+        raise HTTPException(413, "Too many items (max 10,000)")
     count = 0
     for entry in items:
         url = entry.get("url", "")

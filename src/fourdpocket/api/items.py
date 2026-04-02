@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from pydantic import BaseModel
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, select, func, col, delete as sql_delete
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.base import ItemType, SourcePlatform
@@ -321,6 +321,7 @@ def bulk_action(
             item.is_archived = True
             db.add(item)
         elif data.action == "delete":
+            db.exec(sql_delete(ItemTag).where(ItemTag.item_id == item.id))
             db.delete(item)
         elif data.action == "favorite":
             item.is_favorite = True

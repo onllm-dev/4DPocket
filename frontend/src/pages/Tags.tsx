@@ -51,7 +51,7 @@ export default function Tags() {
       maxCount === minCount
         ? 0.5
         : (count - minCount) / (maxCount - minCount);
-    return 0.4 + ratio * 0.6;
+    return 0.6 + ratio * 0.4;
   };
 
   const getFontSize = (count: number) => {
