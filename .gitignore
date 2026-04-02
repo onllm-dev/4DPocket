@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data & runtime
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Environment & secrets
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/test-screenshots/
+frontend/test-*.png
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# OMC / Claude
+.omc/state/
+.omc/logs/
+.omc/notepad.md
+.omc/prd.json
+.omc/progress.txt
+.omc/plans/
+.omc/research/
+design-system/
+
+# Build artifacts
+*.tgz
+*.tar.gz
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test artifacts
+test-results/
+playwright-report/

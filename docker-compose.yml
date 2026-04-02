@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "4040:4040"
+    environment:
+      - FDP_DATABASE__URL=postgresql://4dp:4dp@db:5432/4dpocket
+      - FDP_SEARCH__BACKEND=meilisearch
+      - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+      - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
+      - FDP_AI__OLLAMA_URL=http://ollama:11434
+      - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
+      - FDP_AI__NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - FDP_AUTH__MODE=multi
+      - FDP_STORAGE__BASE_PATH=/data
+    volumes:
+      - 4dp-data:/data
+    depends_on:
+      - db
+      - meilisearch
+
+  worker:
+    build: .
+    command: ["python", "-m", "huey.bin.huey_consumer", "fourdpocket.workers.huey", "--workers", "2"]
+    environment:
+      - FDP_DATABASE__URL=postgresql://4dp:4dp@db:5432/4dpocket
+      - FDP_SEARCH__BACKEND=meilisearch
+      - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+      - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
+      - FDP_AI__OLLAMA_URL=http://ollama:11434
+      - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
+      - FDP_AI__NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - FDP_STORAGE__BASE_PATH=/data
+    volumes:
+      - 4dp-data:/data
+    depends_on:
+      - db
+      - meilisearch
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=4dp
+      - POSTGRES_PASSWORD=4dp
+      - POSTGRES_DB=4dpocket
+    volumes:
+      - 4dp-postgres:/var/lib/postgresql/data
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+    volumes:
+      - 4dp-meili:/meili_data
+    ports:
+      - "7700:7700"
+
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - 4dp-chroma:/chroma/chroma
+    ports:
+      - "8000:8000"
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - 4dp-ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  4dp-data:
+  4dp-postgres:
+  4dp-meili:
+  4dp-chroma:
+  4dp-ollama:
