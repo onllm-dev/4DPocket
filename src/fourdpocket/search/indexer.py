@@ -7,7 +7,6 @@ from sqlmodel import Session
 
 from fourdpocket.config import get_settings
 from fourdpocket.models.item import KnowledgeItem
-from fourdpocket.search import sqlite_fts
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,7 @@ class SearchIndexer:
     def init(self) -> None:
         """Initialize search backend (create tables/indexes)."""
         if self._backend == "sqlite":
+            from fourdpocket.search import sqlite_fts
             sqlite_fts.init_fts(self._db)
         elif self._backend == "meilisearch":
             pass  # Meilisearch initialization handled separately
@@ -29,6 +29,7 @@ class SearchIndexer:
     def index_item(self, item: KnowledgeItem) -> None:
         """Index a knowledge item."""
         if self._backend == "sqlite":
+            from fourdpocket.search import sqlite_fts
             sqlite_fts.index_item(self._db, item)
         elif self._backend == "meilisearch":
             from fourdpocket.search.meilisearch_backend import index_item as meili_index
@@ -38,6 +39,7 @@ class SearchIndexer:
     def delete_item(self, item_id: uuid.UUID) -> None:
         """Remove an item from the search index."""
         if self._backend == "sqlite":
+            from fourdpocket.search import sqlite_fts
             sqlite_fts.delete_item(self._db, item_id)
         elif self._backend == "meilisearch":
             from fourdpocket.search.meilisearch_backend import delete_item as meili_delete
@@ -55,6 +57,7 @@ class SearchIndexer:
     ) -> list[dict]:
         """Search items."""
         if self._backend == "sqlite":
+            from fourdpocket.search import sqlite_fts
             return sqlite_fts.search(
                 self._db, query, user_id, item_type, source_platform, limit, offset
             )

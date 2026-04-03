@@ -4,9 +4,14 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class Tag(SQLModel, table=True):
@@ -21,7 +26,10 @@ class Tag(SQLModel, table=True):
     color: str | None = None
     description: str | None = None
     usage_count: int = Field(default=0)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
 class ItemTag(SQLModel, table=True):

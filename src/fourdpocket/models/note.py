@@ -9,9 +9,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import Text
+    from sqlalchemy import DateTime, Text
 except ImportError:
-    from sqlmodel import Text
+    from sqlmodel import DateTime, Text
 
 
 class Note(SQLModel, table=True):
@@ -23,8 +23,14 @@ class Note(SQLModel, table=True):
     title: str | None = None
     content: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     summary: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class NoteCreate(BaseModel):

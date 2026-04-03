@@ -3,7 +3,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlmodel import Field, SQLModel
+from sqlalchemy import DateTime
+from sqlmodel import Column, Field, SQLModel
 
 
 class RSSFeed(SQLModel, table=True):
@@ -17,6 +18,12 @@ class RSSFeed(SQLModel, table=True):
     target_collection_id: uuid.UUID | None = Field(default=None, foreign_key="collections.id")
     poll_interval: int = Field(default=3600)  # seconds: 900, 3600, 21600, 86400
     is_active: bool = Field(default=True)
-    last_fetched_at: datetime | None = None
+    last_fetched_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     last_entry_id: str | None = None  # To avoid re-fetching
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

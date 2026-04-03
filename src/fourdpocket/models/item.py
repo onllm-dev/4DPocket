@@ -9,9 +9,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import ItemType, SourcePlatform, utc_now
 
 try:
-    from sqlalchemy import JSON, Text
+    from sqlalchemy import JSON, DateTime, Text
 except ImportError:
-    from sqlmodel import JSON, Text
+    from sqlmodel import JSON, DateTime, Text
 
 
 class KnowledgeItem(SQLModel, table=True):
@@ -29,13 +29,19 @@ class KnowledgeItem(SQLModel, table=True):
     summary: str | None = None
     screenshot_path: str | None = None
     archive_path: str | None = None
-    media: list = Field(default_factory=list, sa_column=Column(JSON, default="[]"))
-    item_metadata: dict = Field(default_factory=dict, sa_column=Column("metadata", JSON, default="{}"))
+    media: list = Field(default_factory=list, sa_column=Column(JSON))
+    item_metadata: dict = Field(default_factory=dict, sa_column=Column("metadata", JSON))
     is_favorite: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     reading_progress: int = Field(default=0)
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class ItemCreate(BaseModel):

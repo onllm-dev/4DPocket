@@ -8,9 +8,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import JSON
+    from sqlalchemy import DateTime, JSON
 except ImportError:
-    from sqlmodel import JSON
+    from sqlmodel import DateTime, JSON
 
 
 class KnowledgeFeed(SQLModel, table=True):
@@ -19,5 +19,8 @@ class KnowledgeFeed(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     subscriber_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     publisher_id: uuid.UUID = Field(foreign_key="users.id", index=True)
-    filter_config: dict = Field(default_factory=dict, sa_column=Column("filter", JSON, default="{}"))
-    created_at: datetime = Field(default_factory=utc_now)
+    filter_config: dict = Field(default_factory=dict, sa_column=Column("filter", JSON))
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

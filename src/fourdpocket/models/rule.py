@@ -8,9 +8,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import JSON
+    from sqlalchemy import DateTime, JSON
 except ImportError:
-    from sqlmodel import JSON
+    from sqlmodel import DateTime, JSON
 
 
 class Rule(SQLModel, table=True):
@@ -19,7 +19,10 @@ class Rule(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     name: str
-    condition: dict = Field(default_factory=dict, sa_column=Column(JSON, default="{}"))
-    action: dict = Field(default_factory=dict, sa_column=Column(JSON, default="{}"))
+    condition: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    action: dict = Field(default_factory=dict, sa_column=Column(JSON))
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

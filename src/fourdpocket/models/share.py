@@ -4,9 +4,14 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class ShareType(str, enum.Enum):
@@ -30,8 +35,14 @@ class Share(SQLModel, table=True):
     collection_id: uuid.UUID | None = Field(default=None, foreign_key="collections.id")
     tag_id: uuid.UUID | None = Field(default=None, foreign_key="tags.id")
     public_token: str | None = Field(default=None, unique=True)
-    expires_at: datetime | None = None
-    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
 class ShareRecipient(SQLModel, table=True):
@@ -42,4 +53,7 @@ class ShareRecipient(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     role: ShareRecipientRole = Field(default=ShareRecipientRole.viewer)
     accepted: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

@@ -4,9 +4,14 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import ShareMode, utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class Collection(SQLModel, table=True):
@@ -21,8 +26,14 @@ class Collection(SQLModel, table=True):
     is_smart: bool = Field(default=False)
     smart_query: str | None = None
     share_mode: ShareMode = Field(default=ShareMode.private)
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class CollectionItem(SQLModel, table=True):
@@ -31,7 +42,10 @@ class CollectionItem(SQLModel, table=True):
     collection_id: uuid.UUID = Field(foreign_key="collections.id", primary_key=True)
     item_id: uuid.UUID = Field(foreign_key="knowledge_items.id", primary_key=True)
     position: int = Field(default=0)
-    added_at: datetime = Field(default_factory=utc_now)
+    added_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
 class CollectionCreate(BaseModel):

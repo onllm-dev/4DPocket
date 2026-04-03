@@ -17,4 +17,4 @@ class InstanceSettings(SQLModel, table=True):
     registration_mode: str = Field(default="open")  # "open", "invite", "disabled"
     default_user_role: str = Field(default="user")
     max_users: int | None = None
-    extra: dict = Field(default_factory=dict, sa_column=Column(JSON, default="{}"))
+    extra: dict = Field(default_factory=dict, sa_column=Column(JSON))

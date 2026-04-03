@@ -152,8 +152,7 @@ def login(
     # Set httpOnly cookie for XSS protection (supplements Bearer token)
     from fourdpocket.config import get_settings
     cookie_settings = get_settings()
-    # Use secure=True in production (non-SQLite database); allow plain HTTP in dev
-    is_secure = not cookie_settings.database.url.startswith("sqlite")
+    is_secure = cookie_settings.server.secure_cookies
     response.set_cookie(
         key="4dp_token",
         value=access_token,

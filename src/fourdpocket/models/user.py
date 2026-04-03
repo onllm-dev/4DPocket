@@ -10,9 +10,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import UserRole, utc_now
 
 try:
-    from sqlalchemy import JSON
+    from sqlalchemy import DateTime, JSON
 except ImportError:
-    from sqlmodel import JSON
+    from sqlmodel import DateTime, JSON
 
 
 class User(SQLModel, table=True):
@@ -27,9 +27,15 @@ class User(SQLModel, table=True):
     bio: str | None = None
     is_active: bool = Field(default=True)
     role: UserRole = Field(default=UserRole.user)
-    settings: dict = Field(default_factory=dict, sa_column=Column(JSON, default="{}"))
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    settings: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class UserCreate(BaseModel):

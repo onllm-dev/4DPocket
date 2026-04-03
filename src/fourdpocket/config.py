@@ -3,7 +3,7 @@
 import secrets
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -78,6 +78,7 @@ class ServerSettings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 4040
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4040"]
+    secure_cookies: bool = False  # Set True behind HTTPS in production
 
 
 class Settings(BaseSettings):
@@ -89,6 +90,17 @@ class Settings(BaseSettings):
     search: SearchSettings = Field(default_factory=SearchSettings)
     ai: AISettings = Field(default_factory=AISettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+
+    @model_validator(mode="after")
+    def validate_search_db_compat(self) -> "Settings":
+        if not self.database.url.startswith("sqlite") and self.search.backend == "sqlite":
+            import logging
+            logging.getLogger(__name__).warning(
+                "FDP_SEARCH__BACKEND=sqlite is incompatible with PostgreSQL. "
+                "Auto-switching to 'meilisearch'. Set FDP_SEARCH__BACKEND=meilisearch explicitly."
+            )
+            self.search.backend = "meilisearch"
+        return self
 
 
 _settings: Settings | None = None
