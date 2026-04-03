@@ -23,8 +23,9 @@ interface Item {
 }
 
 interface SearchFilters {
-  platforms: string[];
-  item_types: string[];
+  platforms: Array<{ name: string; count: number }>;
+  types: string[];
+  tags: Array<{ name: string; slug: string; count: number }>;
 }
 
 export default function Search() {
@@ -85,7 +86,7 @@ export default function Search() {
   const showSkeleton = (isLoading || isFetching) && query.length >= 2;
 
   return (
-    <div className="animate-fade-in p-6 max-w-4xl mx-auto">
+    <div className="animate-fade-in p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <SearchIcon className="h-6 w-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -135,24 +136,24 @@ export default function Search() {
       </div>
 
       {/* Filter chips */}
-      {(filters?.platforms?.length || filters?.item_types?.length) ? (
+      {(filters?.platforms?.length || filters?.types?.length) ? (
         <div className="flex flex-wrap gap-2 mb-6">
-          {filters.platforms?.map((platform) => (
+          {filters.platforms?.map((p) => (
             <button
-              key={platform}
+              key={p.name}
               onClick={() =>
-                setSelectedPlatform(selectedPlatform === platform ? null : platform)
+                setSelectedPlatform(selectedPlatform === p.name ? null : p.name)
               }
               className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-                selectedPlatform === platform
+                selectedPlatform === p.name
                   ? "bg-sky-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
               }`}
             >
-              {platform}
+              {p.name} ({p.count})
             </button>
           ))}
-          {filters.item_types?.map((type) => (
+          {filters.types?.map((type) => (
             <button
               key={type}
               onClick={() =>

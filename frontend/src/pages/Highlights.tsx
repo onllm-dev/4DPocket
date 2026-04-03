@@ -44,7 +44,7 @@ export default function Highlights() {
     : highlights;
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto px-4">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4">
       <div className="flex items-center gap-3 mb-6">
         <Highlighter className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Highlights</h1>
@@ -89,7 +89,7 @@ export default function Highlights() {
               )}
               <div className="flex items-center justify-between mt-3">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400">{timeAgo(h.created_at)}</span>
-                <button onClick={() => deleteHighlight.mutate(h.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer">
+                <button onClick={() => deleteHighlight.mutate(h.id)} aria-label="Delete highlight" className="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>

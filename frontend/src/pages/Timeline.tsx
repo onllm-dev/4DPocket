@@ -33,7 +33,7 @@ export default function Timeline() {
   };
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto px-4">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4">
       <div className="flex items-center gap-3 mb-6">
         <Clock className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Timeline</h1>

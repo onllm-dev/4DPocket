@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 export function useSharedWithMe() {
   return useQuery<any[]>({
     queryKey: ["shared-with-me"],
-    queryFn: () => api.get("/api/v1/shared-with-me"),
+    queryFn: () => api.get("/api/v1/shares/shared-with-me"),
   });
 }
 

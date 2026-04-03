@@ -4,17 +4,13 @@ import {
   BookOpen,
   Grid3x3,
   List,
-  Play,
-  GitBranch,
-  MessageSquare,
   Globe,
-  Newspaper,
-  Hash,
-  Camera,
   Loader2,
   CheckSquare,
   RefreshCw,
+  ArrowUpDown,
 } from "lucide-react";
+import { PlatformIcon } from "@/components/common/PlatformIcon";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
@@ -23,13 +19,13 @@ import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 
 const PLATFORMS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "All", label: "All", icon: <Globe className="h-4 w-4" /> },
-  { key: "YouTube", label: "YouTube", icon: <Play className="h-4 w-4" /> },
-  { key: "Reddit", label: "Reddit", icon: <MessageSquare className="h-4 w-4" /> },
-  { key: "GitHub", label: "GitHub", icon: <GitBranch className="h-4 w-4" /> },
-  { key: "Twitter", label: "Twitter", icon: <Hash className="h-4 w-4" /> },
-  { key: "HackerNews", label: "HackerNews", icon: <Newspaper className="h-4 w-4" /> },
-  { key: "Medium", label: "Medium", icon: <BookOpen className="h-4 w-4" /> },
-  { key: "Substack", label: "Substack", icon: <Camera className="h-4 w-4" /> },
+  { key: "YouTube", label: "YouTube", icon: <PlatformIcon platform="youtube" className="h-4 w-4" /> },
+  { key: "Reddit", label: "Reddit", icon: <PlatformIcon platform="reddit" className="h-4 w-4" /> },
+  { key: "GitHub", label: "GitHub", icon: <PlatformIcon platform="github" className="h-4 w-4" /> },
+  { key: "Twitter", label: "Twitter", icon: <PlatformIcon platform="twitter" className="h-4 w-4" /> },
+  { key: "HackerNews", label: "HackerNews", icon: <PlatformIcon platform="hackernews" className="h-4 w-4" /> },
+  { key: "Medium", label: "Medium", icon: <PlatformIcon platform="medium" className="h-4 w-4" /> },
+  { key: "Substack", label: "Substack", icon: <PlatformIcon platform="substack" className="h-4 w-4" /> },
 ];
 
 export default function KnowledgeBase() {
@@ -37,6 +33,7 @@ export default function KnowledgeBase() {
   const isFavorite = searchParams.get("is_favorite") === "true" ? true : undefined;
   const isArchived = searchParams.get("is_archived") === "true" ? true : undefined;
   const [platform, setPlatform] = useState("All");
+  const [sortKey, setSortKey] = useState("created_at:desc");
   const { viewMode, setViewMode } = useUIStore();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -52,7 +49,8 @@ export default function KnowledgeBase() {
     setTimeout(() => setRefreshing(false), 500);
   };
 
-  const filters: Record<string, unknown> = {};
+  const [sortBy, sortOrder] = sortKey.split(":");
+  const filters: Record<string, unknown> = { sort_by: sortBy, sort_order: sortOrder };
   if (platform !== "All") filters.source_platform = platform.toLowerCase();
   if (isFavorite) filters.is_favorite = true;
   if (isArchived) filters.is_archived = true;
@@ -97,7 +95,7 @@ export default function KnowledgeBase() {
   };
 
   return (
-    <div className="animate-fade-in p-6 max-w-6xl mx-auto">
+    <div className="animate-fade-in p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <BookOpen className="h-6 w-6 text-sky-600" />
@@ -106,6 +104,21 @@ export default function KnowledgeBase() {
           </h1>
         </div>
         <div className="flex items-center gap-1">
+          <div className="relative inline-flex items-center">
+            <ArrowUpDown className="absolute left-2 h-3.5 w-3.5 text-gray-500 pointer-events-none" />
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value)}
+              className="pl-7 pr-3 py-2 rounded-lg text-sm bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-none outline-none cursor-pointer hover:shadow-md transition-all duration-200 appearance-none"
+              aria-label="Sort order"
+            >
+              <option value="created_at:desc">Newest first</option>
+              <option value="created_at:asc">Oldest first</option>
+              <option value="title:asc">Title A-Z</option>
+              <option value="title:desc">Title Z-A</option>
+              <option value="updated_at:desc">Recently updated</option>
+            </select>
+          </div>
           <button
             onClick={handleRefresh}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"

@@ -28,6 +28,7 @@ class CommentRead(BaseModel):
     item_id: uuid.UUID
     content: str
     created_at: datetime
+    user_display_name: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -69,14 +70,20 @@ def list_comments(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
         )
-    comments = db.exec(
-        select(Comment)
+    rows = db.exec(
+        select(Comment, User.display_name, User.username)
+        .join(User, User.id == Comment.user_id)
         .where(Comment.item_id == item_id)
         .order_by(col(Comment.created_at).asc())
         .offset(offset)
         .limit(limit)
     ).all()
-    return comments
+    result = []
+    for comment, display_name, username in rows:
+        data = CommentRead.model_validate(comment)
+        data.user_display_name = display_name or username or "Unknown"
+        result.append(data)
+    return result
 
 
 @router.delete("/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)

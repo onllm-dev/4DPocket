@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from fourdpocket.api.deps import get_current_user, get_db
-from fourdpocket.models.item import ItemRead
 from fourdpocket.models.user import User
 from fourdpocket.sharing.feed_manager import get_feed_items, subscribe, unsubscribe
 
@@ -46,7 +45,7 @@ def unsubscribe_from_user(
         )
 
 
-@router.get("", response_model=list[ItemRead])
+@router.get("")
 def get_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -56,4 +55,19 @@ def get_feed(
     items = get_feed_items(
         db=db, subscriber_id=current_user.id, limit=limit, offset=offset
     )
-    return items
+    # Enrich with owner display name
+    result = []
+    for item in items:
+        owner = db.get(User, item.user_id)
+        owner_name = (owner.display_name or owner.username) if owner else "Unknown"
+        result.append({
+            "id": str(item.id),
+            "title": item.title,
+            "url": item.url,
+            "source_platform": item.source_platform,
+            "item_type": item.item_type,
+            "summary": item.summary,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+            "owner_display_name": owner_name,
+        })
+    return result

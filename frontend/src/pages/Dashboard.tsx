@@ -28,7 +28,7 @@ export default function Dashboard() {
   const totalItems = stats?.total_items ?? 0;
 
   return (
-    <div className="animate-fade-in p-6 max-w-6xl mx-auto">
+    <div className="animate-fade-in p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
           <LayoutDashboard className="h-7 w-7 text-[#0096C7]" />

@@ -21,10 +21,15 @@ export async function apiFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
+  const incomingHeaders = (options.headers ?? {}) as Record<string, string>;
+  // Only set Content-Type if not explicitly provided as empty (for FormData)
+  const headers: Record<string, string> = Object.keys(incomingHeaders).length === 0
+    ? { "Content-Type": "application/json" }
+    : { ...incomingHeaders };
+  // If body is FormData, remove Content-Type so browser sets it with boundary
+  if (options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  }
   const res = await fetch(url, { ...options, headers });
 
   // Auto-redirect to login on 401 (except for auth endpoints)

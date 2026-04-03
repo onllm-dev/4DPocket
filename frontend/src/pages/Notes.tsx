@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { FileText, Pencil, Plus, Trash2, X } from "lucide-react";
-import { api } from "@/api/client";
+import { useState, useRef, useCallback } from "react";
+import { FileText, Pencil, Plus, Trash2, X, Mic, MicOff, Loader2 } from "lucide-react";
+import { api, apiFetch } from "@/api/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { timeAgo } from "@/lib/utils";
 
@@ -20,6 +20,63 @@ export default function Notes() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (blob.size < 1000) return; // Too short
+
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", blob, "voice-note.webm");
+          const res = await apiFetch("/api/v1/ai/transcribe", {
+            method: "POST",
+            headers: {}, // Let browser set content-type for FormData
+            body: formData,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.text) {
+              setContent((prev) => (prev ? prev + "\n\n" + data.text : data.text));
+              if (!showForm) setShowForm(true);
+            }
+          }
+        } catch {
+          // Transcription failed silently
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      // Microphone access denied
+    }
+  }, [showForm]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  }, []);
 
   const { data: notes, isLoading } = useQuery<Note[]>({
     queryKey: ["notes"],
@@ -80,7 +137,7 @@ export default function Notes() {
   };
 
   return (
-    <div className="animate-fade-in p-6 max-w-3xl mx-auto">
+    <div className="animate-fade-in p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <FileText className="h-6 w-6 text-sky-600" />
@@ -88,13 +145,34 @@ export default function Notes() {
             Notes
           </h1>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all duration-200 cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          New Note
-        </button>
+        <div className="flex items-center gap-2">
+          {isTranscribing && (
+            <span className="flex items-center gap-1.5 text-xs text-sky-600">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Transcribing...
+            </span>
+          )}
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isTranscribing}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer disabled:opacity-50 ${
+              isRecording
+                ? "bg-red-500 text-white animate-pulse"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md"
+            }`}
+            title={isRecording ? "Stop recording" : "Voice note"}
+          >
+            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            <span className="hidden sm:inline">{isRecording ? "Stop" : "Voice"}</span>
+          </button>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all duration-200 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            New Note
+          </button>
+        </div>
       </div>
 
       {showForm && (

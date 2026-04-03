@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
@@ -246,3 +246,72 @@ def find_cross_platform_connections(
                 })
 
     return connections[:50]
+
+
+@router.post("/transcribe")
+def transcribe_audio(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Transcribe audio using Groq's Whisper API."""
+    import httpx
+
+    from fourdpocket.ai.factory import get_resolved_ai_config
+
+    config = get_resolved_ai_config()
+    groq_key = config.get("groq_api_key", "")
+    if not groq_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Groq API key not configured. "
+            "Set FDP_AI__GROQ_API_KEY or configure in Admin panel.",
+        )
+
+    # Validate file type
+    allowed_types = {
+        "audio/webm", "audio/wav", "audio/mp3", "audio/mpeg",
+        "audio/ogg", "audio/mp4", "audio/m4a", "audio/x-m4a",
+    }
+    content_type = file.content_type or ""
+    if content_type not in allowed_types and not content_type.startswith("audio/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported audio format: {content_type}",
+        )
+
+    # Read file content (max 25MB - Groq limit)
+    audio_bytes = file.file.read()
+    if len(audio_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audio file too large (max 25MB)",
+        )
+
+    # Call Groq Whisper API
+    filename = file.filename or "audio.webm"
+    try:
+        resp = httpx.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {groq_key}"},
+            files={"file": (filename, audio_bytes, content_type or "audio/webm")},
+            data={"model": "whisper-large-v3-turbo", "response_format": "json"},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        transcript = result.get("text", "")
+    except httpx.HTTPStatusError as e:
+        detail = f"Groq API error: {e.response.status_code}"
+        try:
+            detail = e.response.json().get("error", {}).get("message", detail)
+        except Exception:
+            pass
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Transcription failed: {str(e)}",
+        )
+
+    return {"text": transcript}

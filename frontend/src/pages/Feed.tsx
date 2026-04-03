@@ -21,7 +21,7 @@ export default function Feed() {
   });
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto px-4">
+    <div className="animate-fade-in max-w-4xl mx-auto px-4">
       <div className="flex items-center gap-3 mb-6">
         <Rss className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Knowledge Feed</h1>

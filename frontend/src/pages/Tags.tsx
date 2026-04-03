@@ -6,7 +6,7 @@ export default function Tags() {
 
   if (isLoading) {
     return (
-      <div className="animate-fade-in p-6 max-w-4xl mx-auto">
+      <div className="animate-fade-in p-6 max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <TagsIcon className="h-6 w-6 text-sky-600" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -23,7 +23,7 @@ export default function Tags() {
 
   if (!tags || tags.length === 0) {
     return (
-      <div className="animate-fade-in p-6 max-w-4xl mx-auto">
+      <div className="animate-fade-in p-6 max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <TagsIcon className="h-6 w-6 text-sky-600" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -67,7 +67,7 @@ export default function Tags() {
     tags.filter((t) => t.parent_id === parentId);
 
   return (
-    <div className="animate-fade-in p-6 max-w-4xl mx-auto">
+    <div className="animate-fade-in p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <TagsIcon className="h-6 w-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">

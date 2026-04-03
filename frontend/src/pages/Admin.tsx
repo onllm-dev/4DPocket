@@ -86,7 +86,7 @@ export default function Admin() {
   // Role guard: redirect non-admins
   if (currentUser && currentUser.role !== "admin") {
     return (
-      <div className="animate-fade-in max-w-4xl mx-auto px-4 md:px-6 py-16 text-center">
+      <div className="animate-fade-in max-w-5xl mx-auto px-4 md:px-6 py-16 text-center">
         <div className="flex flex-col items-center gap-4">
           <ShieldX className="w-16 h-16 text-red-400" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Access Denied</h1>
@@ -105,7 +105,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto px-4 md:px-6">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4 md:px-6">
       <div className="flex items-center gap-3 mb-6">
         <Shield className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Admin Panel</h1>

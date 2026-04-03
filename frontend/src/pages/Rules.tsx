@@ -73,7 +73,7 @@ export default function Rules() {
   };
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto px-4">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Zap className="w-6 h-6 text-sky-600" />
@@ -128,7 +128,7 @@ export default function Rules() {
         <div className="space-y-2">
           {rules.map((rule) => (
             <div key={rule.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-sm transition-all">
-              <button onClick={() => toggleRule.mutate({ id: rule.id, is_active: !rule.is_active })} className="flex-shrink-0 cursor-pointer">
+              <button onClick={() => toggleRule.mutate({ id: rule.id, is_active: !rule.is_active })} aria-label={rule.is_active ? "Disable rule" : "Enable rule"} className="flex-shrink-0 cursor-pointer">
                 {rule.is_active ? <ToggleRight className="w-6 h-6 text-sky-600" /> : <ToggleLeft className="w-6 h-6 text-gray-400" />}
               </button>
               <div className="flex-1 min-w-0">
@@ -139,7 +139,7 @@ export default function Rules() {
                   {rule.action.collection_name && ` "${rule.action.collection_name}"`}
                 </p>
               </div>
-              <button onClick={() => deleteRule.mutate(rule.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors cursor-pointer">
+              <button onClick={() => deleteRule.mutate(rule.id)} aria-label="Delete rule" className="p-2 text-gray-400 hover:text-red-500 transition-colors cursor-pointer">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>

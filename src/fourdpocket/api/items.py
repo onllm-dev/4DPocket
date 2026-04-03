@@ -246,6 +246,60 @@ def list_items(
     return items
 
 
+@router.get("/timeline")
+def get_timeline(
+    days: int = Query(default=30, ge=1, le=365),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get items grouped by date for timeline view."""
+    from collections import defaultdict
+    from datetime import timedelta
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == user.id,
+            KnowledgeItem.created_at >= since,
+        ).order_by(KnowledgeItem.created_at.desc()).offset(offset).limit(limit)
+    ).all()
+
+    # Group by date
+    grouped = defaultdict(list)
+    for item in items:
+        date_key = item.created_at.strftime("%Y-%m-%d") if item.created_at else "unknown"
+        grouped[date_key].append({
+            "id": str(item.id),
+            "title": item.title,
+            "url": item.url,
+            "source_platform": item.source_platform,
+            "item_type": item.item_type,
+            "summary": item.summary,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+        })
+
+    return [{"date": date, "items": items} for date, items in sorted(grouped.items(), reverse=True)]
+
+
+@router.get("/reading-queue")
+def get_reading_queue(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get items in reading queue (has content, not fully read)."""
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == user.id,
+            KnowledgeItem.content.is_not(None),
+            KnowledgeItem.is_archived == False,  # noqa: E712
+            KnowledgeItem.reading_progress < 100,
+        ).order_by(KnowledgeItem.created_at.desc()).limit(50)
+    ).all()
+    return items
+
+
 @router.get("/{item_id}", response_model=ItemRead)
 def get_item(
     item_id: uuid.UUID,
@@ -256,6 +310,36 @@ def get_item(
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     return item
+
+
+@router.get("/{item_id}/tags")
+def get_item_tags(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all tags linked to an item."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    rows = db.exec(
+        select(Tag, ItemTag.confidence).join(ItemTag, ItemTag.tag_id == Tag.id).where(
+            ItemTag.item_id == item_id
+        )
+    ).all()
+
+    return [
+        {
+            "tag_id": str(tag.id),
+            "tag_name": tag.name,
+            "tag_slug": tag.slug,
+            "tag_color": tag.color,
+            "confidence": confidence or 0,
+            "ai_generated": tag.ai_generated,
+        }
+        for tag, confidence in rows
+    ]
 
 
 @router.patch("/{item_id}", response_model=ItemRead)
@@ -357,43 +441,6 @@ def remove_tag_from_item(
     db.commit()
 
 
-@router.get("/timeline")
-def get_timeline(
-    days: int = Query(default=30, ge=1, le=365),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Get items grouped by date for timeline view."""
-    from collections import defaultdict
-    from datetime import timedelta
-
-    since = datetime.now(timezone.utc) - timedelta(days=days)
-    items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == user.id,
-            KnowledgeItem.created_at >= since,
-        ).order_by(KnowledgeItem.created_at.desc()).offset(offset).limit(limit)
-    ).all()
-
-    # Group by date
-    grouped = defaultdict(list)
-    for item in items:
-        date_key = item.created_at.strftime("%Y-%m-%d") if item.created_at else "unknown"
-        grouped[date_key].append({
-            "id": str(item.id),
-            "title": item.title,
-            "url": item.url,
-            "source_platform": item.source_platform,
-            "item_type": item.item_type,
-            "summary": item.summary,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
-        })
-
-    return [{"date": date, "items": items} for date, items in sorted(grouped.items(), reverse=True)]
-
-
 @router.post("/{item_id}/archive", status_code=202)
 def archive_item(
     item_id: uuid.UUID,
@@ -493,23 +540,6 @@ def update_reading_progress(
     return {"status": "updated", "reading_progress": body.progress}
 
 
-@router.get("/reading-queue")
-def get_reading_queue(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Get items in reading queue (has content, not fully read)."""
-    items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == user.id,
-            KnowledgeItem.content.is_not(None),
-            KnowledgeItem.is_archived == False,  # noqa: E712
-            KnowledgeItem.reading_progress < 100,
-        ).order_by(KnowledgeItem.created_at.desc()).limit(50)
-    ).all()
-    return items
-
-
 class BulkAction(str, Enum):
     tag = "tag"
     archive = "archive"
@@ -523,6 +553,7 @@ class BulkActionRequest(BaseModel):
     action: BulkAction
     item_ids: list[uuid.UUID]
     tag_id: uuid.UUID | None = None
+    tag_name: str | None = None
 
 
 @router.post("/bulk")
@@ -550,14 +581,30 @@ def bulk_action(
         elif data.action == "unfavorite":
             item.is_favorite = False
             db.add(item)
-        elif data.action == "tag" and data.tag_id:
-            tag = db.get(Tag, data.tag_id)
+        elif data.action == "tag":
+            # Resolve tag by ID or name (create if needed)
+            tag = None
+            if data.tag_id:
+                tag = db.get(Tag, data.tag_id)
+            elif data.tag_name:
+                slug = data.tag_name.strip().lower().replace(" ", "-")
+                tag = db.exec(
+                    select(Tag).where(Tag.user_id == current_user.id, Tag.slug == slug)
+                ).first()
+                if not tag:
+                    tag = Tag(
+                        user_id=current_user.id,
+                        name=data.tag_name.strip(),
+                        slug=slug,
+                    )
+                    db.add(tag)
+                    db.flush()
             if tag and tag.user_id == current_user.id:
                 existing = db.exec(
-                    select(ItemTag).where(ItemTag.item_id == iid, ItemTag.tag_id == data.tag_id)
+                    select(ItemTag).where(ItemTag.item_id == iid, ItemTag.tag_id == tag.id)
                 ).first()
                 if not existing:
-                    db.add(ItemTag(item_id=iid, tag_id=data.tag_id))
+                    db.add(ItemTag(item_id=iid, tag_id=tag.id))
                     tag.usage_count += 1
                     db.add(tag)
         processed += 1

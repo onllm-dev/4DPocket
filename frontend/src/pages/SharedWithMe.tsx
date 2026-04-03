@@ -19,7 +19,7 @@ type SharedItem = {
 export default function SharedWithMe() {
   const { data: items, isLoading } = useQuery<SharedItem[]>({
     queryKey: ["shared-with-me"],
-    queryFn: () => api.get("/api/v1/shared-with-me"),
+    queryFn: () => api.get("/api/v1/shares/shared-with-me"),
   });
 
   return (
