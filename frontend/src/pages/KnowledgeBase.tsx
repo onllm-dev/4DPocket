@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   Grid3x3,
@@ -32,6 +33,9 @@ const PLATFORMS: { key: string; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function KnowledgeBase() {
+  const [searchParams] = useSearchParams();
+  const isFavorite = searchParams.get("is_favorite") === "true" ? true : undefined;
+  const isArchived = searchParams.get("is_archived") === "true" ? true : undefined;
   const [platform, setPlatform] = useState("All");
   const { viewMode, setViewMode } = useUIStore();
   const [selecting, setSelecting] = useState(false);
@@ -48,8 +52,10 @@ export default function KnowledgeBase() {
     setTimeout(() => setRefreshing(false), 500);
   };
 
-  const filters =
-    platform !== "All" ? { source_platform: platform.toLowerCase() } : {};
+  const filters: Record<string, unknown> = {};
+  if (platform !== "All") filters.source_platform = platform.toLowerCase();
+  if (isFavorite) filters.is_favorite = true;
+  if (isArchived) filters.is_archived = true;
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useItems(filters);
 
@@ -96,7 +102,7 @@ export default function KnowledgeBase() {
         <div className="flex items-center gap-3">
           <BookOpen className="h-6 w-6 text-sky-600" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Knowledge Base
+            {isFavorite ? "Favorites" : isArchived ? "Archive" : "Knowledge Base"}
           </h1>
         </div>
         <div className="flex items-center gap-1">

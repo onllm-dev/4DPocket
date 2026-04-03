@@ -1,11 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter } from "lucide-react";
+import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter, Star, Archive } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: Home },
   { path: "/knowledge", label: "Knowledge Base", icon: BookOpen },
+  { path: "/knowledge?is_favorite=true", label: "Favorites", icon: Star },
+  { path: "/knowledge?is_archived=true", label: "Archive", icon: Archive },
   { path: "/search", label: "Search", icon: Search },
   { path: "/collections", label: "Collections", icon: FolderOpen },
   { path: "/tags", label: "Tags", icon: Tags },
@@ -86,10 +88,17 @@ export function Sidebar() {
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {allNavItems.map((item) => {
+          const itemPath = item.path.split("?")[0];
+          const itemSearch = item.path.includes("?") ? item.path.split("?")[1] : null;
+          const specialParams = ["is_favorite", "is_archived"];
+          const hasSpecialParam = specialParams.some((p) => location.search.includes(p));
           const isActive =
-            item.path === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.path);
+            itemPath === "/"
+              ? location.pathname === "/" && !location.search
+              : location.pathname.startsWith(itemPath) &&
+                (itemSearch
+                  ? location.search.includes(itemSearch)
+                  : !hasSpecialParam);
           const Icon = item.icon;
           return (
             <Link
