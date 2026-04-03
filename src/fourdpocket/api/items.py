@@ -250,6 +250,27 @@ def list_items(
 
     query = query.offset(offset).limit(limit)
     items = db.exec(query).all()
+
+    # Batch-fetch tags for all items (avoids N+1)
+    if items:
+        item_ids = [i.id for i in items]
+        tag_rows = db.exec(
+            select(ItemTag.item_id, Tag.id, Tag.name, Tag.color)
+            .join(Tag, Tag.id == ItemTag.tag_id)
+            .where(ItemTag.item_id.in_(item_ids))
+        ).all()
+        tags_by_item: dict[uuid.UUID, list[dict]] = {}
+        for row in tag_rows:
+            tags_by_item.setdefault(row[0], []).append(
+                {"id": str(row[1]), "name": row[2], "color": row[3]}
+            )
+        result = []
+        for item in items:
+            d = item.model_dump()
+            d["tags"] = tags_by_item.get(item.id, [])
+            result.append(d)
+        return result
+
     return items
 
 

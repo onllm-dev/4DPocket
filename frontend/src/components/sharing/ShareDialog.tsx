@@ -67,7 +67,7 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={onClose}>
       <div
         className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-6 max-w-md w-full animate-fade-in"
         onClick={(e) => e.stopPropagation()}
