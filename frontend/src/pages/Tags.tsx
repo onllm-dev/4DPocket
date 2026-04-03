@@ -14,8 +14,24 @@ export default function Tags() {
           </h1>
         </div>
         <div className="space-y-4">
-          <div className="h-48 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
-          <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+            <div className="h-3 w-20 animate-pulse bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+            <div className="flex flex-wrap gap-2">
+              {[72, 96, 80, 110, 64, 90, 76, 104, 68, 88, 100, 72].map((w, i) => (
+                <div key={i} className="h-7 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-full" style={{ width: `${w}px` }} />
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <div className="h-10 animate-pulse bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+                <div className="w-4 h-4 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-4 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" style={{ width: `${[100, 80, 120, 90, 110][i % 5]}px` }} />
+                <div className="ml-auto h-4 w-8 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-full" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -30,9 +46,9 @@ export default function Tags() {
             Tags
           </h1>
         </div>
-        <div className="text-center py-16 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-          <TagsIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <TagsIcon className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             No tags yet
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500">

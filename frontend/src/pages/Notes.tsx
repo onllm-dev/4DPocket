@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { FileText, Pencil, Plus, Trash2, X, Mic, MicOff, Loader2 } from "lucide-react";
+import { FileText, Pencil, Plus, Trash2, X, Mic, Loader2 } from "lucide-react";
 import { api, apiFetch } from "@/api/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { timeAgo } from "@/lib/utils";
@@ -155,15 +155,27 @@ export default function Notes() {
           <button
             onClick={isRecording ? stopRecording : startRecording}
             disabled={isTranscribing}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer disabled:opacity-50 ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer disabled:opacity-50 min-h-[44px] ${
               isRecording
-                ? "bg-red-500 text-white animate-pulse"
+                ? "bg-red-500 text-white shadow-md shadow-red-500/20"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md"
             }`}
-            title={isRecording ? "Stop recording" : "Voice note"}
+            aria-label={isRecording ? "Stop recording" : "Start voice note"}
           >
-            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            <span className="hidden sm:inline">{isRecording ? "Stop" : "Voice"}</span>
+            {isRecording ? (
+              <>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+                </span>
+                <span className="hidden sm:inline">Recording...</span>
+              </>
+            ) : (
+              <>
+                <Mic className="h-4 w-4" />
+                <span className="hidden sm:inline">Voice</span>
+              </>
+            )}
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -230,20 +242,27 @@ export default function Notes() {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-28 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg"
-            />
+            <div key={i} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded animate-pulse bg-gray-200 dark:bg-gray-700" />
+                <div className="h-4 w-32 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="ml-auto h-3 w-16 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+              <div className="pl-6 space-y-1.5">
+                <div className="h-3 w-full animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-3 w-3/4 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            </div>
           ))}
         </div>
       ) : !notes || notes.length === 0 ? (
-        <div className="text-center py-16 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-          <FileText className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <FileText className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             No notes yet
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-            Capture your thoughts and ideas
+            Capture your thoughts, ideas, and voice memos
           </p>
           <button
             onClick={() => setShowForm(true)}

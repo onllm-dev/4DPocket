@@ -416,11 +416,25 @@ export default function ItemDetail() {
 
   if (isLoading) {
     return (
-      <div className="animate-fade-in p-6 max-w-3xl mx-auto space-y-4">
-        <div className="h-6 w-24 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
-        <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
-        <div className="h-8 w-2/3 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
-        <div className="h-32 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
+      <div className="animate-fade-in max-w-5xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-16 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-xl" />
+          <div className="h-10 w-48 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-xl" />
+        </div>
+        <div className="aspect-video rounded-2xl animate-pulse bg-gray-100 dark:bg-gray-800" />
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="h-4 w-16 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-4 w-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
+          <div className="h-7 w-3/4 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-1/2 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+        </div>
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-2">
+          <div className="h-3 w-20 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-full animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="h-4 w-5/6 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+        </div>
       </div>
     );
   }
@@ -483,126 +497,108 @@ export default function ItemDetail() {
   };
 
   return (
-    <div className="animate-fade-in p-6 max-w-5xl mx-auto">
-      <button
-        onClick={() => navigate(-1)}
-        aria-label="Go back"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </button>
+    <div className="animate-fade-in max-w-5xl mx-auto space-y-6">
+      {/* Back + Actions bar */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Go back"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-1 shadow-sm">
+          <button
+            onClick={handleToggleFavorite}
+            aria-label={item.is_favorite ? "Unfavorite" : "Favorite"}
+            title={item.is_favorite ? "Unfavorite" : "Favorite"}
+            className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+              item.is_favorite
+                ? "bg-amber-50 dark:bg-amber-900/20 text-amber-500"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+            }`}
+          >
+            <Star className="h-4 w-4" fill={item.is_favorite ? "currentColor" : "none"} />
+          </button>
+          <button
+            onClick={handleArchive}
+            aria-label={item.is_archived ? "Unarchive" : "Archive"}
+            className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+              item.is_archived
+                ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+            }`}
+          >
+            <Archive className="h-4 w-4" />
+          </button>
+          <button onClick={() => setEditOpen(true)} aria-label="Edit" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button onClick={() => setShareOpen(true)} aria-label="Share" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
+            <Share2 className="h-4 w-4" />
+          </button>
+          <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
+          <button onClick={handleDelete} aria-label="Delete" className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
+      {/* Hero thumbnail */}
       {thumbnail ? (
-        <div className={isYouTube ? "relative w-full aspect-video rounded-xl overflow-hidden mb-6" : "w-full mb-6"}>
+        <div className={isYouTube ? "relative w-full aspect-video rounded-2xl overflow-hidden shadow-lg" : "w-full"}>
           <img
             src={thumbnail}
             alt=""
             className={
               isYouTube
                 ? "w-full h-full object-cover"
-                : "w-full max-h-72 object-contain rounded-xl bg-gray-100 dark:bg-gray-900"
+                : "w-full max-h-72 object-contain rounded-2xl bg-gray-100 dark:bg-gray-900"
             }
           />
         </div>
       ) : (
         <div
-          className={`w-full rounded-xl mb-6 flex items-center justify-center bg-gradient-to-br ${getThumbnailGradient(item.source_platform)} ${isYouTube ? "aspect-video" : "h-40"}`}
+          className={`w-full rounded-2xl flex items-center justify-center bg-gradient-to-br ${getThumbnailGradient(item.source_platform)} ${isYouTube ? "aspect-video" : "h-40"}`}
         >
           <PlatformIcon platform={item.source_platform} className="h-12 w-12 opacity-60" />
         </div>
       )}
 
-      <div className="flex items-start justify-center gap-4 mb-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-sky-600">
-              <PlatformIcon platform={item.source_platform} className="h-4 w-4" />
-            </span>
-            <span className="text-xs uppercase tracking-wider text-gray-600 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-              {item.source_platform}
-            </span>
-            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-              <Clock className="h-3 w-3" />
-              {formatDate(item.created_at)}
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {item.title || item.url || "Untitled"}
-          </h1>
+      {/* Title + metadata */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <PlatformIcon platform={item.source_platform} className="h-4 w-4" />
+          <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+            {item.source_platform}
+          </span>
+          <span className="text-gray-300 dark:text-gray-700">·</span>
+          <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+            <Clock className="h-3 w-3" />
+            {formatDate(item.created_at)}
+          </span>
         </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={handleToggleFavorite}
-            aria-label={item.is_favorite ? "Unfavorite" : "Favorite"}
-            title={item.is_favorite ? "Unfavorite" : "Favorite"}
-            className={`p-2.5 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer ${
-              item.is_favorite
-                ? "bg-amber-50 dark:bg-amber-900/20 text-amber-500"
-                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
-            }`}
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+          {item.title || item.url || "Untitled"}
+        </h1>
+        {item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-[#0096C7] hover:text-[#0077A8] mt-2 truncate max-w-full cursor-pointer transition-colors"
           >
-            <Star
-              className="h-5 w-5"
-              fill={item.is_favorite ? "currentColor" : "none"}
-            />
-          </button>
-          <button
-            onClick={handleArchive}
-            aria-label={item.is_archived ? "Unarchive" : "Archive"}
-            title={item.is_archived ? "Unarchive" : "Archive"}
-            className={`p-2.5 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer ${
-              item.is_archived
-                ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600"
-                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
-            }`}
-          >
-            <Archive className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setEditOpen(true)}
-            aria-label="Edit item"
-            title="Edit"
-            className="p-2.5 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/20 text-gray-400 hover:text-sky-600"
-          >
-            <Pencil className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setShareOpen(true)}
-            aria-label="Share"
-            title="Share"
-            className="p-2.5 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-900/20 text-gray-400 hover:text-sky-600 hover:shadow-md transition-all duration-200 cursor-pointer"
-          >
-            <Share2 className="h-5 w-5" />
-            <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-sm sm:font-medium hidden sm:inline">Share</span>
-          </button>
-          <button
-            onClick={handleDelete}
-            aria-label="Delete item"
-            title="Delete"
-            className="p-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:shadow-md transition-all duration-200 cursor-pointer"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
-        </div>
+            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{item.url}</span>
+          </a>
+        )}
       </div>
 
-      {item.url && (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:underline mb-6 truncate max-w-full cursor-pointer"
-        >
-          <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-          {item.url}
-        </a>
-      )}
-
       {item.summary && (
-        <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-5 mb-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-sky-600 mb-2">
+        <div className="rounded-2xl border border-[#0096C7]/20 dark:border-sky-800/50 bg-gradient-to-br from-sky-50 to-white dark:from-sky-950/30 dark:to-gray-900 p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0096C7] mb-2 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0096C7]" />
             AI Summary
           </h2>
           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">

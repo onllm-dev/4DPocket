@@ -95,13 +95,15 @@ export default function KnowledgeBase() {
   };
 
   return (
-    <div className="animate-fade-in p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <BookOpen className="h-6 w-6 text-sky-600" />
+    <div className="animate-fade-in max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {isFavorite ? "Favorites" : isArchived ? "Archive" : "Knowledge Base"}
+            {isFavorite ? "⭐ Favorites" : isArchived ? "📦 Archive" : "Knowledge Base"}
           </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isFavorite ? "Your starred items" : isArchived ? "Archived items" : "All your saved knowledge in one place"}
+          </p>
         </div>
         <div className="flex items-center gap-1">
           <div className="relative inline-flex items-center">
@@ -193,20 +195,24 @@ export default function KnowledgeBase() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-48 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg"
-            />
+            <div key={i} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+              <div className="aspect-video animate-pulse bg-gray-100 dark:bg-gray-800" />
+              <div className="p-4 space-y-2">
+                <div className="h-3 w-20 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-4 w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-3 w-3/4 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <BookOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             No items found
           </p>
           <p className="text-gray-400 dark:text-gray-500 text-sm">
-            Try a different filter or add some content
+            {platform !== "All" ? `No ${platform} items yet. Try a different platform filter.` : "Try a different filter or add some content."}
           </p>
         </div>
       ) : (

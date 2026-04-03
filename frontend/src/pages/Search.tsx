@@ -172,32 +172,36 @@ export default function Search() {
       ) : null}
 
       {!query || query.length < 2 ? (
-        <div className="text-center py-16">
-          <SearchIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <SearchIcon className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             Search your knowledge base
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500">
-            Type at least 2 characters to search
+            Type at least 2 characters to search across all your saved content
           </p>
         </div>
       ) : showSkeleton && items.length === 0 ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-24 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg"
-            />
+            <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+              <div className="w-16 h-16 rounded-xl animate-pulse bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-4 w-3/4 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-3 w-1/2 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            </div>
           ))}
         </div>
       ) : items.length === 0 && !isLoading ? (
-        <div className="text-center py-16">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <SearchIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             No results for &ldquo;{query}&rdquo;
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500">
-            Try different keywords
+            Try different keywords or switch to {semantic ? "full-text" : "semantic"} search
           </p>
         </div>
       ) : (

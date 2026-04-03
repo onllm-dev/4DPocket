@@ -12,13 +12,39 @@
 }
 
 :root {
+  /* Brand colors */
   --color-primary: #0096C7;
-  --color-primary-light: #38BDF8;
+  --color-primary-light: #48CAE4;
   --color-primary-dark: #0077A8;
   --color-accent-yellow: #FCD34D;
   --color-accent-red: #EF4444;
   --color-bg-light: #F0F9FF;
   --color-bg-dark: #0C1222;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+
+  /* Typography scale */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* Semantic tokens */
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
@@ -101,4 +127,45 @@ code, pre {
   .animate-pocket-open {
     animation: none;
   }
+}
+
+/* Focus-visible utility for keyboard navigation */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid #0096C7;
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* Skip-to-content link (visually hidden until focused) */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 100;
+}
+.skip-to-content:focus {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  width: auto;
+  height: auto;
+  padding: var(--space-3) var(--space-4);
+  background: #0096C7;
+  color: white;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+/* Safe area for iOS notch devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

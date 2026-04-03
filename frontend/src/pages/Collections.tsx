@@ -98,16 +98,17 @@ export default function Collections() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-36 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg"
-            />
+            <div key={i} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3">
+              <div className="w-11 h-11 rounded-lg animate-pulse bg-gray-100 dark:bg-gray-800" />
+              <div className="h-5 w-32 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-3 w-20 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+            </div>
           ))}
         </div>
       ) : !collections || collections.length === 0 ? (
-        <div className="text-center py-16 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-          <FolderOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <FolderOpen className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             No collections yet
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">

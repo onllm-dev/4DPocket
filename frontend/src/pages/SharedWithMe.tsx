@@ -32,13 +32,19 @@ export default function SharedWithMe() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-xl" />
+            <div key={i} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+              <div className="aspect-video animate-pulse bg-gray-100 dark:bg-gray-800" />
+              <div className="p-4 space-y-2">
+                <div className="h-3 w-20 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-4 w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </div>
           ))}
         </div>
       ) : !items || items.length === 0 ? (
-        <div className="text-center py-16 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-          <Inbox className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-1">Nothing shared yet</p>
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <Inbox className="w-12 h-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">Nothing shared yet</p>
           <p className="text-sm text-gray-400 dark:text-gray-500">Items shared with you by other users will appear here</p>
         </div>
       ) : (

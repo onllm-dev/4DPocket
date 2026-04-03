@@ -105,6 +105,9 @@ export function CommandPalette() {
     >
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div
+        role="dialog"
+        aria-label="Command palette"
+        aria-modal="true"
         className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -120,6 +123,7 @@ export function CommandPalette() {
             }}
             onKeyDown={handleKeyDown}
             placeholder="Search or jump to..."
+            aria-label="Search commands and items"
             className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none text-sm"
           />
           <kbd className="hidden sm:inline-flex text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">

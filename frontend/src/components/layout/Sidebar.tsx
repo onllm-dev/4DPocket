@@ -3,21 +3,46 @@ import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, 
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 
-const navItems = [
-  { path: "/", label: "Dashboard", icon: Home },
-  { path: "/knowledge", label: "Knowledge Base", icon: BookOpen },
-  { path: "/knowledge?is_favorite=true", label: "Favorites", icon: Star },
-  { path: "/knowledge?is_archived=true", label: "Archive", icon: Archive },
-  { path: "/search", label: "Search", icon: Search },
-  { path: "/collections", label: "Collections", icon: FolderOpen },
-  { path: "/tags", label: "Tags", icon: Tags },
-  { path: "/notes", label: "Notes", icon: FileText },
-  { path: "/shared", label: "Shared with Me", icon: Share2 },
-  { path: "/feed", label: "Feed", icon: Rss },
-  { path: "/timeline", label: "Timeline", icon: Clock },
-  { path: "/highlights", label: "Highlights", icon: Highlighter },
-  { path: "/rules", label: "Rules", icon: Zap },
-  { path: "/settings", label: "Settings", icon: Settings },
+const navSections = [
+  {
+    label: "Main",
+    items: [
+      { path: "/", label: "Dashboard", icon: Home },
+      { path: "/knowledge", label: "Knowledge Base", icon: BookOpen },
+      { path: "/knowledge?is_favorite=true", label: "Favorites", icon: Star },
+      { path: "/knowledge?is_archived=true", label: "Archive", icon: Archive },
+      { path: "/search", label: "Search", icon: Search },
+    ],
+  },
+  {
+    label: "Organize",
+    items: [
+      { path: "/collections", label: "Collections", icon: FolderOpen },
+      { path: "/tags", label: "Tags", icon: Tags },
+      { path: "/notes", label: "Notes", icon: FileText },
+    ],
+  },
+  {
+    label: "Social",
+    items: [
+      { path: "/shared", label: "Shared with Me", icon: Share2 },
+      { path: "/feed", label: "Feed", icon: Rss },
+    ],
+  },
+  {
+    label: "Discover",
+    items: [
+      { path: "/timeline", label: "Timeline", icon: Clock },
+      { path: "/highlights", label: "Highlights", icon: Highlighter },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { path: "/rules", label: "Rules", icon: Zap },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 function BellIcon() {
@@ -51,9 +76,24 @@ export function Sidebar() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
 
-  const allNavItems = user?.role === "admin"
-    ? [...navItems, { path: "/admin", label: "Admin", icon: Shield }]
-    : navItems;
+  const allSections = user?.role === "admin"
+    ? navSections.map((s) =>
+        s.label === "System"
+          ? { ...s, items: [{ path: "/admin", label: "Admin", icon: Shield }, ...s.items] }
+          : s
+      )
+    : navSections;
+
+  const isNavActive = (item: { path: string }) => {
+    const itemPath = item.path.split("?")[0];
+    const itemSearch = item.path.includes("?") ? item.path.split("?")[1] : null;
+    const specialParams = ["is_favorite", "is_archived"];
+    const hasSpecialParam = specialParams.some((p) => location.search.includes(p));
+    return itemPath === "/"
+      ? location.pathname === "/" && !location.search
+      : location.pathname.startsWith(itemPath) &&
+          (itemSearch ? location.search.includes(itemSearch) : !hasSpecialParam);
+  };
 
   return (
     <aside
@@ -86,35 +126,40 @@ export function Sidebar() {
         )}
       </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {allNavItems.map((item) => {
-          const itemPath = item.path.split("?")[0];
-          const itemSearch = item.path.includes("?") ? item.path.split("?")[1] : null;
-          const specialParams = ["is_favorite", "is_archived"];
-          const hasSpecialParam = specialParams.some((p) => location.search.includes(p));
-          const isActive =
-            itemPath === "/"
-              ? location.pathname === "/" && !location.search
-              : location.pathname.startsWith(itemPath) &&
-                (itemSearch
-                  ? location.search.includes(itemSearch)
-                  : !hasSpecialParam);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 cursor-pointer min-h-[44px] ${
-                isActive
-                  ? "bg-sky-50 dark:bg-sky-950 text-[#0096C7] dark:text-sky-400 font-medium"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-sky-50/50 dark:hover:bg-gray-800"
-              }`}
-            >
-              <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </Link>
-          );
-        })}
+      <nav aria-label="Main navigation" className="flex-1 p-2 overflow-y-auto">
+        {allSections.map((section) => (
+          <div key={section.label} className="mb-1">
+            {!collapsed && (
+              <span className="block px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                {section.label}
+              </span>
+            )}
+            {collapsed && section.label !== "Main" && (
+              <div className="mx-3 my-2 border-t border-gray-200 dark:border-gray-800" />
+            )}
+            {section.items.map((item) => {
+              const isActive = isNavActive(item);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 cursor-pointer min-h-[44px] relative ${
+                    isActive
+                      ? "bg-sky-50 dark:bg-sky-950/60 text-[#0096C7] dark:text-sky-400 font-medium"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-sky-50/50 dark:hover:bg-gray-800/50"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#0096C7] dark:bg-sky-400 rounded-r-full" />
+                  )}
+                  <Icon size={18} className="flex-shrink-0" />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="p-3 border-t border-sky-100 dark:border-gray-800">

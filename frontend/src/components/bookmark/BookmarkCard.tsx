@@ -62,7 +62,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
     return (
       <Link
         to={`/item/${item.id}`}
-        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
+        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg hover:shadow-sky-100/50 dark:hover:shadow-sky-900/20 hover:border-sky-200 dark:hover:border-sky-800 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group"
       >
         {thumbnail ? (
           <img src={thumbnail} alt="" loading="lazy" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
@@ -100,7 +100,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   return (
     <Link
       to={`/item/${item.id}`}
-      className="flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all duration-200 cursor-pointer group"
+      className="flex flex-col rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-lg hover:shadow-sky-100/50 dark:hover:shadow-sky-900/20 hover:border-sky-200 dark:hover:border-sky-800 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group"
     >
       {thumbnail ? (
         <div className="aspect-video bg-gray-100 dark:bg-gray-800 overflow-hidden">

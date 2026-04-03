@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Highlighter, Loader2, Trash2, Search } from "lucide-react";
+import { Highlighter, Trash2, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
@@ -72,12 +72,20 @@ export default function Highlights() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-sky-600" /></div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-2">
+              <div className="h-4 w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-3 w-3/4 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-3 w-16 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+            </div>
+          ))}
+        </div>
       ) : !filtered?.length ? (
-        <div className="text-center py-20">
-          <Highlighter className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">No highlights yet</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Highlights from your saved items will appear here</p>
+        <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <Highlighter className="w-12 h-12 text-[#FCD34D]/40 dark:text-yellow-900 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">No highlights yet</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">Highlights from your saved items will appear here</p>
         </div>
       ) : (
         <div className="space-y-3">
