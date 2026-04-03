@@ -8,7 +8,7 @@ from fourdpocket.workers import huey
 logger = logging.getLogger(__name__)
 
 
-@huey.task(retries=3, retry_delay=10)
+@huey.task(retries=2, retry_delay=30)
 def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
     """Fetch URL content and update the knowledge item.
 
