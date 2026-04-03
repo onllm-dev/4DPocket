@@ -13,9 +13,14 @@ def _get_client():
     global _client
     if _client is None:
         import chromadb
+        from pathlib import Path
+        from fourdpocket.config import get_settings
 
-        _client = chromadb.Client()
-        logger.info("ChromaDB client initialized (in-process)")
+        settings = get_settings()
+        persist_dir = Path(settings.storage.base_path) / "chromadb"
+        persist_dir.mkdir(parents=True, exist_ok=True)
+        _client = chromadb.PersistentClient(path=str(persist_dir))
+        logger.info("ChromaDB client initialized (persistent: %s)", persist_dir)
     return _client
 
 

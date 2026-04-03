@@ -34,7 +34,6 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
 
     from fourdpocket.db.session import get_engine
     from fourdpocket.models.item import KnowledgeItem
-    from fourdpocket.processors.pipeline import ExtractionPipeline
     from fourdpocket.search.indexer import SearchIndexer
 
     logger.info("Processing URL %s for item %s", url, item_id)
@@ -46,7 +45,6 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
             logger.error("Item %s not found", item_id)
             return {"status": "error", "error": "Item not found"}
 
-        ExtractionPipeline()
         indexer = SearchIndexer(db)
 
         try:

@@ -29,11 +29,13 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
   const [content, setContent] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const createItem = useCreateItem();
 
   const startRecording = useCallback(async () => {
+    setVoiceError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -65,7 +67,7 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
             }
           }
         } catch {
-          // Transcription failed silently
+          setVoiceError("Transcription failed. Please try again.");
         } finally {
           setIsTranscribing(false);
         }
@@ -74,7 +76,7 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
       mediaRecorder.start();
       setIsRecording(true);
     } catch {
-      // Microphone access denied
+      setVoiceError("Microphone access denied.");
     }
   }, []);
 
@@ -226,6 +228,9 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
                 )}
               </button>
             </div>
+            {voiceError && (
+              <p className="text-xs text-red-500 mb-1">{voiceError}</p>
+            )}
             {isTranscribing && (
               <span className="flex items-center gap-1.5 text-xs text-sky-600">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -280,7 +285,7 @@ export function EditBookmarkForm({ item, onClose, onUpdated }: EditBookmarkFormP
       });
       onUpdated?.();
       onClose?.();
-    } catch (err) {
+    } catch {
       // Error handled by mutation state
     }
   };

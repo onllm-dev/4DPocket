@@ -91,9 +91,6 @@ class PDFProcessor(BaseProcessor):
         description_parts.append(f"{metadata.get('page_count', 0)} pages")
         description = " | ".join(description_parts)
 
-        # Generate summary from first 500 chars
-        full_text[:500] + "..." if full_text and len(full_text) > 500 else full_text
-
         return ProcessorResult(
             title=title,
             description=description,

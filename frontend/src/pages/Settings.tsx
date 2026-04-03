@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon,
   Sun,
@@ -9,10 +10,13 @@ import {
   Sparkles,
   Download,
   Share2,
+  User,
+  Lock,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
+import { useCurrentUser, useUpdateProfile, useChangePassword } from "@/hooks/use-auth";
 
 type Theme = "light" | "dark" | "system";
 type ViewMode = "grid" | "list";
@@ -44,6 +48,20 @@ const SHARE_MODES = ["private", "public"];
 export default function Settings() {
   const qc = useQueryClient();
   const { theme, viewMode, setTheme, setViewMode } = useUIStore();
+  const { data: currentUser } = useCurrentUser();
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
+  const [currentPwd, setCurrentPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      setDisplayName(currentUser.display_name || "");
+      setBio(currentUser.bio || "");
+    }
+  }, [currentUser]);
 
   const { data: settings } = useQuery<ApiSettings>({
     queryKey: ["settings"],
@@ -76,6 +94,65 @@ export default function Settings() {
       </div>
 
       <div className="space-y-6">
+        {/* Profile */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <User className="h-4 w-4 text-sky-600" />
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Profile</h2>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Display Name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                onBlur={() => { if (displayName !== (currentUser?.display_name || "")) updateProfile.mutate({ display_name: displayName }); }}
+                placeholder="Your name"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                onBlur={() => { if (bio !== (currentUser?.bio || "")) updateProfile.mutate({ bio }); }}
+                placeholder="A short bio..."
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Security */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Lock className="h-4 w-4 text-sky-600" />
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Security</h2>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Current Password</label>
+              <input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">New Password</label>
+              <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+            </div>
+            <button
+              onClick={() => { changePassword.mutate({ current_password: currentPwd, new_password: newPwd }); setCurrentPwd(""); setNewPwd(""); }}
+              disabled={!currentPwd || !newPwd || changePassword.isPending}
+              className="px-4 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {changePassword.isPending ? "Changing..." : "Change Password"}
+            </button>
+            {changePassword.isError && <p className="text-xs text-red-500">Failed to change password</p>}
+            {changePassword.isSuccess && <p className="text-xs text-green-500">Password changed successfully</p>}
+          </div>
+        </div>
+
         {/* Appearance */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
           <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4">

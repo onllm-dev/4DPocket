@@ -14,6 +14,8 @@ interface SharePayload {
   item_id: string | null;
   collection_id: string | null;
   public?: boolean;
+  recipient_email?: string;
+  permission?: "viewer" | "editor";
 }
 
 interface ShareResponse {
@@ -40,13 +42,14 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
 
   const handleShareWithUser = async () => {
     if (!email.trim()) return;
-    const share = await createShare.mutateAsync({
+    await createShare.mutateAsync({
       share_type: itemId ? "item" : "collection",
       item_id: itemId || null,
       collection_id: collectionId || null,
+      recipient_email: email.trim(),
+      permission: role,
     });
     setEmail("");
-    void share;
   };
 
   const handleGenerateLink = async () => {

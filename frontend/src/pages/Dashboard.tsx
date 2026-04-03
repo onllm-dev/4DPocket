@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, FolderOpen, ChevronDown } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, ChevronDown, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
@@ -66,10 +66,10 @@ export default function Dashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {[
-          { label: "Total Items", value: stats?.total_items, icon: BookOpen, color: "sky", gradient: "from-sky-50 to-white dark:from-sky-950/30 dark:to-gray-900" },
-          { label: "This Week", value: stats?.items_this_week, icon: TrendingUp, color: "emerald", gradient: "from-emerald-50 to-white dark:from-emerald-950/20 dark:to-gray-900" },
-          { label: "Tags", value: stats?.total_tags, icon: Tags, color: "violet", gradient: "from-violet-50 to-white dark:from-violet-950/20 dark:to-gray-900" },
-          { label: "Collections", value: stats?.total_collections, icon: FolderOpen, color: "amber", gradient: "from-amber-50 to-white dark:from-amber-950/20 dark:to-gray-900" },
+          { label: "Total Items", value: stats?.total_items, icon: BookOpen, color: "sky", gradient: "from-sky-50 to-white dark:from-sky-950/30 dark:to-gray-900", link: "/knowledge" },
+          { label: "This Week", value: stats?.items_this_week, icon: TrendingUp, color: "emerald", gradient: "from-emerald-50 to-white dark:from-emerald-950/20 dark:to-gray-900", link: null },
+          { label: "Notes", value: stats?.total_notes, icon: StickyNote, color: "amber", gradient: "from-amber-50 to-white dark:from-amber-950/20 dark:to-gray-900", link: "/notes" },
+          { label: "Tags", value: stats?.total_tags, icon: Tags, color: "violet", gradient: "from-violet-50 to-white dark:from-violet-950/20 dark:to-gray-900", link: null },
         ].map((stat) => {
           const Icon = stat.icon;
           const colorMap: Record<string, string> = {
@@ -78,11 +78,8 @@ export default function Dashboard() {
             violet: "bg-violet-100 dark:bg-violet-900/30 text-violet-600",
             amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600",
           };
-          return (
-            <div
-              key={stat.label}
-              className={`rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-gradient-to-br ${stat.gradient} p-4 md:p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300`}
-            >
+          const cardContent = (
+            <>
               <div className="flex items-center gap-2.5 mb-3">
                 <div className={`p-2 rounded-xl ${colorMap[stat.color]}`}>
                   <Icon className="h-4 w-4 md:h-5 md:w-5" />
@@ -98,6 +95,16 @@ export default function Dashboard() {
                   stat.value ?? 0
                 )}
               </div>
+            </>
+          );
+          const cardClass = `rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-gradient-to-br ${stat.gradient} p-4 md:p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300`;
+          return stat.link ? (
+            <Link key={stat.label} to={stat.link} className={cardClass}>
+              {cardContent}
+            </Link>
+          ) : (
+            <div key={stat.label} className={cardClass}>
+              {cardContent}
             </div>
           );
         })}

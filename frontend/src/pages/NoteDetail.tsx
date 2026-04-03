@@ -44,6 +44,9 @@ export default function NoteDetail() {
   const [showAddTag, setShowAddTag] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
 
   if (isLoading) {
     return (
@@ -124,7 +127,11 @@ export default function NoteDetail() {
             <FolderPlus className="w-4 h-4 text-gray-400" />
           </button>
           <button
-            onClick={() => navigate(`/notes?edit=${note.id}`)}
+            onClick={() => {
+              setEditTitle(note.title || "");
+              setEditContent(note.content || "");
+              setIsEditing(true);
+            }}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title="Edit"
             aria-label="Edit"
@@ -173,6 +180,46 @@ export default function NoteDetail() {
           </div>
         </div>
       )}
+
+      {isEditing ? (
+        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Note title..."
+            className="w-full px-3 py-2 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+          />
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={8}
+            placeholder="Note content..."
+            className="w-full px-3 py-2 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="px-4 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                updateNote.mutate({
+                  id: note.id,
+                  title: editTitle.trim() || undefined,
+                  content: editContent.trim() || undefined,
+                });
+                setIsEditing(false);
+              }}
+              className="px-4 py-2 text-sm rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Title */}
       <div className="mb-4">

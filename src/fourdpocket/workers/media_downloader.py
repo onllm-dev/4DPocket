@@ -80,12 +80,7 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
             continue
 
         try:
-            with httpx.stream(
-                media_url,
-                timeout=30.0,
-                follow_redirects=True,
-                headers={"User-Agent": "4DPocket/0.1"},
-            ) as response:
+            with httpx.stream("GET", media_url, timeout=30.0, follow_redirects=True, headers={"User-Agent": "4DPocket/0.1"}) as response:
                 response.raise_for_status()
                 total_size = 0
                 chunks = []

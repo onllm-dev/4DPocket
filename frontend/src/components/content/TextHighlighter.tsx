@@ -127,8 +127,7 @@ export default function TextHighlighter({ itemId, noteId, highlights = [], child
 
       qc.invalidateQueries({ queryKey: ["highlights"] });
       window.getSelection()?.removeAllRanges();
-    } catch (err) {
-      console.error("Failed to create highlight:", err);
+    } catch {
     } finally {
       setSaving(false);
       setShowPicker(false);

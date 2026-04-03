@@ -101,7 +101,7 @@ export default function Feed() {
 
 function KnowledgeFeedTab() {
   const { data: items, isLoading } = useQuery<KnowledgeFeedItem[]>({
-    queryKey: ["feeds"],
+    queryKey: ["knowledge-feed"],
     queryFn: () => api.get("/api/v1/feeds"),
   });
 

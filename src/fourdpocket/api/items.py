@@ -697,6 +697,8 @@ def bulk_action(
                     db.add(ItemTag(item_id=iid, tag_id=tag.id))
                     tag.usage_count += 1
                     db.add(tag)
+        elif data.action == "enrich":
+            _try_sync_enrich(item, db, current_user.id)
         processed += 1
 
     db.commit()

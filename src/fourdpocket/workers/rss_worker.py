@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import httpx
 from sqlmodel import Session
 
+from fourdpocket.models.base import ItemType, SourcePlatform
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rss_feed import RSSFeed
 from fourdpocket.utils.ssrf import is_safe_url
@@ -56,8 +57,6 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
 
             title = title_el.text if title_el is not None else url
             description = desc_el.text if desc_el is not None else None
-            guid = guid_el.text if guid_el is not None else url  # noqa: F841
-
             # Skip if already fetched (by URL)
             from sqlmodel import select
             existing = db.exec(
@@ -75,8 +74,8 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
                 url=url,
                 title=title,
                 description=description,
-                item_type="url",
-                source_platform="generic",
+                item_type=ItemType.url,
+                source_platform=SourcePlatform.generic,
             )
             db.add(item)
             new_count += 1

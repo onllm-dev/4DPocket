@@ -12,7 +12,7 @@ from fourdpocket.models.rule import Rule
 from fourdpocket.models.tag import ItemTag, Tag
 
 
-def evaluate_condition(condition: dict, item: KnowledgeItem) -> bool:
+def evaluate_condition(condition: dict, item: KnowledgeItem, db: Session | None = None) -> bool:
     """Evaluate a rule condition against an item."""
     cond_type = condition.get("type", "")
 
@@ -38,8 +38,16 @@ def evaluate_condition(condition: dict, item: KnowledgeItem) -> bool:
         return keyword in (item.content or "").lower()
 
     elif cond_type == "has_tag":
-        # This requires checking item's tags - handled at caller level
-        return False
+        tag_name = condition.get("tag_name", "").lower()
+        if not tag_name or not db:
+            return False
+        result = db.exec(
+            select(ItemTag).join(Tag, ItemTag.tag_id == Tag.id).where(
+                ItemTag.item_id == item.id,
+                Tag.name == tag_name,
+            )
+        ).first()
+        return result is not None
 
     return False
 
@@ -103,7 +111,7 @@ def run_rules_for_item(item: KnowledgeItem, db: Session) -> int:
 
     matched = 0
     for rule in rules:
-        if evaluate_condition(rule.condition, item):
+        if evaluate_condition(rule.condition, item, db):
             execute_action(rule.action, item, db)
             matched += 1
 

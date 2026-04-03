@@ -76,5 +76,5 @@ class LinkedInProcessor(BaseProcessor):
             metadata=metadata,
             source_platform="linkedin",
             item_type="url",
-            status=ProcessorStatus.partial,
+            status=ProcessorStatus.success if content else ProcessorStatus.partial,
         )

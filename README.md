@@ -30,7 +30,7 @@
 
 Everyone saves things - bookmarks, articles, videos, code snippets, social media posts - across dozens of platforms. Then can never find them again.
 
-**4DPocket** is different. It's not a bookmark manager - it's a **magic library**. Throw anything in - URLs, notes, YouTube videos, Reddit threads, GitHub repos, tweets, PDFs, images - and 4dpocket **understands** it, **connects** it to what you already know, and **serves** it back when you need it.
+**4DPocket** is different. It's not a bookmark manager - it's a **magic library**. Throw anything in - URLs, notes, YouTube videos, Reddit threads, GitHub repos, tweets, PDFs, images - and the pocket **understands** it, **connects** it to what you already know, and **serves** it back when you need it.
 
 Just like Doraemon reaches into his 4D Pocket and pulls out the perfect gadget for any situation, you reach into yours and pull out exactly the knowledge you need.
 
@@ -38,11 +38,11 @@ Just like Doraemon reaches into his 4D Pocket and pulls out the perfect gadget f
 
 | Principle | What It Means |
 |-----------|--------------|
-| **Knowledge-First** | Every item is extracted, enriched, indexed, and connected. Your 4dpocket *understands* what's inside it. |
+| **Knowledge-First** | Every item is extracted, enriched, indexed, and connected. Your pocket *understands* what's inside it. |
 | **Retrieval-First** | Everything is designed around getting things *out* fast. Search is instant, smart, and forgiving. |
 | **Local-First** | Runs entirely on your machine by default. Your data never leaves unless you choose external APIs. |
 | **Zero-Friction Capture** | Save anything in 1-2 actions. Paste a URL and everything is handled automatically. |
-| **Smart by Default** | AI auto-tags, auto-summarizes, auto-connects. You don't organize - 4dpocket organizes itself. |
+| **Smart by Default** | AI auto-tags, auto-summarizes, auto-connects. You don't organize - the pocket organizes itself. |
 | **Private by Default** | Each user's knowledge base is their own. Sharing is explicit, granular, and revocable. |
 
 ---
@@ -93,7 +93,7 @@ The brain of 4DPocket - what transforms it from a link saver into a knowledge ba
 
 ### Multi-User Knowledge Bases
 
-Every user gets their own isolated 4dpocket. Knowledge is private by default, shareable by choice.
+Every user gets their own isolated pocket. Knowledge is private by default, shareable by choice.
 
 - **Per-User Isolation** - Items, tags, collections, AI enrichments are all scoped to the user.
 - **Selective Sharing** - Share individual items, entire collections, or tag-based groups with specific users.
@@ -192,7 +192,7 @@ Open http://localhost:4040
 | **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) |
 | **Embeddings** | sentence-transformers (local) / NVIDIA nv-embed-v1 |
 | **Background Jobs** | Huey (SQLite backend) |
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS v4 |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | **State** | TanStack Query (server) + Zustand (client) |
 | **Icons** | Lucide React |
 
@@ -240,7 +240,7 @@ Interactive docs at http://localhost:4040/docs when running.
 ```
 4dpocket/
 ├── src/fourdpocket/          # Python backend
-│   ├── api/                  # FastAPI endpoints (15 routers)
+│   ├── api/                  # FastAPI endpoints (19 routers)
 │   ├── models/               # SQLModel database models
 │   ├── processors/           # Content extractors (17 platforms)
 │   ├── ai/                   # AI providers + tagging + summarization + sanitizer
@@ -250,11 +250,11 @@ Interactive docs at http://localhost:4040/docs when running.
 │   └── storage/              # File storage (user-scoped)
 ├── frontend/                 # React PWA
 │   └── src/
-│       ├── pages/            # 12 page components
+│       ├── pages/            # 21 page components
 │       ├── components/       # Layout, BookmarkCard, ShareDialog, CommandPalette
 │       ├── hooks/            # TanStack Query data hooks + keyboard shortcuts
 │       └── stores/           # Zustand UI state
-├── tests/                    # pytest test suite (55+ tests)
+├── tests/                    # pytest test suite (65+ tests)
 ├── Dockerfile               # Multi-stage Python build
 ├── docker-compose.yml       # Full stack orchestration
 └── .env.example             # Configuration reference
@@ -278,7 +278,7 @@ make migrate-gen msg="description"
 
 ## License
 
-MIT
+GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
 
 ---
 

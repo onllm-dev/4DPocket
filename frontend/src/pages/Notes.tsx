@@ -25,10 +25,12 @@ export default function Notes() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   const startRecording = useCallback(async () => {
+    setVoiceError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -61,7 +63,7 @@ export default function Notes() {
             }
           }
         } catch {
-          // Transcription failed silently
+          setVoiceError("Transcription failed. Please try again.");
         } finally {
           setIsTranscribing(false);
         }
@@ -70,7 +72,7 @@ export default function Notes() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch {
-      // Microphone access denied
+      setVoiceError("Microphone access denied");
     }
   }, [showForm]);
 
@@ -189,6 +191,9 @@ export default function Notes() {
           </button>
         </div>
       </div>
+      {voiceError && (
+        <p className="text-xs text-red-500 mt-1 mb-2">{voiceError}</p>
+      )}
 
       {showForm && (
         <form
