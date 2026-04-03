@@ -1,5 +1,8 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { FileText, Pencil, Plus, Trash2, X, Mic, Loader2 } from "lucide-react";
+
+const TiptapEditor = lazy(() => import("@/components/editor/TiptapEditor"));
 import { api, apiFetch } from "@/api/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { timeAgo } from "@/lib/utils";
@@ -212,13 +215,13 @@ export default function Notes() {
             autoFocus
             className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-600"
           />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Write a note (Markdown supported)..."
-            rows={4}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none font-mono"
-          />
+          <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />}>
+            <TiptapEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Write a note..."
+            />
+          </Suspense>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -301,13 +304,13 @@ export default function Notes() {
                     autoFocus
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-600"
                   />
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Write a note (Markdown supported)..."
-                    rows={4}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none font-mono"
-                  />
+                  <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />}>
+                    <TiptapEditor
+                      content={editContent}
+                      onChange={setEditContent}
+                      placeholder="Write a note..."
+                    />
+                  </Suspense>
                   <div className="flex gap-2">
                     <button
                       type="submit"
@@ -350,12 +353,12 @@ export default function Notes() {
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                    <Link to={`/notes/${note.id}`} className="flex items-center gap-2 hover:text-sky-600 transition-colors">
                       <FileText className="h-4 w-4 text-sky-600" />
-                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100 hover:text-sky-600">
                         {note.title || "Untitled Note"}
                       </h3>
-                    </div>
+                    </Link>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-600 dark:text-gray-400 mr-2">
                         {timeAgo(note.created_at)}
@@ -374,8 +377,8 @@ export default function Notes() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap line-clamp-4 font-mono pl-6">
-                    {note.content}
+                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-4 pl-6">
+                    {note.content ? new DOMParser().parseFromString(note.content, "text/html").body.textContent || "" : ""}
                   </p>
                 </>
               )}

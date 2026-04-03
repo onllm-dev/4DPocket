@@ -68,6 +68,7 @@ class ItemRead(BaseModel):
     title: str | None
     description: str | None
     content: str | None
+    raw_content: str | None
     summary: str | None
     screenshot_path: str | None
     favicon_url: str | None

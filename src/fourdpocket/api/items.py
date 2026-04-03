@@ -200,6 +200,9 @@ def create_item(
     except Exception:
         pass  # Worker dispatch is best-effort
 
+    # Sync enrichment fallback: if Huey worker is not running, enrich inline
+    _try_sync_enrich(item, db, current_user.id)
+
     return item
 
 

@@ -21,6 +21,7 @@ import {
   Repeat2,
   Pencil,
   FolderPlus,
+  BookMarked,
   LinkIcon,
   Plus,
   X,
@@ -33,6 +34,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useCollections, useAddItemToCollection } from "@/hooks/use-collections";
+import { useToggleReadingList, useMarkAsRead } from "@/hooks/use-reading-list";
 import { useItemLinks, useAddItemLink, useRemoveItemLink } from "@/hooks/use-item-links";
 import { formatDate } from "@/lib/utils";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
@@ -371,6 +373,8 @@ export default function ItemDetail() {
   const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
   const { data: collections } = useCollections();
   const addToCollection = useAddItemToCollection();
+  const toggleReadingList = useToggleReadingList();
+  const markAsRead = useMarkAsRead();
 
   const commentInputRef = useRef<HTMLInputElement>(null);
 
@@ -690,6 +694,35 @@ export default function ItemDetail() {
           />
         </TextHighlighter>
       )}
+
+      {/* Reading list action */}
+      <div className="flex items-center gap-3">
+        {item.reading_status === "reading_list" ? (
+          <button
+            onClick={() => markAsRead.mutate({ id: item.id, type: "item" })}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+          >
+            <Check className="w-4 h-4" />
+            Mark as Read
+          </button>
+        ) : item.reading_status === "read" ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+            <Check className="w-3.5 h-3.5" />
+            Read
+          </span>
+        ) : null}
+        <button
+          onClick={() => toggleReadingList.mutate({ id: item.id, type: "item", add: item.reading_status !== "reading_list" })}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            item.reading_status === "reading_list"
+              ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:text-sky-600"
+          }`}
+        >
+          <BookMarked className="w-4 h-4" />
+          {item.reading_status === "reading_list" ? "In Reading List" : "Add to Reading List"}
+        </button>
+      </div>
 
       {/* Multi-link section */}
       <ItemLinksSection itemId={item.id} />

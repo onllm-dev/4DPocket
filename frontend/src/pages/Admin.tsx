@@ -1,5 +1,5 @@
 import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX, Sparkles, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -248,14 +248,17 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
   const [localConfig, setLocalConfig] = useState<AIConfig | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Initialize local config from server config
-  const effective = localConfig || config;
-  if (!config) return null;
-  if (!localConfig && config) {
-    // Use a ref-style pattern: set on first render
-    setTimeout(() => setLocalConfig({ ...config }), 0);
+  // Sync local config from server config on load
+  const prevConfig = useRef(config);
+  if (config && !localConfig && config !== prevConfig.current) {
+    prevConfig.current = config;
   }
-  if (!effective) return null;
+  if (config && !localConfig) {
+    setLocalConfig({ ...config });
+  }
+
+  if (!config) return null;
+  const effective = localConfig || config;
 
   const toggleKey = (key: string) => setShowKeys((prev) => ({ ...prev, [key]: !prev[key] }));
 
