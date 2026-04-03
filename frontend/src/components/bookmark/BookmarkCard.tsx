@@ -23,9 +23,16 @@ interface BookmarkCardProps {
 export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   const updateItem = useUpdateItem();
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
+  const thumbUrl = thumbMedia?.url;
+  // LinkedIn blocks hotlinking - proxy those images through backend
+  const needsProxy = thumbUrl && (
+    thumbUrl.includes("licdn.com") || thumbUrl.includes("linkedin.com")
+  );
   const thumbnail = thumbMedia?.local_path
     ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
-    : thumbMedia?.url || undefined;
+    : needsProxy
+    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbUrl)}`
+    : thumbUrl || undefined;
 
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();

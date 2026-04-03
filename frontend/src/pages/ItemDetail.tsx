@@ -444,9 +444,15 @@ export default function ItemDetail() {
   }
 
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
+  const thumbUrl = thumbMedia?.url;
+  const needsProxy = thumbUrl && (
+    thumbUrl.includes("licdn.com") || thumbUrl.includes("linkedin.com")
+  );
   const thumbnail = thumbMedia?.local_path
     ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
-    : thumbMedia?.url || undefined;
+    : needsProxy
+    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbUrl)}`
+    : thumbUrl || undefined;
   const tags = itemTags ?? [];
   const isYouTube = item.source_platform.toLowerCase() === "youtube";
   const metadata = item.item_metadata ?? {};
