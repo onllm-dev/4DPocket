@@ -14,8 +14,10 @@ import { PlatformIcon } from "@/components/common/PlatformIcon";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
+import { useNotes } from "@/hooks/use-notes";
 import { useUIStore } from "@/stores/ui-store";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
+import NoteCard from "@/components/bookmark/NoteCard";
 
 const PLATFORMS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "All", label: "All", icon: <Globe className="h-4 w-4" /> },
@@ -60,6 +62,7 @@ export default function KnowledgeBase() {
     useItems(filters);
 
   const items = data?.pages.flat() ?? [];
+  const { data: notes } = useNotes({ is_archived: isArchived, is_favorite: isFavorite });
 
   const bulkAction = useMutation({
     mutationFn: (data: { action: string; item_ids: string[]; tag_name?: string }) =>
@@ -251,6 +254,10 @@ export default function KnowledgeBase() {
               ) : (
                 <BookmarkCard key={item.id} item={item} variant={viewMode} />
               )
+            ))}
+            {/* Notes in knowledge base */}
+            {platform === "All" && notes && notes.length > 0 && !selecting && notes.map((note) => (
+              <NoteCard key={`note-${note.id}`} note={note} variant={viewMode === "list" ? "compact" : "grid"} />
             ))}
           </div>
 

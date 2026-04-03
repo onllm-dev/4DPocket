@@ -18,7 +18,8 @@ class Highlight(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
-    item_id: uuid.UUID = Field(foreign_key="knowledge_items.id", index=True)
+    item_id: uuid.UUID | None = Field(default=None, foreign_key="knowledge_items.id", index=True)
+    note_id: uuid.UUID | None = Field(default=None, foreign_key="notes.id", index=True)
     text: str  # The highlighted text
     note: str | None = None  # Annotation note
     color: str = Field(default="yellow")  # yellow, green, blue, red, purple

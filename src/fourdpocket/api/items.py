@@ -14,7 +14,7 @@ from sqlmodel import Session, col, select
 from sqlmodel import delete as sql_delete
 
 from fourdpocket.api.deps import get_current_user, get_db
-from fourdpocket.models.base import ItemType, SourcePlatform
+from fourdpocket.models.base import ItemType, ReadingStatus, SourcePlatform
 from fourdpocket.models.item import ItemCreate, ItemRead, ItemUpdate, KnowledgeItem
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
@@ -200,16 +200,6 @@ def create_item(
     except Exception:
         pass  # Worker dispatch is best-effort
 
-    # Sync enrichment fallback: run processor + tagging + summarization inline.
-    # This ensures items get AI-enriched even when Huey worker is not running.
-    # Defense-in-depth design: sync runs first for immediate UX responsiveness;
-    # Huey handles the full pipeline (including embeddings, which sync skips).
-    # Double-processing is safe: _try_sync_enrich checks for existing tags and
-    # returns early if tags are already present, making it idempotent. If Huey
-    # runs first and adds tags, sync enrichment skips. If sync runs first and
-    # adds tags, Huey's tagging step finds existing tags and skips.
-    _try_sync_enrich(item, db, current_user.id)
-
     return item
 
 
@@ -324,6 +314,46 @@ def get_reading_queue(
             KnowledgeItem.is_archived == False,  # noqa: E712
             KnowledgeItem.reading_progress < 100,
         ).order_by(KnowledgeItem.created_at.desc()).limit(50)
+    ).all()
+    return items
+
+
+@router.get("/reading-list", response_model=list[ItemRead])
+def get_reading_list(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """Get items where reading_status is 'reading_list'."""
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.reading_status == ReadingStatus.reading_list,
+        )
+        .order_by(col(KnowledgeItem.created_at).desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return items
+
+
+@router.get("/read", response_model=list[ItemRead])
+def get_read_items(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """Get items where reading_status is 'read'."""
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.reading_status == ReadingStatus.read,
+        )
+        .order_by(col(KnowledgeItem.created_at).desc())
+        .offset(offset)
+        .limit(limit)
     ).all()
     return items
 
@@ -736,8 +766,12 @@ def media_proxy(
 
     # Fetch from source
     try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        }
         with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-            resp = client.get(url)
+            resp = client.get(url, headers=headers)
             resp.raise_for_status()
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")

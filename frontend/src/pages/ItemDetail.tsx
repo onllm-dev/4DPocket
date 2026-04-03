@@ -14,19 +14,28 @@ import {
   ThumbsUp,
   GitFork,
   MessageSquare,
-  ChevronDown,
-  ChevronUp,
   User,
   Calendar,
   Hash,
   Play,
   Repeat2,
   Pencil,
+  FolderPlus,
+  BookOpen,
+  LinkIcon,
+  Plus,
+  X,
+  Check,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
+import ContentRenderer from "@/components/content/ContentRenderer";
+import TextHighlighter from "@/components/content/TextHighlighter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
+import { useCollections, useAddItemToCollection } from "@/hooks/use-collections";
+import { useItemLinks, useAddItemLink, useRemoveItemLink } from "@/hooks/use-item-links";
+import { useToggleReadingList } from "@/hooks/use-reading-list";
 import { formatDate } from "@/lib/utils";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
 import { EditBookmarkForm } from "@/components/bookmark/BookmarkForm";
@@ -350,7 +359,6 @@ function getThumbnailGradient(platform: string): string {
   return PLATFORM_GRADIENTS[platform.toLowerCase()] ?? "from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-gray-900";
 }
 
-const CONTENT_PREVIEW_LENGTH = 500;
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -362,12 +370,16 @@ export default function ItemDetail() {
   const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [contentExpanded, setContentExpanded] = useState(false);
+  const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
+  const { data: collections } = useCollections();
+  const addToCollection = useAddItemToCollection();
+  const toggleReadingList = useToggleReadingList();
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   const { data: relatedItems } = useQuery<Array<{
     id: string;
     title: string;
+    url: string | null;
     source_platform: string;
     score: number;
   }>>({
@@ -458,9 +470,11 @@ export default function ItemDetail() {
   }
 
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
-  const thumbUrl = thumbMedia?.url;
+  const thumbUrl = thumbMedia?.url?.replaceAll("&amp;", "&");
   const needsProxy = thumbUrl && (
-    thumbUrl.includes("licdn.com") || thumbUrl.includes("linkedin.com")
+    thumbUrl.includes("licdn.com") ||
+    thumbUrl.includes("linkedin.com") ||
+    thumbUrl.includes("preview.redd.it")
   );
   const thumbnail = thumbMedia?.local_path
     ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
@@ -475,12 +489,6 @@ export default function ItemDetail() {
   const hasDisplayableMetadata = Object.keys(metadata).some(
     (k) => !HIDDEN_METADATA_KEYS.has(k) && metadata[k] != null && String(metadata[k]) !== ""
   );
-
-  const contentTooLong = (item.content?.length ?? 0) > CONTENT_PREVIEW_LENGTH;
-  const displayedContent =
-    contentTooLong && !contentExpanded
-      ? item.content!.slice(0, CONTENT_PREVIEW_LENGTH) + "…"
-      : item.content;
 
   const handleDelete = async () => {
     if (!confirm("Delete this item?")) return;
@@ -535,6 +543,12 @@ export default function ItemDetail() {
           <button onClick={() => setEditOpen(true)} aria-label="Edit" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <Pencil className="h-4 w-4" />
           </button>
+          <button onClick={() => setCollectionPickerOpen((p) => !p)} aria-label="Add to Collection" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
+            <FolderPlus className="h-4 w-4" />
+          </button>
+          <button onClick={() => toggleReadingList.mutate({ id: item.id, type: "item", add: item.reading_status !== "reading_list" })} aria-label="Reading List" className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${item.reading_status === "reading_list" ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600" : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"}`}>
+            <BookOpen className="h-4 w-4" />
+          </button>
           <button onClick={() => setShareOpen(true)} aria-label="Share" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <Share2 className="h-4 w-4" />
           </button>
@@ -544,6 +558,30 @@ export default function ItemDetail() {
           </button>
         </div>
       </div>
+
+      {/* Collection picker dropdown */}
+      {collectionPickerOpen && collections && (
+        <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Add to Collection</p>
+          <div className="flex flex-wrap gap-2">
+            {collections.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  addToCollection.mutate({ collectionId: c.id, itemIds: [item.id] });
+                  setCollectionPickerOpen(false);
+                }}
+                className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 hover:border-sky-300 dark:hover:border-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
+              >
+                {c.name}
+              </button>
+            ))}
+            {collections.length === 0 && (
+              <p className="text-xs text-gray-400">No collections yet. Create one first.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hero thumbnail */}
       {thumbnail ? (
@@ -562,14 +600,14 @@ export default function ItemDetail() {
         <div
           className={`w-full rounded-2xl flex items-center justify-center bg-gradient-to-br ${getThumbnailGradient(item.source_platform)} ${isYouTube ? "aspect-video" : "h-40"}`}
         >
-          <PlatformIcon platform={item.source_platform} className="h-12 w-12 opacity-60" />
+          <PlatformIcon platform={item.source_platform} url={item.url} faviconUrl={item.favicon_url} className="h-12 w-12 opacity-60" />
         </div>
       )}
 
       {/* Title + metadata */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <PlatformIcon platform={item.source_platform} className="h-4 w-4" />
+          <PlatformIcon platform={item.source_platform} url={item.url} faviconUrl={item.favicon_url} className="h-4 w-4" />
           <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
             {item.source_platform === "generic" ? "Web" : item.source_platform}
           </span>
@@ -649,34 +687,17 @@ export default function ItemDetail() {
       )}
 
       {item.content && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 mb-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
-            Content
-          </h2>
-          <div className="prose dark:prose-invert max-w-prose text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
-            {displayedContent}
-          </div>
-          {contentTooLong && (
-            <button
-              onClick={() => setContentExpanded((prev) => !prev)}
-              className="mt-3 inline-flex items-center gap-1.5 text-sm text-sky-600 hover:text-sky-700 font-medium transition-colors duration-150 cursor-pointer"
-              aria-expanded={contentExpanded}
-            >
-              {contentExpanded ? (
-                <>
-                  <ChevronUp className="h-4 w-4" />
-                  Show less
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4" />
-                  Show more
-                </>
-              )}
-            </button>
-          )}
-        </div>
+        <TextHighlighter itemId={item.id}>
+          <ContentRenderer
+            content={item.content}
+            rawContent={item.raw_content}
+            sourceUrl={item.url}
+          />
+        </TextHighlighter>
       )}
+
+      {/* Multi-link section */}
+      <ItemLinksSection itemId={item.id} />
 
       <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
@@ -692,7 +713,7 @@ export default function ItemDetail() {
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-sky-600">
-                    <PlatformIcon platform={related.source_platform} className="h-4 w-4" />
+                    <PlatformIcon platform={related.source_platform} url={related.url} className="h-4 w-4" />
                   </span>
                   <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium truncate">
                     {related.source_platform}
@@ -784,13 +805,120 @@ export default function ItemDetail() {
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setEditOpen(false)}
           />
-          <EditBookmarkForm
-            item={item}
-            onClose={() => setEditOpen(false)}
-            onUpdated={() => qc.invalidateQueries({ queryKey: ["items", id] })}
-          />
+          <div className="relative z-10">
+            <EditBookmarkForm
+              item={item}
+              onClose={() => setEditOpen(false)}
+              onUpdated={() => qc.invalidateQueries({ queryKey: ["items", id] })}
+            />
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ItemLinksSection({ itemId }: { itemId: string }) {
+  const { data: links } = useItemLinks(itemId);
+  const addLink = useAddItemLink();
+  const removeLink = useRemoveItemLink();
+  const [showAdd, setShowAdd] = useState(false);
+  const [newUrl, setNewUrl] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+
+  const handleAdd = () => {
+    if (!newUrl.trim()) return;
+    addLink.mutate({ itemId, url: newUrl.trim(), title: newTitle.trim() || undefined });
+    setNewUrl("");
+    setNewTitle("");
+    setShowAdd(false);
+  };
+
+  if (!links?.length && !showAdd) {
+    return (
+      <div className="mt-4">
+        <button
+          onClick={() => setShowAdd(true)}
+          className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-sky-500 transition-colors"
+        >
+          <LinkIcon className="w-3.5 h-3.5" />
+          Add related links
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+          Related Links
+        </h2>
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-500 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="flex gap-2 mb-3">
+          <input
+            type="url"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            placeholder="https://..."
+            className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5"
+            autoFocus
+          />
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Title (optional)"
+            className="w-40 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5"
+          />
+          <button onClick={handleAdd} className="p-1.5 rounded-lg bg-sky-600 text-white hover:bg-sky-700">
+            <Check className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {links?.map((link) => (
+          <div
+            key={link.id}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
+          >
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${link.domain}&sz=32`}
+              alt=""
+              className="w-4 h-4 rounded"
+            />
+            <div className="flex-1 min-w-0">
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-gray-800 dark:text-gray-200 hover:text-sky-600 truncate block"
+              >
+                {link.title || link.url}
+              </a>
+              <span className="text-[10px] text-gray-400">{link.domain}</span>
+            </div>
+            <button
+              onClick={() => removeLink.mutate({ itemId, linkId: link.id })}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-all"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

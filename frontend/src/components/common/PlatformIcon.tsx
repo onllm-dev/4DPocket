@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Globe } from "lucide-react";
 
 interface PlatformIconProps {
   platform: string;
   className?: string;
+  url?: string | null;
+  faviconUrl?: string | null;
 }
 
 function YouTubeIcon({ className }: { className?: string }) {
@@ -196,10 +199,28 @@ const PLATFORM_ICON_MAP: Record<string, React.ComponentType<{ className?: string
   threads: ThreadsIcon,
 };
 
-export function PlatformIcon({ platform, className }: PlatformIconProps) {
+export function PlatformIcon({ platform, className, url, faviconUrl }: PlatformIconProps) {
   const Icon = PLATFORM_ICON_MAP[platform.toLowerCase()];
   if (Icon) {
     return <Icon className={className} />;
   }
+
+  const [imgError, setImgError] = useState(false);
+
+  // Generic URL: try favicon first (from DB), then Google Favicons service
+  if ((url || faviconUrl) && !imgError) {
+    const src = faviconUrl || (url ? `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64` : null);
+    if (src) {
+      return (
+        <img
+          src={src}
+          alt=""
+          className={className}
+          onError={() => setImgError(true)}
+        />
+      );
+    }
+  }
+
   return <Globe className={className} />;
 }

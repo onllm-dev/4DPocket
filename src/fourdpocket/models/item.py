@@ -6,7 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel
 
-from fourdpocket.models.base import ItemType, SourcePlatform, utc_now
+from fourdpocket.models.base import ItemType, ReadingStatus, SourcePlatform, utc_now
 
 try:
     from sqlalchemy import JSON, DateTime, Text
@@ -28,12 +28,18 @@ class KnowledgeItem(SQLModel, table=True):
     raw_content: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     summary: str | None = None
     screenshot_path: str | None = None
+    favicon_url: str | None = None
     archive_path: str | None = None
     media: list = Field(default_factory=list, sa_column=Column(JSON))
     item_metadata: dict = Field(default_factory=dict, sa_column=Column("metadata", JSON))
     is_favorite: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     reading_progress: int = Field(default=0)
+    reading_status: ReadingStatus = Field(default=ReadingStatus.unread)
+    read_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -64,12 +70,15 @@ class ItemRead(BaseModel):
     content: str | None
     summary: str | None
     screenshot_path: str | None
+    favicon_url: str | None
     archive_path: str | None
     media: list
     item_metadata: dict
     is_favorite: bool
     is_archived: bool
     reading_progress: int
+    reading_status: ReadingStatus
+    read_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -83,3 +92,4 @@ class ItemUpdate(BaseModel):
     is_favorite: bool | None = None
     is_archived: bool | None = None
     reading_progress: int | None = None
+    reading_status: ReadingStatus | None = None

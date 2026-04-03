@@ -42,5 +42,11 @@ class ShareMode(str, enum.Enum):
     invite = "invite"
 
 
+class ReadingStatus(str, enum.Enum):
+    unread = "unread"
+    reading_list = "reading_list"
+    read = "read"
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)

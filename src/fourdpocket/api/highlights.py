@@ -14,11 +14,18 @@ router = APIRouter(prefix="/highlights", tags=["highlights"])
 
 
 class HighlightCreate(BaseModel):
-    item_id: uuid.UUID
+    item_id: uuid.UUID | None = None
+    note_id: uuid.UUID | None = None
     text: str
     note: str | None = None
     color: str = "yellow"
     position: dict | None = None
+
+    def model_post_init(self, __context):
+        if not self.item_id and not self.note_id:
+            raise ValueError("Either item_id or note_id must be provided")
+        if self.item_id and self.note_id:
+            raise ValueError("Only one of item_id or note_id should be provided")
 
 
 class HighlightUpdate(BaseModel):
@@ -29,13 +36,16 @@ class HighlightUpdate(BaseModel):
 @router.get("")
 def list_highlights(
     item_id: uuid.UUID | None = None,
+    note_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all highlights, optionally filtered by item."""
+    """List all highlights, optionally filtered by item or note."""
     query = select(Highlight).where(Highlight.user_id == current_user.id)
     if item_id:
         query = query.where(Highlight.item_id == item_id)
+    if note_id:
+        query = query.where(Highlight.note_id == note_id)
     query = query.order_by(Highlight.created_at.desc())
     return db.exec(query).all()
 
@@ -49,6 +59,7 @@ def create_highlight(
     highlight = Highlight(
         user_id=current_user.id,
         item_id=body.item_id,
+        note_id=body.note_id,
         text=body.text,
         note=body.note,
         color=body.color,

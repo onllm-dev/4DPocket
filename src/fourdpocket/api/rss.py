@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.models.feed_entry import FeedEntry, FeedEntryRead
+from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rss_feed import RSSFeed
 from fourdpocket.models.user import User
 
@@ -19,6 +21,9 @@ class RSSFeedCreate(BaseModel):
     category: str | None = None
     target_collection_id: str | None = None
     poll_interval: int = 3600
+    format: str = "rss"
+    mode: str = "auto"
+    filters: str | None = None
 
 
 class RSSFeedUpdate(BaseModel):
@@ -50,6 +55,9 @@ def create_feed(
         category=body.category,
         target_collection_id=body.target_collection_id,
         poll_interval=body.poll_interval,
+        format=body.format,
+        mode=body.mode,
+        filters=body.filters,
     )
     db.add(feed)
     db.commit()
@@ -100,3 +108,111 @@ def fetch_feed_now(
     from fourdpocket.workers.rss_worker import fetch_rss_feed
     count = fetch_rss_feed(feed, db)
     return {"status": "fetched", "new_items": count}
+
+
+@router.get("/{feed_id}/entries", response_model=list[FeedEntryRead])
+def list_feed_entries(
+    feed_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    status_filter: str | None = None,
+):
+    """List feed entries, optionally filtered by status."""
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    query = select(FeedEntry).where(
+        FeedEntry.feed_id == feed_id,
+        FeedEntry.user_id == current_user.id,
+    )
+    if status_filter:
+        query = query.where(FeedEntry.status == status_filter)
+    query = query.order_by(FeedEntry.created_at.desc())
+    return db.exec(query).all()
+
+
+class EntryStatusUpdate(BaseModel):
+    status: str  # approved, rejected
+
+
+@router.post("/{feed_id}/entries/{entry_id}/approve")
+def approve_feed_entry(
+    feed_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Approve a feed entry: create a KnowledgeItem from entry data."""
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    entry = db.exec(
+        select(FeedEntry).where(
+            FeedEntry.id == entry_id,
+            FeedEntry.feed_id == feed_id,
+            FeedEntry.user_id == current_user.id,
+        )
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    # Create KnowledgeItem from entry
+    item = KnowledgeItem(
+        user_id=current_user.id,
+        url=entry.url,
+        title=entry.title,
+        description=entry.content_snippet,
+    )
+    db.add(item)
+
+    # Add to target collection if set
+    if feed.target_collection_id:
+        from fourdpocket.models.collection import CollectionItem
+
+        link = CollectionItem(
+            collection_id=feed.target_collection_id,
+            item_id=item.id,
+            position=0,
+        )
+        db.add(link)
+
+    entry.status = "approved"
+    db.add(entry)
+    db.commit()
+    db.refresh(item)
+
+    return {"status": "approved", "item_id": str(item.id)}
+
+
+@router.patch("/{feed_id}/entries/{entry_id}")
+def update_feed_entry_status(
+    feed_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    body: EntryStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a feed entry status (approve/reject)."""
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    entry = db.exec(
+        select(FeedEntry).where(
+            FeedEntry.id == entry_id,
+            FeedEntry.feed_id == feed_id,
+            FeedEntry.user_id == current_user.id,
+        )
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    if body.status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
+
+    entry.status = body.status
+    db.add(entry)
+    db.commit()
+    return {"status": entry.status, "entry_id": str(entry.id)}

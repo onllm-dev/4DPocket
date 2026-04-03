@@ -245,16 +245,47 @@ const API_TYPES = [
 
 function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (data: Partial<AIConfig>) => void }) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [localConfig, setLocalConfig] = useState<AIConfig | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
+  // Initialize local config from server config
+  const effective = localConfig || config;
   if (!config) return null;
+  if (!localConfig && config) {
+    // Use a ref-style pattern: set on first render
+    setTimeout(() => setLocalConfig({ ...config }), 0);
+  }
+  if (!effective) return null;
 
   const toggleKey = (key: string) => setShowKeys((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const updateLocal = (data: Partial<AIConfig>) => {
+    setLocalConfig((prev) => prev ? { ...prev, ...data } : { ...config, ...data });
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    if (localConfig) {
+      onUpdate(localConfig);
+      setHasChanges(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    setLocalConfig({ ...config });
+    setHasChanges(false);
+  };
+
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6 mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-sky-600" />
-        <h2 className="font-bold text-gray-900 dark:text-gray-100">AI Configuration</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-sky-600" />
+          <h2 className="font-bold text-gray-900 dark:text-gray-100">AI Configuration</h2>
+        </div>
+        {hasChanges && (
+          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Unsaved changes</span>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -265,8 +296,8 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">AI model provider for tagging and summarization</p>
           </div>
           <select
-            value={config.chat_provider}
-            onChange={(e) => onUpdate({ chat_provider: e.target.value })}
+            value={effective.chat_provider}
+            onChange={(e) => updateLocal({ chat_provider: e.target.value })}
             className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
           >
             {PROVIDERS.map((p) => (
@@ -276,14 +307,14 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
         </div>
 
         {/* Ollama Settings */}
-        {config.chat_provider === "ollama" && (
+        {effective.chat_provider === "ollama" && (
           <div className="space-y-3 pl-4 border-l-2 border-sky-200 dark:border-sky-800">
             <div>
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Ollama URL</label>
               <input
                 type="text"
-                defaultValue={config.ollama_url}
-                onBlur={(e) => onUpdate({ ollama_url: e.target.value })}
+                value={effective.ollama_url || ""}
+                onChange={(e) => updateLocal({ ollama_url: e.target.value })}
                 className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
               />
             </div>
@@ -291,8 +322,8 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Model</label>
               <input
                 type="text"
-                defaultValue={config.ollama_model}
-                onBlur={(e) => onUpdate({ ollama_model: e.target.value })}
+                value={effective.ollama_model || ""}
+                onChange={(e) => updateLocal({ ollama_model: e.target.value })}
                 className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
               />
             </div>
@@ -300,14 +331,14 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
         )}
 
         {/* Groq Settings */}
-        {config.chat_provider === "groq" && (
+        {effective.chat_provider === "groq" && (
           <div className="pl-4 border-l-2 border-sky-200 dark:border-sky-800">
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Groq API Key</label>
             <div className="relative mt-1">
               <input
                 type={showKeys.groq ? "text" : "password"}
-                defaultValue={config.groq_api_key}
-                onBlur={(e) => onUpdate({ groq_api_key: e.target.value })}
+                value={effective.groq_api_key || ""}
+                onChange={(e) => updateLocal({ groq_api_key: e.target.value })}
                 placeholder="gsk_..."
                 className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
               />
@@ -319,14 +350,14 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
         )}
 
         {/* NVIDIA Settings */}
-        {config.chat_provider === "nvidia" && (
+        {effective.chat_provider === "nvidia" && (
           <div className="pl-4 border-l-2 border-sky-200 dark:border-sky-800">
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400">NVIDIA API Key</label>
             <div className="relative mt-1">
               <input
                 type={showKeys.nvidia ? "text" : "password"}
-                defaultValue={config.nvidia_api_key}
-                onBlur={(e) => onUpdate({ nvidia_api_key: e.target.value })}
+                value={effective.nvidia_api_key || ""}
+                onChange={(e) => updateLocal({ nvidia_api_key: e.target.value })}
                 placeholder="nvapi-..."
                 className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
               />
@@ -338,13 +369,13 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
         )}
 
         {/* Custom Provider Settings */}
-        {config.chat_provider === "custom" && (
+        {effective.chat_provider === "custom" && (
           <div className="space-y-3 pl-4 border-l-2 border-sky-200 dark:border-sky-800">
             <div>
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">API Type</label>
               <select
-                value={config.custom_api_type}
-                onChange={(e) => onUpdate({ custom_api_type: e.target.value })}
+                value={effective.custom_api_type || "openai"}
+                onChange={(e) => updateLocal({ custom_api_type: e.target.value })}
                 className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
               >
                 {API_TYPES.map((t) => (
@@ -356,8 +387,8 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Base URL</label>
               <input
                 type="text"
-                defaultValue={config.custom_base_url}
-                onBlur={(e) => onUpdate({ custom_base_url: e.target.value })}
+                value={effective.custom_base_url || ""}
+                onChange={(e) => updateLocal({ custom_base_url: e.target.value })}
                 placeholder="https://api.minimax.io/anthropic/v1"
                 className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
               />
@@ -367,8 +398,8 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
               <div className="relative mt-1">
                 <input
                   type={showKeys.custom ? "text" : "password"}
-                  defaultValue={config.custom_api_key}
-                  onBlur={(e) => onUpdate({ custom_api_key: e.target.value })}
+                  value={effective.custom_api_key || ""}
+                  onChange={(e) => updateLocal({ custom_api_key: e.target.value })}
                   placeholder="sk-..."
                   className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
                 />
@@ -381,8 +412,8 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Model Name</label>
               <input
                 type="text"
-                defaultValue={config.custom_model}
-                onBlur={(e) => onUpdate({ custom_model: e.target.value })}
+                value={effective.custom_model || ""}
+                onChange={(e) => updateLocal({ custom_model: e.target.value })}
                 placeholder="MiniMax-M2.7"
                 className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
               />
@@ -402,13 +433,13 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Automatically tag items with AI</p>
           </div>
           <button
-            onClick={() => onUpdate({ auto_tag: !config.auto_tag })}
+            onClick={() => updateLocal({ auto_tag: !effective.auto_tag })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-              config.auto_tag ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+              effective.auto_tag ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
             }`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-              config.auto_tag ? "translate-x-6" : "translate-x-1"
+              effective.auto_tag ? "translate-x-6" : "translate-x-1"
             }`} />
           </button>
         </div>
@@ -420,13 +451,13 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Generate summaries for new items</p>
           </div>
           <button
-            onClick={() => onUpdate({ auto_summarize: !config.auto_summarize })}
+            onClick={() => updateLocal({ auto_summarize: !effective.auto_summarize })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-              config.auto_summarize ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+              effective.auto_summarize ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
             }`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-              config.auto_summarize ? "translate-x-6" : "translate-x-1"
+              effective.auto_summarize ? "translate-x-6" : "translate-x-1"
             }`} />
           </button>
         </div>
@@ -438,13 +469,13 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Run AI inline when background worker is not running</p>
           </div>
           <button
-            onClick={() => onUpdate({ sync_enrichment: !config.sync_enrichment })}
+            onClick={() => updateLocal({ sync_enrichment: !effective.sync_enrichment })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-              config.sync_enrichment ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+              effective.sync_enrichment ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
             }`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-              config.sync_enrichment ? "translate-x-6" : "translate-x-1"
+              effective.sync_enrichment ? "translate-x-6" : "translate-x-1"
             }`} />
           </button>
         </div>
@@ -456,13 +487,36 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Vector embeddings for semantic search</p>
           </div>
           <select
-            value={config.embedding_provider}
-            onChange={(e) => onUpdate({ embedding_provider: e.target.value })}
+            value={effective.embedding_provider}
+            onChange={(e) => updateLocal({ embedding_provider: e.target.value })}
             className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
           >
             <option value="local">Local (sentence-transformers)</option>
             <option value="nvidia">NVIDIA</option>
           </select>
+        </div>
+
+        {/* Save / Discard buttons */}
+        <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              hasChanges
+                ? "bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            Save Changes
+          </button>
+          {hasChanges && (
+            <button
+              onClick={handleDiscard}
+              className="px-5 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Discard
+            </button>
+          )}
         </div>
       </div>
     </div>

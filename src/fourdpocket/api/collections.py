@@ -15,7 +15,9 @@ from fourdpocket.models.collection import (
     CollectionRead,
     CollectionUpdate,
 )
+from fourdpocket.models.collection_note import CollectionNote
 from fourdpocket.models.item import ItemRead, KnowledgeItem
+from fourdpocket.models.note import Note, NoteRead
 from fourdpocket.models.user import User
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -343,3 +345,143 @@ def get_collection_rss(
 </rss>"""
 
     return Response(content=xml, media_type="application/rss+xml")
+
+
+# --- Collection Notes endpoints ---
+
+
+class AddNotesRequest(BaseModel):
+    note_ids: list[uuid.UUID]
+
+
+@router.post("/{collection_id}/notes", status_code=status.HTTP_201_CREATED)
+def add_notes_to_collection(
+    collection_id: uuid.UUID,
+    data: AddNotesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add notes to a collection."""
+    collection = db.get(Collection, collection_id)
+    if not collection or collection.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found"
+        )
+
+    # Get current max position
+    existing = db.exec(
+        select(CollectionNote)
+        .where(CollectionNote.collection_id == collection_id)
+        .order_by(col(CollectionNote.position).desc())
+    ).first()
+    position = (existing.position + 1) if existing else 0
+
+    added = []
+    for note_id in data.note_ids:
+        note = db.get(Note, note_id)
+        if not note or note.user_id != current_user.id:
+            continue
+
+        exists = db.exec(
+            select(CollectionNote).where(
+                CollectionNote.collection_id == collection_id,
+                CollectionNote.note_id == note_id,
+            )
+        ).first()
+        if exists:
+            continue
+
+        link = CollectionNote(
+            collection_id=collection_id,
+            note_id=note_id,
+            position=position,
+        )
+        db.add(link)
+        added.append(str(note_id))
+        position += 1
+
+    db.commit()
+    return {"added": added}
+
+
+@router.delete(
+    "/{collection_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def remove_note_from_collection(
+    collection_id: uuid.UUID,
+    note_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a note from a collection."""
+    collection = db.get(Collection, collection_id)
+    if not collection or collection.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found"
+        )
+
+    link = db.exec(
+        select(CollectionNote).where(
+            CollectionNote.collection_id == collection_id,
+            CollectionNote.note_id == note_id,
+        )
+    ).first()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not in collection"
+        )
+
+    db.delete(link)
+    db.commit()
+
+
+@router.get("/{collection_id}/notes", response_model=list[NoteRead])
+def list_collection_notes(
+    collection_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """List notes in a collection, ordered by position."""
+    collection = db.get(Collection, collection_id)
+    if not collection or collection.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found"
+        )
+
+    notes = db.exec(
+        select(Note)
+        .join(CollectionNote, CollectionNote.note_id == Note.id)
+        .where(CollectionNote.collection_id == collection_id)
+        .order_by(col(CollectionNote.position).asc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return notes
+
+
+# --- Item collections convenience endpoint ---
+
+item_collections_router = APIRouter(tags=["collections"])
+
+
+@item_collections_router.get("/items/{item_id}/collections", response_model=list[CollectionRead])
+def list_item_collections(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List collections an item belongs to."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
+        )
+
+    collections = db.exec(
+        select(Collection)
+        .join(CollectionItem, CollectionItem.collection_id == Collection.id)
+        .where(CollectionItem.item_id == item_id)
+    ).all()
+    return collections

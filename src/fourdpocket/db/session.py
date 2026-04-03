@@ -37,11 +37,42 @@ def get_session():
         yield session
 
 
+def _ensure_columns(engine):
+    """Add missing columns to existing tables (safe for SQLite, idempotent)."""
+    from sqlmodel import text, Session
+
+    migrations = [
+        ("knowledge_items", "favicon_url", "TEXT"),
+        ("knowledge_items", "reading_status", "VARCHAR DEFAULT 'unread'"),
+        ("knowledge_items", "read_at", "TIMESTAMP"),
+        ("notes", "is_favorite", "BOOLEAN DEFAULT 0"),
+        ("notes", "is_archived", "BOOLEAN DEFAULT 0"),
+        ("notes", "reading_status", "VARCHAR DEFAULT 'unread'"),
+        ("notes", "reading_progress", "INTEGER DEFAULT 0"),
+        ("highlights", "note_id", "TEXT REFERENCES notes(id)"),
+        ("rss_feeds", "format", "VARCHAR DEFAULT 'rss'"),
+        ("rss_feeds", "mode", "VARCHAR DEFAULT 'auto'"),
+        ("rss_feeds", "filters", "TEXT"),
+    ]
+
+    with Session(engine) as db:
+        for table, column, col_type in migrations:
+            try:
+                db.exec(text(f"SELECT {column} FROM {table} LIMIT 0"))
+            except Exception:
+                try:
+                    db.exec(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+
 def init_db():
     import fourdpocket.models  # noqa: F401 - ensure all models are registered
 
     engine = get_engine()
     SQLModel.metadata.create_all(engine)
+    _ensure_columns(engine)
 
 
 def reset_engine():

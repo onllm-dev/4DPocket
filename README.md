@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-active%20development-brightgreen" alt="Active Development" />
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" />
+  <img src="https://img.shields.io/badge/license-GNU%20GPLv3-blue" alt="GNU GPLv3 License" />
 </p>
 
 > **This project is in active development and is being updated regularly.** New features, processors, and improvements ship frequently. Star the repo to stay updated!
@@ -128,6 +128,17 @@ Every user gets their own isolated pocket. Knowledge is private by default, shar
 - **Share Target** - Share URLs directly from your phone's share sheet to 4DPocket.
 - **Responsive** - Optimized for mobile (bottom nav, touch-friendly), tablet (collapsible sidebar), and desktop (full sidebar, keyboard shortcuts).
 - **Dark Mode** - System-aware with manual toggle.
+
+### Browser Extensions (Coming Soon)
+
+- **Chrome** - Save pages, highlights, and selections with one click.
+- **Firefox** - Full extension support with context menu integration.
+- **Safari** - Native Safari extension for macOS and iOS.
+
+### Native Apps (Coming Soon)
+
+- **Android** - Native Android app with share intent integration and offline support.
+- **iOS** - Native iOS app with share extension and widget support.
 
 ### Keyboard-First UX
 

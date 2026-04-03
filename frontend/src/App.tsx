@@ -23,6 +23,8 @@ const PublicShare = lazy(() => import("./pages/PublicShare"));
 const Rules = lazy(() => import("./pages/Rules"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Highlights = lazy(() => import("./pages/Highlights"));
+const NoteDetail = lazy(() => import("./pages/NoteDetail"));
+const ReadingList = lazy(() => import("./pages/ReadingList"));
 
 function LoadingFallback() {
   return (
@@ -60,6 +62,8 @@ export default function App() {
           <Route path="/collections/:id" element={<SuspenseWrap><CollectionDetail /></SuspenseWrap>} />
           <Route path="/tags" element={<SuspenseWrap><Tags /></SuspenseWrap>} />
           <Route path="/notes" element={<SuspenseWrap><Notes /></SuspenseWrap>} />
+          <Route path="/notes/:id" element={<SuspenseWrap><NoteDetail /></SuspenseWrap>} />
+          <Route path="/reading-list" element={<SuspenseWrap><ReadingList /></SuspenseWrap>} />
           <Route path="/settings" element={<SuspenseWrap><Settings /></SuspenseWrap>} />
           <Route path="/add" element={<SuspenseWrap><AddItem /></SuspenseWrap>} />
           <Route path="/admin" element={<SuspenseWrap><Admin /></SuspenseWrap>} />

@@ -2,10 +2,26 @@
 
 import logging
 import uuid
+from urllib.parse import urlparse
 
 from fourdpocket.workers import huey
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_favicon(item, url: str) -> None:
+    """Fetch favicon for a URL and update the item.
+
+    Tries Google's favicon service first (no CORS issues), then falls back
+    to /favicon.ico. Failures are silent — favicon is best-effort only.
+    """
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc or parsed.path.split("/")[0]
+        favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+        item.favicon_url = favicon_url
+    except Exception:
+        pass  # Silently skip if URL parsing fails
 
 
 @huey.task(retries=2, retry_delay=30)
@@ -61,6 +77,12 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
 
             # Index for search
             indexer.index_item(item)
+
+            # Set favicon URL for generic URLs (brand platforms already have custom icons)
+            if item.source_platform.value == "generic":
+                _fetch_favicon(item, url)
+                db.add(item)
+                db.commit()
 
             # Chain: AI enrichment (content now available)
             try:

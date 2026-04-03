@@ -28,6 +28,9 @@ class RSSFeed(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
+    format: str = Field(default="rss")  # rss, atom, json_feed
+    mode: str = Field(default="auto")  # auto (add to collection), approval (hold for review)
+    filters: str | None = None  # JSON string of keyword/tag filter rules
     last_entry_id: str | None = None  # To avoid re-fetching
     created_at: datetime = Field(
         default_factory=utc_now,

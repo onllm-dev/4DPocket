@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, FolderOpen, Grid3x3, List } from "lucide-react";
+import { ArrowLeft, FolderOpen, Grid3x3, List, Plus, Search, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
+import { useItems } from "@/hooks/use-items";
+import { useAddItemToCollection } from "@/hooks/use-collections";
 
 interface Collection {
   id: string;
@@ -16,6 +19,10 @@ interface Collection {
 export default function CollectionDetail() {
   const { id } = useParams<{ id: string }>();
   const { viewMode, setViewMode } = useUIStore();
+  const [showAddItems, setShowAddItems] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const addItem = useAddItemToCollection();
+  const { data: searchResults } = useItems(searchQuery.length >= 2 ? {} : {});
 
   const {
     data: collection,
@@ -70,6 +77,13 @@ export default function CollectionDetail() {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setShowAddItems(!showAddItems)}
+            className="p-2.5 rounded-lg text-sm bg-sky-600 text-white hover:bg-sky-700 transition-all duration-200 cursor-pointer mr-2"
+            aria-label="Add items"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => setViewMode("grid")}
             className={`p-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${
               viewMode === "grid"
@@ -98,6 +112,46 @@ export default function CollectionDetail() {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
           {collection.description}
         </p>
+      )}
+
+      {showAddItems && (
+        <div className="mb-6 p-4 border border-sky-200 dark:border-sky-800 rounded-xl bg-sky-50/50 dark:bg-sky-950/20">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Add Items to Collection</p>
+            <button onClick={() => setShowAddItems(false)} className="p-1 text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items to add..."
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              autoFocus
+            />
+          </div>
+          {searchResults?.pages?.[0] && searchResults.pages[0].length > 0 && (
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {searchResults.pages[0].slice(0, 10).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    addItem.mutate({ collectionId: id!, itemIds: [item.id] });
+                  }}
+                  className="w-full flex items-center gap-2 p-2 text-left text-sm rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                  <span className="truncate text-gray-800 dark:text-gray-200">
+                    {item.title || item.url || "Untitled"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {isLoading ? (

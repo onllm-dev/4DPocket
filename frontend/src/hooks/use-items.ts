@@ -10,11 +10,16 @@ interface Item {
   title: string | null;
   description: string | null;
   content: string | null;
+  raw_content: string | null;
   summary: string | null;
+  favicon_url: string | null;
   media: Array<{ type: string; url?: string; role: string; local_path?: string; original_url?: string }>;
   item_metadata: Record<string, unknown>;
   is_favorite: boolean;
   is_archived: boolean;
+  reading_progress: number;
+  reading_status: "unread" | "reading_list" | "read";
+  read_at: string | null;
   created_at: string;
   updated_at: string;
 }
