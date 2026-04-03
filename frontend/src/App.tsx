@@ -9,6 +9,7 @@ const KnowledgeBase = lazy(() => import("./pages/KnowledgeBase"));
 const ItemDetail = lazy(() => import("./pages/ItemDetail"));
 const Search = lazy(() => import("./pages/Search"));
 const Collections = lazy(() => import("./pages/Collections"));
+const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
 const Tags = lazy(() => import("./pages/Tags"));
 const Notes = lazy(() => import("./pages/Notes"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/item/:id" element={<SuspenseWrap><ItemDetail /></SuspenseWrap>} />
           <Route path="/search" element={<SuspenseWrap><Search /></SuspenseWrap>} />
           <Route path="/collections" element={<SuspenseWrap><Collections /></SuspenseWrap>} />
+          <Route path="/collections/:id" element={<SuspenseWrap><CollectionDetail /></SuspenseWrap>} />
           <Route path="/tags" element={<SuspenseWrap><Tags /></SuspenseWrap>} />
           <Route path="/notes" element={<SuspenseWrap><Notes /></SuspenseWrap>} />
           <Route path="/settings" element={<SuspenseWrap><Settings /></SuspenseWrap>} />
