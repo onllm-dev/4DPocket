@@ -32,6 +32,7 @@ export default function KnowledgeBase() {
   const [searchParams] = useSearchParams();
   const isFavorite = searchParams.get("is_favorite") === "true" ? true : undefined;
   const isArchived = searchParams.get("is_archived") === "true" ? true : undefined;
+  const tagId = searchParams.get("tag_id") || undefined;
   const [platform, setPlatform] = useState("All");
   const [sortKey, setSortKey] = useState("created_at:desc");
   const { viewMode, setViewMode } = useUIStore();
@@ -54,6 +55,7 @@ export default function KnowledgeBase() {
   if (platform !== "All") filters.source_platform = platform.toLowerCase();
   if (isFavorite) filters.is_favorite = true;
   if (isArchived) filters.is_archived = true;
+  if (tagId) filters.tag_id = tagId;
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useItems(filters);
 
@@ -99,10 +101,10 @@ export default function KnowledgeBase() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {isFavorite ? "⭐ Favorites" : isArchived ? "📦 Archive" : "Knowledge Base"}
+            {isFavorite ? "Favorites" : isArchived ? "Archive" : tagId ? "Tagged Items" : "Knowledge Base"}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {isFavorite ? "Your starred items" : isArchived ? "Archived items" : "All your saved knowledge in one place"}
+            {isFavorite ? "Your starred items" : isArchived ? "Archived items" : tagId ? "Filtered by tag" : "All your saved knowledge in one place"}
           </p>
         </div>
         <div className="flex items-center gap-1">

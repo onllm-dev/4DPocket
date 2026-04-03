@@ -169,7 +169,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <PlatformIcon platform={item.source_platform} className="w-3.5 h-3.5" />
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform}</span>
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform === "generic" ? "Web" : item.source_platform}</span>
           </div>
           <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100 group-hover:text-[#0096C7] dark:group-hover:text-sky-400 transition-colors">
             {item.title || item.url || "Untitled"}
@@ -212,7 +212,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <PlatformIcon platform={item.source_platform} className="w-3.5 h-3.5" />
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform}</span>
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{item.source_platform === "generic" ? "Web" : item.source_platform}</span>
           </div>
           <button onClick={toggleFavorite} aria-label="Toggle favorite" className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
             <Star className={`w-4 h-4 ${item.is_favorite ? "fill-[#FCD34D] text-[#FCD34D]" : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400"}`} />

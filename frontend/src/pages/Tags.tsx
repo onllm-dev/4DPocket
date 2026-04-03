@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Tags as TagsIcon, Hash, Sparkles } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 
@@ -97,17 +98,18 @@ export default function Tags() {
         </h2>
         <div className="flex flex-wrap gap-2.5 items-center">
           {tags.map((tag) => (
-            <span
+            <Link
               key={tag.id}
+              to={`/knowledge?tag_id=${tag.id}`}
               title={`${tag.usage_count} items`}
               style={{
                 fontSize: `${getFontSize(tag.usage_count)}px`,
                 opacity: getOpacity(tag.usage_count),
               }}
-              className="px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-900/20 text-sky-600 cursor-default transition-all duration-200 hover:shadow-md"
+              className="px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-900/20 text-sky-600 cursor-pointer transition-all duration-200 hover:shadow-md hover:bg-sky-100 dark:hover:bg-sky-900/40"
             >
               {tag.name}
-            </span>
+            </Link>
           ))}
         </div>
       </div>
@@ -119,7 +121,10 @@ export default function Tags() {
         <ul className="divide-y divide-gray-100 dark:divide-gray-800">
           {rootTags.map((tag) => (
             <li key={tag.id}>
-              <div className="flex items-center justify-between px-5 py-3">
+              <Link
+                to={`/knowledge?tag_id=${tag.id}`}
+                className="flex items-center justify-between px-5 py-3 hover:bg-sky-50/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center gap-2.5">
                   <Hash className="h-4 w-4 text-gray-400" />
                   {tag.color && (
@@ -141,11 +146,12 @@ export default function Tags() {
                 <span className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
                   {tag.usage_count}
                 </span>
-              </div>
+              </Link>
               {childTags(tag.id).map((child) => (
-                <div
+                <Link
                   key={child.id}
-                  className="flex items-center justify-between pl-10 pr-5 py-2.5 bg-gray-50/50 dark:bg-gray-800/30"
+                  to={`/knowledge?tag_id=${child.id}`}
+                  className="flex items-center justify-between pl-10 pr-5 py-2.5 bg-gray-50/50 dark:bg-gray-800/30 hover:bg-sky-50/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5">
                     <Hash className="h-3.5 w-3.5 text-gray-300 dark:text-gray-600" />
@@ -168,7 +174,7 @@ export default function Tags() {
                   <span className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
                     {child.usage_count}
                   </span>
-                </div>
+                </Link>
               ))}
             </li>
           ))}

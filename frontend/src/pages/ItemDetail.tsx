@@ -571,7 +571,7 @@ export default function ItemDetail() {
         <div className="flex items-center gap-2 mb-2">
           <PlatformIcon platform={item.source_platform} className="h-4 w-4" />
           <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
-            {item.source_platform}
+            {item.source_platform === "generic" ? "Web" : item.source_platform}
           </span>
           <span className="text-gray-300 dark:text-gray-700">·</span>
           <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
