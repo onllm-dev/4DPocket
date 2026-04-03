@@ -21,7 +21,7 @@ function GitHubIcon({ className }: { className?: string }) {
         fillRule="evenodd"
         clipRule="evenodd"
         d="M10 0C4.477 0 0 4.477 0 10c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.104-.254-.447-1.27.097-2.646 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0110 4.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.376.202 2.392.1 2.646.64.698 1.026 1.591 1.026 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C17.138 18.163 20 14.418 20 10c0-5.523-4.477-10-10-10z"
-        fill="#24292E"
+        className="fill-[#24292E] dark:fill-gray-200"
       />
     </svg>
   );
@@ -42,10 +42,10 @@ function RedditIcon({ className }: { className?: string }) {
 function TwitterXIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect width="20" height="20" rx="4" fill="#000000" />
+      <rect width="20" height="20" rx="4" className="fill-[#000000] dark:fill-gray-200" />
       <path
         d="M11.19 9.12L15.77 4h-1.08l-3.97 4.62L7.55 4H4l4.8 6.99L4 16h1.08l4.2-4.88L12.45 16H16l-4.81-6.88zm-1.48 1.73l-.49-.7-3.88-5.55H7l3.13 4.48.49.7 4.07 5.83H13.1l-3.39-4.76z"
-        fill="white"
+        className="fill-white dark:fill-gray-900"
       />
     </svg>
   );
@@ -97,10 +97,10 @@ function HackerNewsIcon({ className }: { className?: string }) {
 function MediumIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect width="20" height="20" rx="3" fill="#000000" />
-      <ellipse cx="7" cy="10" rx="3.5" ry="4.5" fill="white" />
-      <ellipse cx="13.5" cy="10" rx="2" ry="4" fill="white" />
-      <ellipse cx="17.5" cy="10" rx="0.75" ry="3.5" fill="white" />
+      <rect width="20" height="20" rx="3" className="fill-[#000000] dark:fill-gray-200" />
+      <ellipse cx="7" cy="10" rx="3.5" ry="4.5" className="fill-white dark:fill-gray-900" />
+      <ellipse cx="13.5" cy="10" rx="2" ry="4" className="fill-white dark:fill-gray-900" />
+      <ellipse cx="17.5" cy="10" rx="0.75" ry="3.5" className="fill-white dark:fill-gray-900" />
     </svg>
   );
 }
@@ -129,7 +129,7 @@ function SpotifyIcon({ className }: { className?: string }) {
 function TikTokIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect width="20" height="20" rx="4" fill="#010101" />
+      <rect width="20" height="20" rx="4" className="fill-[#010101] dark:fill-gray-200" />
       <path
         d="M13.5 4.5c.3 1.8 1.5 2.8 3 3v2c-1 0-2-.3-3-1v4.5c0 2.5-2 4.5-4.5 4.5S4.5 15.5 4.5 13s2-4.5 4.5-4.5c.17 0 .33 0 .5.02V11c-.17-.03-.33-.05-.5-.05-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5V4.5h2z"
         fill="#69C9D0"
@@ -170,10 +170,10 @@ function StackOverflowIcon({ className }: { className?: string }) {
 function ThreadsIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect width="20" height="20" rx="4" fill="#000000" />
+      <rect width="20" height="20" rx="4" className="fill-[#000000] dark:fill-gray-200" />
       <path
         d="M13.5 9.2c-.1-.06-.2-.11-.3-.16C12.9 7.5 11.6 6.5 10 6.5c-1.1 0-2 .5-2.5 1.4L8.8 8.7c.3-.6.8-.9 1.4-.9.9 0 1.6.6 1.8 1.5-0.4-.1-.8-.1-1.2-.1-1.7 0-3 .9-3 2.3 0 1.4 1.1 2.2 2.5 2.2 1.1 0 2-.5 2.6-1.4.4-.6.6-1.4.6-2.1zm-1.7 2c-.3.7-.9 1.1-1.6 1.1-.8 0-1.2-.4-1.2-.9 0-.7.7-1.1 1.8-1.1.4 0 .7 0 1 .1 0 .3-.1.6-.2.8z"
-        fill="white"
+        className="fill-white dark:fill-gray-900"
       />
     </svg>
   );

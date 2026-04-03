@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, FolderOpen } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, FolderOpen, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
@@ -23,8 +24,10 @@ export default function Dashboard() {
 
   const { data, isLoading: itemsLoading } = useItems();
 
+  const [visibleCount, setVisibleCount] = useState(8);
   const allItems = data?.pages.flat() ?? [];
-  const recentItems = allItems.slice(0, 8);
+  const recentItems = allItems.slice(0, visibleCount);
+  const hasMore = allItems.length > visibleCount;
   const totalItems = stats?.total_items ?? 0;
 
   return (
@@ -141,15 +144,17 @@ export default function Dashboard() {
                 <BookmarkCard key={item.id} item={item} variant="grid" />
               ))}
             </div>
-            <div className="mt-6 text-center">
-              <Link
-                to="/add"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0096C7] text-white rounded-xl text-sm font-medium hover:bg-[#0077A8] hover:shadow-lg transition-all duration-200 cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                Add something
-              </Link>
-            </div>
+            {hasMore && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setVisibleCount((c) => c + 8)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:shadow-md transition-all duration-200 cursor-pointer"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                  View more
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
