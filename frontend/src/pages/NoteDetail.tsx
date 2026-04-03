@@ -34,8 +34,9 @@ function timeAgo(dateStr: string): string {
 export default function NoteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: note, isLoading } = useNote(id!);
-  const { data: tags } = useNoteTags(id!);
+  const noteId = id ?? "";
+  const { data: note, isLoading } = useNote(noteId);
+  const { data: tags } = useNoteTags(noteId);
   const updateNote = useUpdateNote();
   const deleteNote = useDeleteNote();
   const summarize = useSummarizeNote();
