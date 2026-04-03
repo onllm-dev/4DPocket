@@ -26,6 +26,15 @@ import {
   Plus,
   X,
   Check,
+  CircleDot,
+  CircleCheck,
+  GitMerge,
+  GitPullRequest,
+  Scale,
+  Tag,
+  FileCode,
+  Users,
+  AlertTriangle,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
 import ContentRenderer from "@/components/content/ContentRenderer";
@@ -35,6 +44,7 @@ import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useCollections, useAddItemToCollection } from "@/hooks/use-collections";
 import { useToggleReadingList, useMarkAsRead } from "@/hooks/use-reading-list";
+import { useHighlights } from "@/hooks/use-highlights";
 import { useItemLinks, useAddItemLink, useRemoveItemLink } from "@/hooks/use-item-links";
 import { formatDate } from "@/lib/utils";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
@@ -146,49 +156,199 @@ function YouTubeMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function GitHubMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const ghType = metadata.type as string | undefined;
+  const ownerRaw = metadata.owner ?? metadata.author;
+  const ownerStr = ownerRaw != null ? String(ownerRaw) : null;
+
+  // Issue / PR fields
+  const numberRaw = metadata.number;
+  const stateRaw = metadata.state as string | undefined;
+  const labels = Array.isArray(metadata.labels) ? (metadata.labels as string[]) : [];
+  const commentCount = metadata.comment_count;
+  const closedAt = metadata.closed_at as string | undefined;
+
+  // Repo fields
   const starsRaw = metadata.stargazers_count ?? metadata.stars ?? metadata.star_count;
   const forksRaw = metadata.forks_count ?? metadata.forks;
   const languageRaw = metadata.language ?? metadata.primary_language;
-  const ownerRaw = metadata.owner ?? metadata.author;
+  const licenseRaw = metadata.license;
+  const topics = Array.isArray(metadata.topics) ? (metadata.topics as string[]) : [];
+  const updatedAt = metadata.updated_at as string | undefined;
+  const openIssues = metadata.open_issues;
 
-  const ownerStr = ownerRaw != null ? String(ownerRaw) : null;
-  const languageStr = languageRaw != null ? String(languageRaw) : null;
   const starsStr = starsRaw != null ? formatNumber(starsRaw) : null;
   const forksStr = forksRaw != null ? formatNumber(forksRaw) : null;
+  const languageStr = languageRaw != null ? String(languageRaw) : null;
+  const licenseStr = licenseRaw != null ? String(licenseRaw) : null;
+
+  // Detect content type
+  const isIssue = ghType === "issue";
+  const isPR = ghType === "pull";
+  const isIssueOrPR = isIssue || isPR;
+
+  // State badge colors
+  const stateOpen = stateRaw === "open";
+  const stateClosed = stateRaw === "closed";
+  const stateMerged = stateRaw === "merged";
+
+  const stateColor = stateMerged
+    ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+    : stateOpen
+    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+    : stateClosed
+    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+
+  const stateIcon = stateMerged ? (
+    <GitMerge className="h-3.5 w-3.5" />
+  ) : isPR ? (
+    <GitPullRequest className="h-3.5 w-3.5" />
+  ) : stateOpen ? (
+    <CircleDot className="h-3.5 w-3.5" />
+  ) : (
+    <CircleCheck className="h-3.5 w-3.5" />
+  );
 
   return (
-    <div className="flex flex-wrap gap-2 mt-1">
-      {ownerStr && (
-        <MetaBadge
-          icon={<User className="h-3.5 w-3.5" />}
-          label="Owner"
-          value={ownerStr}
-          colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-        />
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {ownerStr && (
+          <MetaBadge
+            icon={<User className="h-3.5 w-3.5" />}
+            label="Owner"
+            value={ownerStr}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* Issue/PR number and state */}
+        {isIssueOrPR && numberRaw != null && (
+          <MetaBadge
+            icon={isPR ? <GitPullRequest className="h-3.5 w-3.5" /> : <CircleDot className="h-3.5 w-3.5" />}
+            label={isPR ? "PR" : "Issue"}
+            value={`${isPR ? "PR" : "Issue"} #${numberRaw}`}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {isIssueOrPR && stateRaw && (
+          <MetaBadge
+            icon={stateIcon}
+            label="State"
+            value={stateRaw.charAt(0).toUpperCase() + stateRaw.slice(1)}
+            colorClass={stateColor}
+          />
+        )}
+
+        {/* Repo: language with color dot */}
+        {languageStr && (
+          <MetaBadge
+            icon={<FileCode className="h-3.5 w-3.5" />}
+            label="Language"
+            value={languageStr}
+            colorClass="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+          />
+        )}
+
+        {/* Stars */}
+        {starsStr && (
+          <MetaBadge
+            icon={<Star className="h-3.5 w-3.5" />}
+            label="Stars"
+            value={starsStr}
+            colorClass="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
+          />
+        )}
+
+        {/* Forks */}
+        {forksStr && (
+          <MetaBadge
+            icon={<GitFork className="h-3.5 w-3.5" />}
+            label="Forks"
+            value={forksStr}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* License */}
+        {licenseStr && licenseStr !== "null" && (
+          <MetaBadge
+            icon={<Scale className="h-3.5 w-3.5" />}
+            label="License"
+            value={licenseStr}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* Open issues count (repos) */}
+        {openIssues != null && !isIssueOrPR && (
+          <MetaBadge
+            icon={<AlertTriangle className="h-3.5 w-3.5" />}
+            label="Open Issues"
+            value={formatNumber(openIssues)}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* Comment count (issues/PRs) */}
+        {isIssueOrPR && commentCount != null && (
+          <MetaBadge
+            icon={<MessageSquare className="h-3.5 w-3.5" />}
+            label="Comments"
+            value={formatNumber(commentCount)}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* Closed date for issues/PRs */}
+        {isIssueOrPR && closedAt && (
+          <MetaBadge
+            icon={<Calendar className="h-3.5 w-3.5" />}
+            label="Closed"
+            value={closedAt.slice(0, 10)}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+
+        {/* Last updated (repos) */}
+        {updatedAt && !isIssueOrPR && (
+          <MetaBadge
+            icon={<Clock className="h-3.5 w-3.5" />}
+            label="Updated"
+            value={updatedAt.slice(0, 10)}
+            colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+          />
+        )}
+      </div>
+
+      {/* Labels (issues/PRs) */}
+      {labels.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {labels.map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+            >
+              <Tag className="h-2.5 w-2.5" />
+              {label}
+            </span>
+          ))}
+        </div>
       )}
-      {languageStr && (
-        <MetaBadge
-          icon={<Hash className="h-3.5 w-3.5" />}
-          label="Language"
-          value={languageStr}
-          colorClass="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-        />
-      )}
-      {starsStr && (
-        <MetaBadge
-          icon={<Star className="h-3.5 w-3.5" />}
-          label="Stars"
-          value={starsStr}
-          colorClass="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
-        />
-      )}
-      {forksStr && (
-        <MetaBadge
-          icon={<GitFork className="h-3.5 w-3.5" />}
-          label="Forks"
-          value={forksStr}
-          colorClass="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-        />
+
+      {/* Topics (repos) */}
+      {topics.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {topics.map((topic) => (
+            <span
+              key={topic}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+            >
+              <Hash className="h-2.5 w-2.5" />
+              {topic}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -375,6 +535,7 @@ export default function ItemDetail() {
   const addToCollection = useAddItemToCollection();
   const toggleReadingList = useToggleReadingList();
   const markAsRead = useMarkAsRead();
+  const { data: highlights } = useHighlights(id);
 
   const commentInputRef = useRef<HTMLInputElement>(null);
 
@@ -686,7 +847,7 @@ export default function ItemDetail() {
       )}
 
       {item.content && (
-        <TextHighlighter itemId={item.id}>
+        <TextHighlighter itemId={item.id} highlights={highlights}>
           <ContentRenderer
             content={item.content}
             rawContent={item.raw_content}

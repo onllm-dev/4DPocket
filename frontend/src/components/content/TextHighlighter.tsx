@@ -1,11 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Highlighter, X } from "lucide-react";
 import { api } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
+import type { Highlight } from "@/hooks/use-highlights";
 
 interface TextHighlighterProps {
   itemId?: string;
   noteId?: string;
+  highlights?: Highlight[];
   children: React.ReactNode;
 }
 
@@ -17,13 +19,76 @@ const COLORS = [
   { name: "purple", bg: "bg-purple-200 dark:bg-purple-700/50", ring: "ring-purple-400" },
 ];
 
-export default function TextHighlighter({ itemId, noteId, children }: TextHighlighterProps) {
+const COLOR_MARK_CLASSES: Record<string, string> = {
+  yellow: "bg-yellow-200 dark:bg-yellow-700/50",
+  green: "bg-green-200 dark:bg-green-700/50",
+  blue: "bg-blue-200 dark:bg-blue-700/50",
+  red: "bg-red-200 dark:bg-red-700/50",
+  purple: "bg-purple-200 dark:bg-purple-700/50",
+};
+
+function applyHighlightsToDOM(container: HTMLElement, highlights: Highlight[]) {
+  if (!highlights.length) return;
+
+  // Remove previously applied highlight marks
+  container.querySelectorAll("mark[data-highlight-id]").forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) {
+      parent.insertBefore(mark.firstChild, mark);
+    }
+    parent.removeChild(mark);
+    parent.normalize();
+  });
+
+  // Apply each highlight by searching for matching text in text nodes
+  for (const hl of highlights) {
+    if (!hl.text) continue;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node: Text | null;
+
+    while ((node = walker.nextNode() as Text | null)) {
+      const idx = node.nodeValue?.indexOf(hl.text) ?? -1;
+      if (idx === -1) continue;
+
+      // Already inside a highlight mark? skip
+      if (node.parentElement?.closest("mark[data-highlight-id]")) continue;
+
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + hl.text.length);
+
+      const mark = document.createElement("mark");
+      mark.setAttribute("data-highlight-id", hl.id);
+      mark.className = `rounded px-0.5 ${COLOR_MARK_CLASSES[hl.color] ?? COLOR_MARK_CLASSES.yellow}`;
+      range.surroundContents(mark);
+
+      // Only highlight first occurrence per highlight
+      break;
+    }
+  }
+}
+
+export default function TextHighlighter({ itemId, noteId, highlights = [], children }: TextHighlighterProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
   const [selectedText, setSelectedText] = useState("");
   const [selectedPosition, setSelectedPosition] = useState<{ start: number; end: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const qc = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Apply highlight overlays after render
+  useEffect(() => {
+    if (!containerRef.current || !highlights.length) return;
+    // Small delay to ensure children have rendered
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        applyHighlightsToDOM(containerRef.current, highlights);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [highlights]);
 
   const handleTextSelect = useCallback(
     (text: string, position: { start: number; end: number }) => {
@@ -81,6 +146,7 @@ export default function TextHighlighter({ itemId, noteId, children }: TextHighli
   return (
     <div className="relative">
       <div
+        ref={containerRef}
         onMouseUp={() => {
           const selection = window.getSelection();
           if (!selection || selection.isCollapsed) {

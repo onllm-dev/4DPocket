@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { Link2, FileText, Loader2, X } from "lucide-react";
+import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { Link2, FileText, Loader2, X, Plus, Trash2, Mic } from "lucide-react";
 import { useCreateItem, useUpdateItem } from "@/hooks/use-items";
+import { api, apiFetch } from "@/api/client";
+
+const TiptapEditor = lazy(() => import("@/components/editor/TiptapEditor"));
 
 interface Item {
   id: string;
@@ -20,24 +23,92 @@ interface EditBookmarkFormProps {
 
 export function BookmarkForm({ onClose }: BookmarkFormProps) {
   const [url, setUrl] = useState("");
+  const [extraUrls, setExtraUrls] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<"url" | "note">("url");
   const [content, setContent] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const createItem = useCreateItem();
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (blob.size < 1000) return;
+
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", blob, "voice-note.webm");
+          const res = await apiFetch("/api/v1/ai/transcribe", {
+            method: "POST",
+            headers: {},
+            body: formData,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.text) {
+              setContent((prev) => (prev ? prev + "\n\n" + data.text : data.text));
+            }
+          }
+        } catch {
+          // Transcription failed silently
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      // Microphone access denied
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  }, []);
+
+  const addExtraUrl = () => setExtraUrls((prev) => [...prev, ""]);
+  const removeExtraUrl = (index: number) =>
+    setExtraUrls((prev) => prev.filter((_, i) => i !== index));
+  const updateExtraUrl = (index: number, value: string) =>
+    setExtraUrls((prev) => prev.map((u, i) => (i === index ? value : u)));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (mode === "url") {
-        await createItem.mutateAsync({ url: url.trim() });
+        const created = await createItem.mutateAsync({ url: url.trim() });
+        const validExtras = extraUrls.map((u) => u.trim()).filter(Boolean);
+        for (const extraUrl of validExtras) {
+          await api.post(`/api/v1/items/${created.id}/links`, { url: extraUrl });
+        }
       } else {
         await createItem.mutateAsync({ title: title.trim(), content: content.trim() });
       }
       setUrl("");
+      setExtraUrls([]);
       setTitle("");
       setContent("");
       onClose?.();
-    } catch (err) {
+    } catch {
       // Error handled by mutation state
     }
   };
@@ -80,36 +151,94 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {mode === "url" ? (
-          <div className="relative">
-            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste a URL..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-              autoFocus
-              required
-            />
+          <div className="space-y-3">
+            <div className="relative">
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste a URL..."
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                autoFocus
+                required
+              />
+            </div>
+            {extraUrls.map((extraUrl, index) => (
+              <div key={index} className="relative flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="url"
+                    value={extraUrl}
+                    onChange={(e) => updateExtraUrl(index, e.target.value)}
+                    placeholder="Additional URL..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeExtraUrl(index)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addExtraUrl}
+              className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:text-sky-700 font-medium transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add another URL
+            </button>
           </div>
         ) : (
           <>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Note title..."
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-              autoFocus
-            />
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your note (Markdown supported)..."
-              rows={6}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none font-mono transition-all"
-              required
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Note title..."
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isTranscribing}
+                className={`p-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer disabled:opacity-50 ${
+                  isRecording
+                    ? "bg-red-500 text-white shadow-md shadow-red-500/20"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md"
+                }`}
+                aria-label={isRecording ? "Stop recording" : "Start voice note"}
+              >
+                {isRecording ? (
+                  <span className="relative flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-white" />
+                  </span>
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            {isTranscribing && (
+              <span className="flex items-center gap-1.5 text-xs text-sky-600">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Transcribing...
+              </span>
+            )}
+            <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />}>
+              <TiptapEditor
+                content={content}
+                onChange={setContent}
+                placeholder="Write your note..."
+              />
+            </Suspense>
           </>
         )}
 
