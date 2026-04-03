@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -662,3 +663,126 @@ def download_item_video(
     db.commit()
 
     return {"status": "downloaded", "path": video_path}
+
+
+@router.get("/{item_id}/media-proxy")
+def media_proxy(
+    item_id: uuid.UUID,
+    url: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Proxy and cache images for an item.
+    Fetches the URL server-side, caches locally, then serves from cache.
+    Handles CORS-blocked and auth-protected URLs (e.g. LinkedIn, Twitter).
+    """
+    from fourdpocket.config import get_settings
+    from fourdpocket.storage.local import LocalStorage
+    import hashlib, httpx
+
+    item = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id
+        )
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    settings = get_settings()
+    storage = LocalStorage(base_path=settings.storage.base_path)
+    url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
+    uid = current_user.id
+    ext = url.rsplit(".", 1)[-1].lower() if "." in url else "bin"
+    ext = ext[:10]
+    filename = f"{item_id}_{url_hash}.{ext}"
+    relative_path = f"{uid}/media/{filename}"
+
+    # Check if already cached
+    if storage.file_exists(relative_path):
+        resolved = storage.get_absolute_path(relative_path)
+        mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                    ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+                    ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+        import mimetypes
+        mime_type = mime_map.get(resolved.suffix.lower()) or mimetypes.guess_type(str(resolved))[0] or "application/octet-stream"
+        return FileResponse(resolved, media_type=mime_type)
+
+    # Fetch from source
+    try:
+        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")
+
+    # Save to local storage
+    path = storage.save_file(uid, "media", filename, resp.content)
+
+    # Update item media with local_path
+    existing_media = list(item.media) if item.media else []
+    # Find and update or append
+    thumb_idx = next((i for i, m in enumerate(existing_media) if m.get("role") == "thumbnail" and m.get("url") == url), -1)
+    if thumb_idx >= 0:
+        existing_media[thumb_idx]["local_path"] = path
+        existing_media[thumb_idx]["original_url"] = url
+    else:
+        existing_media.append({"type": "image", "url": url, "local_path": path, "role": "thumbnail"})
+    item.media = existing_media
+    db.add(item)
+    db.commit()
+
+    resolved = storage.get_absolute_path(path)
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+                ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+    import mimetypes as _mt
+    mime_type = mime_map.get(resolved.suffix.lower()) or _mt.guess_type(str(resolved))[0] or "application/octet-stream"
+    return FileResponse(resolved, media_type=mime_type)
+
+
+@router.get("/{item_id}/media/{path:path}")
+def serve_media(
+    item_id: uuid.UUID,
+    path: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+):
+    """Serve locally-downloaded media files for an item."""
+    from fastapi.responses import FileResponse
+
+    item = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id
+        )
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    from fourdpocket.config import get_settings
+    from fourdpocket.storage.local import LocalStorage
+
+    settings = get_settings()
+    storage = LocalStorage(base_path=settings.storage.base_path)
+
+    try:
+        file_bytes = storage.get_file(path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    resolved = storage.get_absolute_path(path)
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".svg": "image/svg+xml",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".pdf": "application/pdf",
+    }
+    import mimetypes
+    mime_type = mime_map.get(resolved.suffix.lower()) or mimetypes.guess_type(str(resolved))[0] or "application/octet-stream"
+
+    return FileResponse(resolved, media_type=mime_type)

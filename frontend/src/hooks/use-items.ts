@@ -11,7 +11,7 @@ interface Item {
   description: string | null;
   content: string | null;
   summary: string | null;
-  media: Array<{ type: string; url: string; role: string }>;
+  media: Array<{ type: string; url?: string; role: string; local_path?: string; original_url?: string }>;
   item_metadata: Record<string, unknown>;
   is_favorite: boolean;
   is_archived: boolean;

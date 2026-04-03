@@ -1,9 +1,21 @@
 import { useState } from "react";
 import { Link2, FileText, Loader2, X } from "lucide-react";
-import { useCreateItem } from "@/hooks/use-items";
+import { useCreateItem, useUpdateItem } from "@/hooks/use-items";
+
+interface Item {
+  id: string;
+  title: string | null;
+  content: string | null;
+}
 
 interface BookmarkFormProps {
   onClose?: () => void;
+}
+
+interface EditBookmarkFormProps {
+  item: Item;
+  onClose?: () => void;
+  onUpdated?: () => void;
 }
 
 export function BookmarkForm({ onClose }: BookmarkFormProps) {
@@ -117,6 +129,80 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
         </button>
 
         {createItem.isError && (
+          <p className="text-red-500 text-sm text-center">Failed to save. Please try again.</p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+export function EditBookmarkForm({ item, onClose, onUpdated }: EditBookmarkFormProps) {
+  const [title, setTitle] = useState(item.title ?? "");
+  const [content, setContent] = useState(item.content ?? "");
+  const updateItem = useUpdateItem();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateItem.mutateAsync({
+        id: item.id,
+        title: title.trim() || undefined,
+        content: content.trim() || undefined,
+      });
+      onUpdated?.();
+      onClose?.();
+    } catch (err) {
+      // Error handled by mutation state
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-6 max-w-lg w-full animate-fade-in">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Edit Item</h2>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title..."
+          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+          autoFocus
+        />
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Content (Markdown supported)..."
+          rows={6}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none font-mono transition-all"
+        />
+
+        <button
+          type="submit"
+          disabled={updateItem.isPending}
+          className="w-full py-3 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+        >
+          {updateItem.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </button>
+
+        {updateItem.isError && (
           <p className="text-red-500 text-sm text-center">Failed to save. Please try again.</p>
         )}
       </form>

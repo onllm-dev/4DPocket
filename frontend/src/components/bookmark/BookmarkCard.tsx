@@ -13,7 +13,7 @@ interface BookmarkCardProps {
     source_platform: string;
     item_type: string;
     summary: string | null;
-    media: Array<{ type: string; url: string; role: string }>;
+    media: Array<{ type: string; url?: string; role: string; local_path?: string }>;
     is_favorite: boolean;
     created_at: string;
   };
@@ -22,7 +22,12 @@ interface BookmarkCardProps {
 
 export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   const updateItem = useUpdateItem();
-  const thumbnail = item.media?.find((m) => m.role === "thumbnail")?.url;
+  const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
+  const thumbnail = thumbMedia?.local_path
+    ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
+    : thumbMedia?.url
+    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbMedia.url)}`
+    : undefined;
 
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();

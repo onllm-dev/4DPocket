@@ -21,6 +21,7 @@ import {
   Hash,
   Play,
   Repeat2,
+  Pencil,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,7 @@ import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { formatDate } from "@/lib/utils";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
+import { EditBookmarkForm } from "@/components/bookmark/BookmarkForm";
 
 // Fields to always hide from metadata display
 const HIDDEN_METADATA_KEYS = new Set([
@@ -358,6 +360,7 @@ export default function ItemDetail() {
   const updateItem = useUpdateItem();
   const deleteItem = useDeleteItem();
   const [shareOpen, setShareOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [contentExpanded, setContentExpanded] = useState(false);
   const commentInputRef = useRef<HTMLInputElement>(null);
@@ -440,7 +443,12 @@ export default function ItemDetail() {
     );
   }
 
-  const thumbnail = item.media?.find((m) => m.role === "thumbnail")?.url;
+  const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
+  const thumbnail = thumbMedia?.local_path
+    ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
+    : thumbMedia?.url
+    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbMedia.url!)}`
+    : undefined;
   const tags = itemTags ?? [];
   const isYouTube = item.source_platform.toLowerCase() === "youtube";
   const metadata = item.item_metadata ?? {};
@@ -501,7 +509,7 @@ export default function ItemDetail() {
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="flex items-start justify-center gap-4 mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sky-600">
@@ -547,6 +555,14 @@ export default function ItemDetail() {
             }`}
           >
             <Archive className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setEditOpen(true)}
+            aria-label="Edit item"
+            title="Edit"
+            className="p-2.5 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/20 text-gray-400 hover:text-sky-600"
+          >
+            <Pencil className="h-5 w-5" />
           </button>
           <button
             onClick={() => setShareOpen(true)}
@@ -760,6 +776,20 @@ export default function ItemDetail() {
           itemId={id}
           onClose={() => setShareOpen(false)}
         />
+      )}
+
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setEditOpen(false)}
+          />
+          <EditBookmarkForm
+            item={item}
+            onClose={() => setEditOpen(false)}
+            onUpdated={() => qc.invalidateQueries({ queryKey: ["items", id] })}
+          />
+        </div>
       )}
     </div>
   );
