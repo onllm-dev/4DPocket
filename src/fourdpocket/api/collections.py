@@ -253,10 +253,11 @@ def get_smart_collection_items(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart collection"
         )
 
-    from fourdpocket.search.sqlite_fts import search
+    from fourdpocket.search.indexer import SearchIndexer
 
-    results = search(
-        db, collection.smart_query, user_id=current_user.id, limit=limit, offset=offset
+    indexer = SearchIndexer(db)
+    results = indexer.search(
+        collection.smart_query, user_id=current_user.id, limit=limit, offset=offset
     )
     return results
 

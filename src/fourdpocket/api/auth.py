@@ -4,7 +4,7 @@ import re
 import time
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, field_validator
 from sqlmodel import Session, func, select
@@ -23,6 +23,21 @@ _failed_login_attempts: dict[str, dict] = defaultdict(lambda: {"count": 0, "lock
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATIONS = [5, 10, 20, 40, 80]  # Minutes for consecutive failures
 
+# In-memory rate limiting for registration attempts (10 per hour per IP)
+_register_attempts: dict[str, list[float]] = {}
+
+
+def _check_register_rate_limit(client_ip: str) -> None:
+    now = time.time()
+    attempts = [t for t in _register_attempts.get(client_ip, []) if now - t < 3600]
+    if len(attempts) >= 10:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts. Try again later.",
+        )
+    attempts.append(now)
+    _register_attempts[client_ip] = attempts
+
 
 def _get_or_create_settings(db: Session) -> InstanceSettings:
     settings = db.get(InstanceSettings, 1)
@@ -35,7 +50,8 @@ def _get_or_create_settings(db: Session) -> InstanceSettings:
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
+    _check_register_rate_limit(request.client.host if request.client else "unknown")
     # Check instance registration settings
     settings = _get_or_create_settings(db)
     if not settings.registration_enabled:
@@ -136,12 +152,14 @@ def login(
     # Set httpOnly cookie for XSS protection (supplements Bearer token)
     from fourdpocket.config import get_settings
     cookie_settings = get_settings()
+    # Use secure=True in production (non-SQLite database); allow plain HTTP in dev
+    is_secure = not cookie_settings.database.url.startswith("sqlite")
     response.set_cookie(
         key="4dp_token",
         value=access_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=is_secure,
+        samesite="lax",
         max_age=cookie_settings.auth.token_expire_minutes * 60,
     )
     return {"access_token": access_token, "token_type": "bearer"}

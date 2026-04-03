@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session, col, select
 from sqlmodel import delete as sql_delete
 
@@ -377,10 +377,14 @@ def get_related_items(
         return []
 
 
+class ReadingProgressUpdate(BaseModel):
+    progress: int = Field(ge=0, le=100)
+
+
 @router.patch("/{item_id}/reading-progress")
 def update_reading_progress(
     item_id: uuid.UUID,
-    body: dict,  # {"progress": 0-100}
+    body: ReadingProgressUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -392,10 +396,9 @@ def update_reading_progress(
     ).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-    progress = max(0, min(100, body.get("progress", 0)))
-    item.reading_progress = progress
+    item.reading_progress = body.progress
     db.commit()
-    return {"status": "updated", "reading_progress": progress}
+    return {"status": "updated", "reading_progress": body.progress}
 
 
 @router.get("/reading-queue")

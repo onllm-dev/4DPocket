@@ -59,6 +59,16 @@ def test_client(engine):
     ]
     app.middleware_stack = app.build_middleware_stack()
 
+    # Clear in-endpoint rate limiters between tests
+    import fourdpocket.api.auth as auth_module
+    if hasattr(auth_module, "_failed_login_attempts"):
+        auth_module._failed_login_attempts.clear()
+    if hasattr(auth_module, "_register_attempts"):
+        auth_module._register_attempts.clear()
+    import fourdpocket.api.sharing as sharing_module
+    if hasattr(sharing_module, "_public_token_attempts"):
+        sharing_module._public_token_attempts.clear()
+
     with TestClient(app) as c:
         yield c
 

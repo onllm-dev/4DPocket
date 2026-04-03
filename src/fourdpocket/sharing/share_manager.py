@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
+from fourdpocket.models.collection import Collection
+from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole, ShareType
 
 
@@ -19,6 +21,15 @@ def create_share(
     public: bool = False,
     expires_hours: int | None = None,
 ) -> Share:
+    if item_id:
+        item = db.get(KnowledgeItem, item_id)
+        if not item or str(item.user_id) != str(owner_id):
+            raise ValueError("Item not found or not owned by user")
+    if collection_id:
+        coll = db.get(Collection, collection_id)
+        if not coll or str(coll.user_id) != str(owner_id):
+            raise ValueError("Collection not found or not owned by user")
+
     share = Share(
         owner_id=owner_id,
         share_type=share_type,

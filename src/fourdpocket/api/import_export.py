@@ -2,6 +2,7 @@
 import io
 import json
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,16 @@ router = APIRouter(tags=["import-export"])
 
 
 MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+def _safe_href(url: str | None) -> str | None:
+    """Return url only if it uses a safe scheme, with quotes escaped."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https", ""):
+        return None
+    return url.replace('"', "%22")
 
 
 @router.post("/import/{source}")
@@ -140,9 +151,10 @@ def export_bookmarks(
             '<DL><p>',
         ]
         for i in items:
-            if i.url:
+            safe_url = _safe_href(i.url)
+            if safe_url:
                 title = (i.title or i.url).replace("<", "&lt;").replace(">", "&gt;")
-                lines.append(f'    <DT><A HREF="{i.url}">{title}</A>')
+                lines.append(f'    <DT><A HREF="{safe_url}">{title}</A>')
         lines.append('</DL><p>')
         content = "\n".join(lines)
         return StreamingResponse(

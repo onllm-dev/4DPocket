@@ -98,16 +98,19 @@ def create_share_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    share = create_share(
-        db=db,
-        owner_id=current_user.id,
-        share_type=body.share_type,
-        item_id=body.item_id,
-        collection_id=body.collection_id,
-        tag_id=body.tag_id,
-        public=body.public,
-        expires_hours=body.expires_hours,
-    )
+    try:
+        share = create_share(
+            db=db,
+            owner_id=current_user.id,
+            share_type=body.share_type,
+            item_id=body.item_id,
+            collection_id=body.collection_id,
+            tag_id=body.tag_id,
+            public=body.public,
+            expires_hours=body.expires_hours,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return share
 
 

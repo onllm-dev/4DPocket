@@ -4,6 +4,8 @@ import re
 
 from sqlmodel import Session, select
 
+MAX_PATTERN_LEN = 200
+
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rule import Rule
@@ -16,7 +18,13 @@ def evaluate_condition(condition: dict, item: KnowledgeItem) -> bool:
 
     if cond_type == "url_matches":
         pattern = condition.get("pattern", "")
-        return bool(item.url and re.search(pattern, item.url))
+        if not pattern or len(pattern) > MAX_PATTERN_LEN:
+            return False
+        try:
+            compiled = re.compile(pattern)
+        except re.error:
+            return False
+        return bool(item.url and compiled.search(item.url[:2000]))
 
     elif cond_type == "source_platform":
         return item.source_platform == condition.get("platform", "")

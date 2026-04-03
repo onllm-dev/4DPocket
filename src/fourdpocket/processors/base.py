@@ -88,7 +88,10 @@ class BaseProcessor(ABC):
     async def _fetch_url(
         self, url: str, timeout: float = 30.0, follow_redirects: bool = True
     ) -> httpx.Response:
-        """Fetch a URL with proper headers and timeout."""
+        """Fetch a URL with proper headers and timeout.
+
+        Redirects are followed manually so each target is SSRF-checked.
+        """
         if not _is_safe_url(url):
             raise ValueError("URL blocked: targets internal network")
         headers = {
@@ -99,12 +102,29 @@ class BaseProcessor(ABC):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }
-        async with httpx.AsyncClient(
-            timeout=timeout, follow_redirects=follow_redirects
-        ) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return response
+        max_redirects = 5 if follow_redirects else 0
+        current_url = url
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            for _ in range(max_redirects + 1):
+                response = await client.get(current_url, headers=headers)
+                if response.is_redirect and max_redirects > 0:
+                    location = response.headers.get("location", "")
+                    if not location:
+                        break
+                    # Resolve relative redirects
+                    if location.startswith("/"):
+                        from urllib.parse import urlparse
+                        parsed = urlparse(current_url)
+                        location = f"{parsed.scheme}://{parsed.netloc}{location}"
+                    # SSRF check on redirect target
+                    if not _is_safe_url(location):
+                        raise ValueError("Redirect blocked: targets internal network")
+                    current_url = location
+                else:
+                    response.raise_for_status()
+                    return response
+        response.raise_for_status()
+        return response
 
     def _extract_og_metadata(self, html_content: str) -> dict:
         """Extract Open Graph and meta tag metadata from HTML."""

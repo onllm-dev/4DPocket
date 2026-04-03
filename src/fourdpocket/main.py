@@ -22,8 +22,8 @@ async def lifespan(app: FastAPI):
     data_dir.mkdir(parents=True, exist_ok=True)
     init_db()
 
-    # Initialize FTS5 search if using sqlite backend
-    if settings.search.backend == "sqlite":
+    # Initialize FTS5 search only when both the search backend and database are SQLite
+    if settings.search.backend == "sqlite" and settings.database.url.startswith("sqlite"):
         from sqlmodel import Session
 
         from fourdpocket.search.sqlite_fts import init_fts
