@@ -33,7 +33,6 @@ import {
   Scale,
   Tag,
   FileCode,
-  Users,
   AlertTriangle,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";

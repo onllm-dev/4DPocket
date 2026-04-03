@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, Loader2, Sparkles, AlignLeft } from "lucide-react";
+import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
+import NoteCard from "@/components/bookmark/NoteCard";
+import { useSearchNotes } from "@/hooks/use-notes";
 
 interface Item {
   id: string;
@@ -26,6 +28,47 @@ interface SearchFilters {
   platforms: Array<{ name: string; count: number }>;
   types: string[];
   tags: Array<{ name: string; slug: string; count: number }>;
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  generic: "Web",
+  youtube: "YouTube",
+  github: "GitHub",
+  reddit: "Reddit",
+  twitter: "Twitter",
+  hackernews: "Hacker News",
+  stackoverflow: "Stack Overflow",
+  wikipedia: "Wikipedia",
+  arxiv: "arXiv",
+  medium: "Medium",
+  substack: "Substack",
+  mastodon: "Mastodon",
+  bluesky: "Bluesky",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  spotify: "Spotify",
+  goodreads: "Goodreads",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  url: "Link",
+  note: "Note",
+  image: "Image",
+  video: "Video",
+  audio: "Audio",
+  document: "Document",
+  pdf: "PDF",
+  article: "Article",
+  file: "File",
+};
+
+function formatPlatformLabel(raw: string): string {
+  const cleaned = raw.replace(/^SourcePlatform\./, "");
+  return PLATFORM_LABELS[cleaned] ?? cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function formatTypeLabel(raw: string): string {
+  return TYPE_LABELS[raw] ?? raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 export default function Search() {
@@ -66,6 +109,9 @@ export default function Search() {
       enabled: !semantic && query.length >= 2,
     });
 
+  // Note search
+  const { data: noteResults, isLoading: notesLoading } = useSearchNotes(query);
+
   const results = semantic ? semanticResults : fulltextResults;
   const isLoading = semantic ? semanticLoading : fulltextLoading;
   const isFetching = semantic ? semanticFetching : fulltextFetching;
@@ -83,7 +129,9 @@ export default function Search() {
   }, [input, setSearchParams]);
 
   const items = results ?? [];
-  const showSkeleton = (isLoading || isFetching) && query.length >= 2;
+  const notes = noteResults ?? [];
+  const totalResults = items.length + notes.length;
+  const showSkeleton = (isLoading || isFetching || notesLoading) && query.length >= 2;
 
   return (
     <div className="animate-fade-in p-6 max-w-5xl mx-auto">
@@ -150,7 +198,7 @@ export default function Search() {
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
               }`}
             >
-              {p.name} ({p.count})
+              {formatPlatformLabel(p.name)} ({p.count})
             </button>
           ))}
           {filters.types?.map((type) => (
@@ -165,7 +213,7 @@ export default function Search() {
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
               }`}
             >
-              {type}
+              {formatTypeLabel(type)}
             </button>
           ))}
         </div>
@@ -181,7 +229,7 @@ export default function Search() {
             Type at least 2 characters to search across all your saved content
           </p>
         </div>
-      ) : showSkeleton && items.length === 0 ? (
+      ) : showSkeleton && totalResults === 0 ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -194,7 +242,7 @@ export default function Search() {
             </div>
           ))}
         </div>
-      ) : items.length === 0 && !isLoading ? (
+      ) : totalResults === 0 && !isLoading ? (
         <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <SearchIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
@@ -206,17 +254,38 @@ export default function Search() {
         </div>
       ) : (
         <div>
-          {items.length > 0 && (
+          {totalResults > 0 && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {items.length} result{items.length !== 1 ? "s" : ""} for &ldquo;
+              {totalResults} result{totalResults !== 1 ? "s" : ""} for &ldquo;
               {query}&rdquo;
             </p>
           )}
-          <div className="flex flex-col gap-3">
-            {items.map((item) => (
-              <BookmarkCard key={item.id} item={item} variant="list" />
-            ))}
-          </div>
+
+          {/* Note results */}
+          {notes.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <StickyNote className="h-4 w-4 text-amber-500" />
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Notes ({notes.length})
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {notes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Item results */}
+          {items.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {items.map((item) => (
+                <BookmarkCard key={item.id} item={item} variant="list" />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
