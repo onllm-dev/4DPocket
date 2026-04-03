@@ -17,6 +17,7 @@ import {
 import { useNote, useUpdateNote, useDeleteNote, useNoteTags, useAddNoteTags, useRemoveNoteTag, useSummarizeNote, useGenerateNoteTitle } from "@/hooks/use-notes";
 import { useCollections, useAddNoteToCollection } from "@/hooks/use-collections";
 import { useToggleReadingList, useMarkAsRead } from "@/hooks/use-reading-list";
+import { useHighlights } from "@/hooks/use-highlights";
 import TextHighlighter from "@/components/content/TextHighlighter";
 import ContentRenderer from "@/components/content/ContentRenderer";
 
@@ -47,6 +48,7 @@ export default function NoteDetail() {
   const addToCollection = useAddNoteToCollection();
   const toggleReadingList = useToggleReadingList();
   const markAsRead = useMarkAsRead();
+  const { data: highlights } = useHighlights(undefined, noteId);
 
   const [showCollections, setShowCollections] = useState(false);
   const [showAddTag, setShowAddTag] = useState(false);
@@ -270,7 +272,7 @@ export default function NoteDetail() {
 
       {/* Content */}
       {note.content && (
-        <TextHighlighter noteId={note.id}>
+        <TextHighlighter noteId={note.id} highlights={highlights}>
           <ContentRenderer content={note.content} />
         </TextHighlighter>
       )}

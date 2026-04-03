@@ -308,13 +308,13 @@ export function EditBookmarkForm({ item, onClose, onUpdated }: EditBookmarkFormP
           className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
           autoFocus
         />
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Content (Markdown supported)..."
-          rows={6}
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none font-mono transition-all"
-        />
+        <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />}>
+          <TiptapEditor
+            content={content}
+            onChange={setContent}
+            placeholder="Write content..."
+          />
+        </Suspense>
 
         <button
           type="submit"

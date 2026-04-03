@@ -62,12 +62,14 @@ const TYPE_LABELS: Record<string, string> = {
   file: "File",
 };
 
-function formatPlatformLabel(raw: string): string {
+function formatPlatformLabel(raw: string | undefined | null): string {
+  if (!raw) return "";
   const cleaned = raw.replace(/^SourcePlatform\./, "");
   return PLATFORM_LABELS[cleaned] ?? cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-function formatTypeLabel(raw: string): string {
+function formatTypeLabel(raw: string | undefined | null): string {
+  if (!raw) return "";
   return TYPE_LABELS[raw] ?? raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
