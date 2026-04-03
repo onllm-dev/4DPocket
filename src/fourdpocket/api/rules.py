@@ -1,5 +1,8 @@
 """Automation rules CRUD endpoints."""
 
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -26,41 +29,35 @@ class RuleUpdate(BaseModel):
 
 
 class RuleRead(BaseModel):
-    id: str
+    id: uuid.UUID
     name: str
     condition: dict
     action: dict
     is_active: bool
+    created_at: datetime
+    user_id: uuid.UUID
+    model_config = {"from_attributes": True}
 
 
 @router.get("")
 def list_rules(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> list[RuleRead]:
-    rules = db.exec(select(Rule).where(Rule.user_id == user.id).offset(offset).limit(limit)).all()
-    return [
-        RuleRead(
-            id=str(r.id),
-            name=r.name,
-            condition=r.condition,
-            action=r.action,
-            is_active=r.is_active,
-        )
-        for r in rules
-    ]
+    rules = db.exec(select(Rule).where(Rule.user_id == current_user.id).offset(offset).limit(limit)).all()
+    return rules
 
 
 @router.post("", status_code=201)
 def create_rule(
     body: RuleCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> RuleRead:
     rule = Rule(
-        user_id=user.id,
+        user_id=current_user.id,
         name=body.name,
         condition=body.condition,
         action=body.action,
@@ -69,45 +66,33 @@ def create_rule(
     db.add(rule)
     db.commit()
     db.refresh(rule)
-    return RuleRead(
-        id=str(rule.id),
-        name=rule.name,
-        condition=rule.condition,
-        action=rule.action,
-        is_active=rule.is_active,
-    )
+    return rule
 
 
 @router.patch("/{rule_id}")
 def update_rule(
-    rule_id: str,
+    rule_id: uuid.UUID,
     body: RuleUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> RuleRead:
-    rule = db.exec(select(Rule).where(Rule.id == rule_id, Rule.user_id == user.id)).first()
+    rule = db.exec(select(Rule).where(Rule.id == rule_id, Rule.user_id == current_user.id)).first()
     if not rule:
         raise HTTPException(404, "Rule not found")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(rule, field, value)
     db.commit()
     db.refresh(rule)
-    return RuleRead(
-        id=str(rule.id),
-        name=rule.name,
-        condition=rule.condition,
-        action=rule.action,
-        is_active=rule.is_active,
-    )
+    return rule
 
 
 @router.delete("/{rule_id}", status_code=204)
 def delete_rule(
-    rule_id: str,
+    rule_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    rule = db.exec(select(Rule).where(Rule.id == rule_id, Rule.user_id == user.id)).first()
+    rule = db.exec(select(Rule).where(Rule.id == rule_id, Rule.user_id == current_user.id)).first()
     if not rule:
         raise HTTPException(404, "Rule not found")
     db.delete(rule)

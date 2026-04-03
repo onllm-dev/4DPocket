@@ -10,7 +10,7 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide React icons
 - **Database**: SQLite (default) / PostgreSQL
 - **Search**: SQLite FTS5 (default) / Meilisearch + ChromaDB (semantic)
-- **AI**: Ollama / Groq / NVIDIA via OpenAI-compatible provider (NO litellm, NO langchain)
+- **AI**: Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) (NO litellm, NO langchain)
 - **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose)
 - **HTTP**: httpx (backend), native fetch (frontend) (NO axios)
 - **Background Jobs**: Huey (SQLite backend)
@@ -57,7 +57,10 @@ frontend/src/
 
 ## Key Patterns
 
-- **Config**: pydantic-settings with `FDP_` env prefix
+- **Config**: pydantic-settings with `FDP_` env prefix. Admin panel overrides via `InstanceSettings.extra["ai_config"]`
+- **AI config precedence**: .env defaults < admin panel overrides. User-level controls only preferences (auto_tag, auto_summarize)
+- **Sync enrichment**: Items are AI-enriched inline if Huey worker is not running (tagging + summarization, skips embedding)
+- **Login**: Accepts both email and username (OR query on User table)
 - **User scoping**: Every query includes `WHERE user_id = current_user.id`
 - **Processors**: `@register_processor` decorator, URL pattern matching, returns `ProcessorResult`
 - **AI safety**: All user content sanitized via `ai/sanitizer.py` before LLM prompts

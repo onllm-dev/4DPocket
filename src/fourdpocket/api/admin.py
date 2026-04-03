@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_db, require_admin
+from fourdpocket.api.deps import get_db, get_or_create_settings, require_admin
 from fourdpocket.models.base import UserRole
-from fourdpocket.models.instance_settings import InstanceSettings
 from fourdpocket.models.user import User, UserRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -80,6 +79,104 @@ def delete_user(
     db.commit()
 
 
+# ─── AI Settings (admin-controlled) ─────────────────────────────
+
+AI_CONFIG_KEYS = {
+    "chat_provider", "ollama_url", "ollama_model",
+    "groq_api_key", "nvidia_api_key",
+    "custom_base_url", "custom_api_key", "custom_model", "custom_api_type",
+    "embedding_provider", "embedding_model",
+    "auto_tag", "auto_summarize",
+    "tag_confidence_threshold", "tag_suggestion_threshold",
+    "sync_enrichment",
+}
+
+
+def _mask_key(value: str) -> str:
+    """Mask API keys for display: show first 4 and last 4 chars."""
+    if not value or len(value) < 12:
+        return "***" if value else ""
+    return f"{value[:4]}...{value[-4:]}"
+
+
+@router.get("/ai-settings")
+def get_ai_settings(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get resolved AI configuration (env defaults + admin overrides)."""
+    from fourdpocket.ai.factory import get_resolved_ai_config
+
+    config = get_resolved_ai_config()
+    # Mask sensitive keys in response
+    masked = {**config}
+    for key in ("groq_api_key", "nvidia_api_key", "custom_api_key"):
+        if key in masked and masked[key]:
+            masked[key] = _mask_key(masked[key])
+    return masked
+
+
+class AISettingsUpdate(BaseModel):
+    chat_provider: str | None = None
+    ollama_url: str | None = None
+    ollama_model: str | None = None
+    groq_api_key: str | None = None
+    nvidia_api_key: str | None = None
+    custom_base_url: str | None = None
+    custom_api_key: str | None = None
+    custom_model: str | None = None
+    custom_api_type: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    auto_tag: bool | None = None
+    auto_summarize: bool | None = None
+    tag_confidence_threshold: float | None = None
+    tag_suggestion_threshold: float | None = None
+    sync_enrichment: bool | None = None
+
+
+@router.patch("/ai-settings")
+def update_ai_settings(
+    data: AISettingsUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Update AI settings (stored in InstanceSettings.extra['ai_config']).
+
+    Admin panel settings take precedence over .env values.
+    """
+    settings = get_or_create_settings(db)
+    extra = dict(settings.extra) if settings.extra else {}
+    ai_config = extra.get("ai_config", {})
+
+    update_dict = data.model_dump(exclude_unset=True)
+    # Only accept known AI config keys
+    for key, value in update_dict.items():
+        if key in AI_CONFIG_KEYS:
+            # Don't overwrite key with masked value
+            if key.endswith("_key") and value and "..." in value:
+                continue
+            ai_config[key] = value
+
+    extra["ai_config"] = ai_config
+    settings.extra = extra
+    db.add(settings)
+    db.commit()
+    db.refresh(settings)
+
+    # Return resolved config with masked keys
+    from fourdpocket.ai.factory import get_resolved_ai_config
+
+    config = get_resolved_ai_config()
+    masked = {**config}
+    for key in ("groq_api_key", "nvidia_api_key", "custom_api_key"):
+        if key in masked and masked[key]:
+            masked[key] = _mask_key(masked[key])
+    return masked
+
+
+# ─── Instance Settings ──────────────────────────────────────────
+
 class InstanceSettingsRead(BaseModel):
     instance_name: str
     registration_enabled: bool
@@ -97,22 +194,12 @@ class InstanceSettingsUpdate(BaseModel):
     max_users: int | None = None
 
 
-def _get_or_create_settings(db: Session) -> InstanceSettings:
-    settings = db.get(InstanceSettings, 1)
-    if not settings:
-        settings = InstanceSettings(id=1)
-        db.add(settings)
-        db.commit()
-        db.refresh(settings)
-    return settings
-
-
 @router.get("/settings", response_model=InstanceSettingsRead)
 def get_instance_settings(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    return _get_or_create_settings(db)
+    return get_or_create_settings(db)
 
 
 @router.patch("/settings", response_model=InstanceSettingsRead)
@@ -121,7 +208,7 @@ def update_instance_settings(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    settings = _get_or_create_settings(db)
+    settings = get_or_create_settings(db)
     update_dict = data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         setattr(settings, key, value)

@@ -44,6 +44,19 @@ class UserCreate(BaseModel):
     password: str
     display_name: str | None = None
 
+    @field_validator("username")
+    @classmethod
+    def username_format(cls, v: str) -> str:
+        if "@" in v:
+            raise ValueError("Username cannot contain '@' - use email field for email addresses")
+        if len(v) < 2:
+            raise ValueError("Username must be at least 2 characters")
+        if len(v) > 30:
+            raise ValueError("Username must be at most 30 characters")
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, underscores, dots, and hyphens")
+        return v
+
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:

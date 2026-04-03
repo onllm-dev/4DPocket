@@ -67,11 +67,11 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
   },
 
-  async login(email: string, password: string): Promise<void> {
+  async login(identifier: string, password: string): Promise<void> {
     const res = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username: email, password }),
+      body: new URLSearchParams({ username: identifier, password }),
       credentials: "include",
     });
     if (!res.ok) throw new Error("Invalid credentials");

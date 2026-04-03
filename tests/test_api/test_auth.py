@@ -91,6 +91,43 @@ def test_register_weak_password_rejected(client):
     assert response.status_code == 422
 
 
+def test_login_with_username(client):
+    """Login with username instead of email should work."""
+    client.post("/api/v1/auth/register", json={
+        "email": "userlogin@example.com",
+        "username": "myusername",
+        "password": "Login123!",
+    })
+    response = client.post("/api/v1/auth/login", data={
+        "username": "myusername",
+        "password": "Login123!",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
+
+def test_register_username_with_at_rejected(client):
+    """Username containing @ should be rejected."""
+    response = client.post("/api/v1/auth/register", json={
+        "email": "atuser@example.com",
+        "username": "user@name",
+        "password": "Valid123!",
+    })
+    assert response.status_code == 422
+
+
+def test_register_username_too_short(client):
+    """Username shorter than 2 characters should be rejected."""
+    response = client.post("/api/v1/auth/register", json={
+        "email": "short@example.com",
+        "username": "x",
+        "password": "Valid123!",
+    })
+    assert response.status_code == 422
+
+
 def test_login_account_lockout(client):
     """After too many failed attempts, account is locked."""
     client.post("/api/v1/auth/register", json={

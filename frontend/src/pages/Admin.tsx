@@ -1,4 +1,5 @@
-import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX } from "lucide-react";
+import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX, Sparkles, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -21,6 +22,23 @@ interface InstanceSettingsData {
   registration_mode: string;
   default_user_role: string;
   max_users: number | null;
+}
+
+interface AIConfig {
+  chat_provider: string;
+  ollama_url: string;
+  ollama_model: string;
+  groq_api_key: string;
+  nvidia_api_key: string;
+  custom_base_url: string;
+  custom_api_key: string;
+  custom_model: string;
+  custom_api_type: string;
+  embedding_provider: string;
+  auto_tag: boolean;
+  auto_summarize: boolean;
+  tag_confidence_threshold: number;
+  sync_enrichment: boolean;
 }
 
 export default function Admin() {
@@ -51,6 +69,18 @@ export default function Admin() {
     mutationFn: ({ id, ...data }: { id: string; role?: string; is_active?: boolean }) =>
       api.patch(`/api/v1/admin/users/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+
+  const { data: aiConfig } = useQuery<AIConfig>({
+    queryKey: ["admin", "ai-settings"],
+    queryFn: () => api.get("/api/v1/admin/ai-settings"),
+    enabled: !!currentUser && currentUser.role === "admin",
+  });
+
+  const updateAI = useMutation({
+    mutationFn: (data: Partial<AIConfig>) =>
+      api.patch("/api/v1/admin/ai-settings", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "ai-settings"] }),
   });
 
   // Role guard: redirect non-admins
@@ -138,6 +168,9 @@ export default function Admin() {
         ) : null}
       </div>
 
+      {/* AI Configuration */}
+      <AIConfigSection config={aiConfig} onUpdate={(data) => updateAI.mutate(data)} />
+
       {/* Users Table */}
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -193,6 +226,244 @@ export default function Admin() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const PROVIDERS = [
+  { value: "ollama", label: "Ollama (Local)" },
+  { value: "groq", label: "Groq (Cloud)" },
+  { value: "nvidia", label: "NVIDIA (Cloud)" },
+  { value: "custom", label: "Custom Endpoint" },
+];
+
+const API_TYPES = [
+  { value: "openai", label: "OpenAI-compatible" },
+  { value: "anthropic", label: "Anthropic-compatible" },
+];
+
+function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (data: Partial<AIConfig>) => void }) {
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+
+  if (!config) return null;
+
+  const toggleKey = (key: string) => setShowKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6 mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="w-5 h-5 text-sky-600" />
+        <h2 className="font-bold text-gray-900 dark:text-gray-100">AI Configuration</h2>
+      </div>
+
+      <div className="space-y-4">
+        {/* Provider Selection */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Chat Provider</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">AI model provider for tagging and summarization</p>
+          </div>
+          <select
+            value={config.chat_provider}
+            onChange={(e) => onUpdate({ chat_provider: e.target.value })}
+            className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
+          >
+            {PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Ollama Settings */}
+        {config.chat_provider === "ollama" && (
+          <div className="space-y-3 pl-4 border-l-2 border-sky-200 dark:border-sky-800">
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Ollama URL</label>
+              <input
+                type="text"
+                defaultValue={config.ollama_url}
+                onBlur={(e) => onUpdate({ ollama_url: e.target.value })}
+                className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Model</label>
+              <input
+                type="text"
+                defaultValue={config.ollama_model}
+                onBlur={(e) => onUpdate({ ollama_model: e.target.value })}
+                className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Groq Settings */}
+        {config.chat_provider === "groq" && (
+          <div className="pl-4 border-l-2 border-sky-200 dark:border-sky-800">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Groq API Key</label>
+            <div className="relative mt-1">
+              <input
+                type={showKeys.groq ? "text" : "password"}
+                defaultValue={config.groq_api_key}
+                onBlur={(e) => onUpdate({ groq_api_key: e.target.value })}
+                placeholder="gsk_..."
+                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
+              />
+              <button onClick={() => toggleKey("groq")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+                {showKeys.groq ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NVIDIA Settings */}
+        {config.chat_provider === "nvidia" && (
+          <div className="pl-4 border-l-2 border-sky-200 dark:border-sky-800">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">NVIDIA API Key</label>
+            <div className="relative mt-1">
+              <input
+                type={showKeys.nvidia ? "text" : "password"}
+                defaultValue={config.nvidia_api_key}
+                onBlur={(e) => onUpdate({ nvidia_api_key: e.target.value })}
+                placeholder="nvapi-..."
+                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
+              />
+              <button onClick={() => toggleKey("nvidia")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+                {showKeys.nvidia ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Provider Settings */}
+        {config.chat_provider === "custom" && (
+          <div className="space-y-3 pl-4 border-l-2 border-sky-200 dark:border-sky-800">
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">API Type</label>
+              <select
+                value={config.custom_api_type}
+                onChange={(e) => onUpdate({ custom_api_type: e.target.value })}
+                className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
+              >
+                {API_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Base URL</label>
+              <input
+                type="text"
+                defaultValue={config.custom_base_url}
+                onBlur={(e) => onUpdate({ custom_base_url: e.target.value })}
+                placeholder="https://api.minimax.io/anthropic/v1"
+                className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">API Key</label>
+              <div className="relative mt-1">
+                <input
+                  type={showKeys.custom ? "text" : "password"}
+                  defaultValue={config.custom_api_key}
+                  onBlur={(e) => onUpdate({ custom_api_key: e.target.value })}
+                  placeholder="sk-..."
+                  className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
+                />
+                <button onClick={() => toggleKey("custom")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+                  {showKeys.custom ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Model Name</label>
+              <input
+                type="text"
+                defaultValue={config.custom_model}
+                onBlur={(e) => onUpdate({ custom_model: e.target.value })}
+                placeholder="MiniMax-M2.7"
+                className="w-full mt-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Divider */}
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">AI Features</p>
+        </div>
+
+        {/* Auto-tag */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Auto-tag</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Automatically tag items with AI</p>
+          </div>
+          <button
+            onClick={() => onUpdate({ auto_tag: !config.auto_tag })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              config.auto_tag ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+              config.auto_tag ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+
+        {/* Auto-summarize */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Auto-summarize</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Generate summaries for new items</p>
+          </div>
+          <button
+            onClick={() => onUpdate({ auto_summarize: !config.auto_summarize })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              config.auto_summarize ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+              config.auto_summarize ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+
+        {/* Sync enrichment */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Sync Enrichment</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Run AI inline when background worker is not running</p>
+          </div>
+          <button
+            onClick={() => onUpdate({ sync_enrichment: !config.sync_enrichment })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              config.sync_enrichment ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+              config.sync_enrichment ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+
+        {/* Embedding Provider */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Embedding Provider</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Vector embeddings for semantic search</p>
+          </div>
+          <select
+            value={config.embedding_provider}
+            onChange={(e) => onUpdate({ embedding_provider: e.target.value })}
+            className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 cursor-pointer"
+          >
+            <option value="local">Local (sentence-transformers)</option>
+            <option value="nvidia">NVIDIA</option>
+          </select>
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,16 @@
 """RSS feed subscription model."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import DateTime
 from sqlmodel import Column, Field, SQLModel
+
+from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class RSSFeed(SQLModel, table=True):
@@ -24,6 +30,6 @@ class RSSFeed(SQLModel, table=True):
     )
     last_entry_id: str | None = None  # To avoid re-fetching
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

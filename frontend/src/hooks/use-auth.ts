@@ -25,8 +25,8 @@ export function useCurrentUser() {
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { email: string; password: string }) => {
-      await api.login(data.email, data.password);
+    mutationFn: async (data: { identifier: string; password: string }) => {
+      await api.login(data.identifier, data.password);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["currentUser"] });

@@ -1,5 +1,7 @@
 """RSS feed subscription endpoints."""
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -30,19 +32,19 @@ class RSSFeedUpdate(BaseModel):
 @router.get("")
 def list_feeds(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    return db.exec(select(RSSFeed).where(RSSFeed.user_id == user.id).order_by(RSSFeed.created_at.desc())).all()
+    return db.exec(select(RSSFeed).where(RSSFeed.user_id == current_user.id).order_by(RSSFeed.created_at.desc())).all()
 
 
 @router.post("", status_code=201)
 def create_feed(
     body: RSSFeedCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     feed = RSSFeed(
-        user_id=user.id,
+        user_id=current_user.id,
         url=body.url,
         title=body.title,
         category=body.category,
@@ -57,14 +59,14 @@ def create_feed(
 
 @router.patch("/{feed_id}")
 def update_feed(
-    feed_id: str,
+    feed_id: uuid.UUID,
     body: RSSFeedUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == user.id)).first()
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
-        raise HTTPException(404)
+        raise HTTPException(status_code=404, detail="Feed not found")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(feed, field, value)
     db.commit()
@@ -74,27 +76,27 @@ def update_feed(
 
 @router.delete("/{feed_id}", status_code=204)
 def delete_feed(
-    feed_id: str,
+    feed_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == user.id)).first()
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
-        raise HTTPException(404)
+        raise HTTPException(status_code=404, detail="Feed not found")
     db.delete(feed)
     db.commit()
 
 
 @router.post("/{feed_id}/fetch")
 def fetch_feed_now(
-    feed_id: str,
+    feed_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Manually trigger a feed fetch."""
-    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == user.id)).first()
+    feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
-        raise HTTPException(404)
+        raise HTTPException(status_code=404, detail="Feed not found")
     from fourdpocket.workers.rss_worker import fetch_rss_feed
     count = fetch_rss_feed(feed, db)
     return {"status": "fetched", "new_items": count}

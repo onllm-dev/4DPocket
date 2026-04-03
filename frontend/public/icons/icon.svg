@@ -1,17 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background circle - Doraemon Blue -->
+  <!-- Blue head/face background -->
   <circle cx="256" cy="256" r="240" fill="#0096C7"/>
-  <!-- Inner circle - white face area like Doraemon -->
-  <circle cx="256" cy="280" r="160" fill="white"/>
-  <!-- Pocket shape - the 4D Pocket -->
-  <path d="M176 300 Q176 380 256 380 Q336 380 336 300" fill="none" stroke="#0096C7" stroke-width="8" stroke-linecap="round"/>
-  <!-- Pocket opening arc -->
-  <path d="M196 300 Q196 260 256 260 Q316 260 316 300" fill="#F0F9FF" stroke="#0096C7" stroke-width="4"/>
-  <!-- 4D text -->
-  <text x="230" y="240" font-family="Inter, Arial, sans-serif" font-weight="900" font-size="64" fill="#0096C7">4D</text>
-  <!-- Bell (Doraemon's bell) -->
-  <circle cx="256" cy="340" r="16" fill="#FCD34D" stroke="#D97706" stroke-width="2"/>
-  <line x1="256" y1="340" x2="256" y2="356" stroke="#D97706" stroke-width="2"/>
-  <!-- Nose (small red circle) -->
-  <circle cx="256" cy="196" r="12" fill="#EF4444"/>
+  <!-- White face area -->
+  <ellipse cx="256" cy="280" rx="175" ry="165" fill="white"/>
+  <!-- Eyes -->
+  <ellipse cx="222" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" stroke-width="3"/>
+  <ellipse cx="290" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" stroke-width="3"/>
+  <!-- Pupils -->
+  <circle cx="232" cy="195" r="12" fill="#0C1222"/>
+  <circle cx="280" cy="195" r="12" fill="#0C1222"/>
+  <!-- Eye highlights -->
+  <circle cx="236" cy="189" r="4" fill="white"/>
+  <circle cx="284" cy="189" r="4" fill="white"/>
+  <!-- Red nose -->
+  <circle cx="256" cy="228" r="16" fill="#EF4444"/>
+  <!-- Nose highlight -->
+  <circle cx="250" cy="222" r="5" fill="#FCA5A5" opacity="0.7"/>
+  <!-- Mouth line down from nose -->
+  <line x1="256" y1="244" x2="256" y2="300" stroke="#0C1222" stroke-width="3"/>
+  <!-- Smile -->
+  <path d="M176 280 Q216 340 256 300 Q296 340 336 280" fill="none" stroke="#0C1222" stroke-width="3" stroke-linecap="round"/>
+  <!-- Whiskers left -->
+  <line x1="90" y1="230" x2="190" y2="248" stroke="#0C1222" stroke-width="2.5"/>
+  <line x1="85" y1="260" x2="188" y2="265" stroke="#0C1222" stroke-width="2.5"/>
+  <line x1="90" y1="290" x2="190" y2="282" stroke="#0C1222" stroke-width="2.5"/>
+  <!-- Whiskers right -->
+  <line x1="422" y1="230" x2="322" y2="248" stroke="#0C1222" stroke-width="2.5"/>
+  <line x1="427" y1="260" x2="324" y2="265" stroke="#0C1222" stroke-width="2.5"/>
+  <line x1="422" y1="290" x2="322" y2="282" stroke="#0C1222" stroke-width="2.5"/>
+  <!-- Collar -->
+  <rect x="140" y="390" width="232" height="24" rx="12" fill="#EF4444"/>
+  <!-- Bell -->
+  <circle cx="256" cy="414" r="18" fill="#FCD34D" stroke="#D97706" stroke-width="2"/>
+  <line x1="242" y1="410" x2="270" y2="410" stroke="#D97706" stroke-width="1.5"/>
+  <circle cx="256" cy="418" r="3" fill="#D97706"/>
+  <line x1="256" y1="421" x2="256" y2="430" stroke="#D97706" stroke-width="1.5"/>
+  <!-- Pocket -->
+  <path d="M186 370 Q186 440 256 440 Q326 440 326 370" fill="#F0F9FF" stroke="#0096C7" stroke-width="3"/>
+  <path d="M196 370 Q196 345 256 345 Q316 345 316 370" fill="none" stroke="#0096C7" stroke-width="2"/>
 </svg>

@@ -41,32 +41,34 @@ def enrich_item(
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
+    # Always run synchronously - Huey silently queues without raising when consumer is down
+    from fourdpocket.ai.sanitizer import sanitize_for_prompt
+    from fourdpocket.ai.summarizer import summarize_item
+    from fourdpocket.ai.tagger import auto_tag_item
+
+    tags = auto_tag_item(
+        item_id=item.id,
+        user_id=current_user.id,
+        title=sanitize_for_prompt(item.title or "", max_length=2000),
+        content=sanitize_for_prompt(item.content or "", max_length=4000),
+        description=sanitize_for_prompt(item.description or "", max_length=1000),
+        db=db,
+    )
+    summary = summarize_item(item.id, db)
+
+    # Also dispatch to Huey for embedding (best-effort, runs if consumer is up)
     try:
         from fourdpocket.workers.ai_enrichment import enrich_item as enrich_task
-
         enrich_task(str(item_id), str(current_user.id))
-        return {"status": "queued", "item_id": str(item_id)}
     except Exception:
-        # Run synchronously if Huey isn't available
-        from fourdpocket.ai.summarizer import summarize_item
-        from fourdpocket.ai.tagger import auto_tag_item
+        pass
 
-        tags = auto_tag_item(
-            item_id=item.id,
-            user_id=current_user.id,
-            title=item.title or "",
-            content=item.content,
-            description=item.description,
-            db=db,
-        )
-        summary = summarize_item(item.id, db)
-
-        return {
-            "status": "completed",
-            "item_id": str(item_id),
-            "tags": len(tags),
-            "summary": bool(summary),
-        }
+    return {
+        "status": "completed",
+        "item_id": str(item_id),
+        "tags": len(tags),
+        "summary": bool(summary),
+    }
 
 
 @router.get("/suggest-collection")

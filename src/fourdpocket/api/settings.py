@@ -11,7 +11,6 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class UserSettingsSchema(BaseModel):
-    ai_provider: str = "ollama"
     auto_tag: bool = True
     auto_summarize: bool = True
     tag_confidence_threshold: float = 0.7

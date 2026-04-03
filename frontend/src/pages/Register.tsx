@@ -8,13 +8,24 @@ function DoraemonLogo() {
     <div className="relative w-24 h-24 mx-auto mb-4">
       <svg viewBox="0 0 512 512" className="w-full h-full drop-shadow-lg">
         <circle cx="256" cy="256" r="240" fill="#0096C7"/>
-        <circle cx="256" cy="280" r="160" fill="white"/>
-        <path d="M176 300 Q176 380 256 380 Q336 380 336 300" fill="none" stroke="#0096C7" strokeWidth="8" strokeLinecap="round"/>
-        <path d="M196 300 Q196 260 256 260 Q316 260 316 300" fill="#F0F9FF" stroke="#0096C7" strokeWidth="4"/>
-        <text x="230" y="240" fontFamily="Inter, Arial, sans-serif" fontWeight="900" fontSize="64" fill="#0096C7">4D</text>
-        <circle cx="256" cy="340" r="16" fill="#FCD34D" stroke="#D97706" strokeWidth="2"/>
-        <line x1="256" y1="340" x2="256" y2="356" stroke="#D97706" strokeWidth="2"/>
-        <circle cx="256" cy="196" r="12" fill="#EF4444"/>
+        <ellipse cx="256" cy="280" rx="175" ry="165" fill="white"/>
+        <ellipse cx="222" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" strokeWidth="3"/>
+        <ellipse cx="290" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" strokeWidth="3"/>
+        <circle cx="232" cy="195" r="12" fill="#0C1222"/>
+        <circle cx="280" cy="195" r="12" fill="#0C1222"/>
+        <circle cx="236" cy="189" r="4" fill="white"/>
+        <circle cx="284" cy="189" r="4" fill="white"/>
+        <circle cx="256" cy="228" r="16" fill="#EF4444"/>
+        <line x1="256" y1="244" x2="256" y2="300" stroke="#0C1222" strokeWidth="3"/>
+        <path d="M176 280 Q216 340 256 300 Q296 340 336 280" fill="none" stroke="#0C1222" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="90" y1="230" x2="190" y2="248" stroke="#0C1222" strokeWidth="2.5"/>
+        <line x1="85" y1="260" x2="188" y2="265" stroke="#0C1222" strokeWidth="2.5"/>
+        <line x1="90" y1="290" x2="190" y2="282" stroke="#0C1222" strokeWidth="2.5"/>
+        <line x1="422" y1="230" x2="322" y2="248" stroke="#0C1222" strokeWidth="2.5"/>
+        <line x1="427" y1="260" x2="324" y2="265" stroke="#0C1222" strokeWidth="2.5"/>
+        <line x1="422" y1="290" x2="322" y2="282" stroke="#0C1222" strokeWidth="2.5"/>
+        <rect x="140" y="390" width="232" height="24" rx="12" fill="#EF4444"/>
+        <circle cx="256" cy="414" r="18" fill="#FCD34D" stroke="#D97706" strokeWidth="2"/>
       </svg>
     </div>
   );
@@ -47,7 +58,7 @@ export default function Register() {
         display_name: displayName || undefined,
       });
       // Auto-login after registration
-      await login.mutateAsync({ email, password });
+      await login.mutateAsync({ identifier: email, password });
       navigate("/");
     } catch (err: unknown) {
       const isConflict = err instanceof Error && err.message.includes("409");

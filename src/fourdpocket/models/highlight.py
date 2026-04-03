@@ -1,10 +1,16 @@
 """Highlight and annotation models."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import DateTime
 from sqlmodel import JSON, Column, Field, SQLModel
+
+from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class Highlight(SQLModel, table=True):
@@ -18,6 +24,6 @@ class Highlight(SQLModel, table=True):
     color: str = Field(default="yellow")  # yellow, green, blue, red, purple
     position: dict | None = Field(default=None, sa_column=Column(JSON))  # Page position info
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

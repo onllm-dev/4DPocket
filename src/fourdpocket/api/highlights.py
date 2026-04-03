@@ -1,6 +1,8 @@
 """Highlights & annotations endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/highlights", tags=["highlights"])
 
 
 class HighlightCreate(BaseModel):
-    item_id: str
+    item_id: uuid.UUID
     text: str
     note: str | None = None
     color: str = "yellow"
@@ -26,26 +28,26 @@ class HighlightUpdate(BaseModel):
 
 @router.get("")
 def list_highlights(
-    item_id: str | None = None,
+    item_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List all highlights, optionally filtered by item."""
-    query = select(Highlight).where(Highlight.user_id == user.id)
+    query = select(Highlight).where(Highlight.user_id == current_user.id)
     if item_id:
         query = query.where(Highlight.item_id == item_id)
     query = query.order_by(Highlight.created_at.desc())
     return db.exec(query).all()
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_highlight(
     body: HighlightCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     highlight = Highlight(
-        user_id=user.id,
+        user_id=current_user.id,
         item_id=body.item_id,
         text=body.text,
         note=body.note,
@@ -60,14 +62,14 @@ def create_highlight(
 
 @router.patch("/{highlight_id}")
 def update_highlight(
-    highlight_id: str,
+    highlight_id: uuid.UUID,
     body: HighlightUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == user.id)).first()
+    h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == current_user.id)).first()
     if not h:
-        raise HTTPException(404)
+        raise HTTPException(status_code=404, detail="Highlight not found")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(h, field, value)
     db.commit()
@@ -75,15 +77,15 @@ def update_highlight(
     return h
 
 
-@router.delete("/{highlight_id}", status_code=204)
+@router.delete("/{highlight_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_highlight(
-    highlight_id: str,
+    highlight_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == user.id)).first()
+    h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == current_user.id)).first()
     if not h:
-        raise HTTPException(404)
+        raise HTTPException(status_code=404, detail="Highlight not found")
     db.delete(h)
     db.commit()
 
@@ -92,11 +94,11 @@ def delete_highlight(
 def search_highlights(
     q: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Search within highlights text and notes."""
     query = select(Highlight).where(
-        Highlight.user_id == user.id,
+        Highlight.user_id == current_user.id,
         (Highlight.text.contains(q)) | (Highlight.note.contains(q)),
     )
     return db.exec(query).all()

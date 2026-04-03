@@ -6,6 +6,16 @@ from pathlib import Path
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Load .env file into os.environ so nested settings classes pick up the values.
+# Skip during pytest to avoid .env values interfering with test expectations.
+import sys as _sys
+if "pytest" not in _sys.modules:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=False)
+    except ImportError:
+        pass
+
 
 def _get_or_create_secret_key() -> str:
     """Get secret key from env, file, or generate and persist one."""
@@ -59,17 +69,23 @@ class SearchSettings(BaseSettings):
 class AISettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_AI__")
 
-    chat_provider: str = "ollama"  # "ollama", "groq", "nvidia"
+    chat_provider: str = "ollama"  # "ollama", "groq", "nvidia", "custom"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     groq_api_key: str = ""
     nvidia_api_key: str = ""
+    # Custom provider (any OpenAI-compatible or Anthropic-compatible endpoint)
+    custom_base_url: str = ""
+    custom_api_key: str = ""
+    custom_model: str = ""
+    custom_api_type: str = "openai"  # "openai" or "anthropic"
     embedding_provider: str = "local"  # "local" or "nvidia"
     embedding_model: str = "all-MiniLM-L6-v2"
     auto_tag: bool = True
     auto_summarize: bool = True
     tag_confidence_threshold: float = 0.7
     tag_suggestion_threshold: float = 0.4
+    sync_enrichment: bool = False  # Set True in .env to run AI inline if Huey not running
 
 
 class ServerSettings(BaseSettings):

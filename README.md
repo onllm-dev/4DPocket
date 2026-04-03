@@ -81,7 +81,8 @@ The brain of 4DPocket - what transforms it from a link saver into a knowledge ba
 - **Smart Tag Hierarchy** - Tags auto-organize into parent-child trees. `python` nests under `programming/python`, `react` under `frontend/react`.
 - **Auto-Summarization** - Every saved item gets a 2-3 sentence AI summary.
 - **Related Items** - The moment you save something, 4DPocket shows you what's related in your library using semantic similarity (0.5 weight), shared tags (0.3), and same-source analysis (0.2).
-- **Multi-Provider AI** - Works with Ollama (local), Groq, or NVIDIA APIs. No vendor lock-in.
+- **Multi-Provider AI** - Works with Ollama (local), Groq, NVIDIA, or any OpenAI/Anthropic-compatible API (MiniMax, Together, Fireworks, OpenRouter, etc.). No vendor lock-in.
+- **Sync Enrichment** - AI enriches items inline when saved, even without a background worker running. Tags + summaries appear immediately.
 - **Prompt Injection Protection** - All user content is sanitized before reaching AI models. XML delimiters isolate user data from system instructions.
 
 ### Powerful Search
@@ -106,6 +107,7 @@ Every user gets their own isolated pocket. Knowledge is private by default, shar
 - **User Management** - List, activate/deactivate, change roles for all users.
 - **Registration Control** - Toggle registration on/off, set mode (open/invite/disabled).
 - **Instance Settings** - Configure instance name, default user role, max users.
+- **AI Configuration** - Change AI provider, API keys, model, base URL from the admin panel. Admin settings override .env values at runtime.
 
 ### Automation Rules
 
@@ -176,7 +178,7 @@ Open http://localhost:4040
 | **Database** | SQLite (default) / PostgreSQL |
 | **Search** | SQLite FTS5 (default) / Meilisearch |
 | **Vector DB** | ChromaDB (in-process) |
-| **AI** | Ollama / Groq / NVIDIA (OpenAI-compatible) |
+| **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) |
 | **Embeddings** | sentence-transformers (local) / NVIDIA nv-embed-v1 |
 | **Background Jobs** | Huey (SQLite backend) |
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS v4 |
@@ -188,7 +190,7 @@ Open http://localhost:4040
 All config via environment variables with `FDP_` prefix. See [`.env.example`](.env.example) for all options.
 
 ```bash
-# AI Provider: "ollama", "groq", or "nvidia"
+# AI Provider: "ollama", "groq", "nvidia", or "custom"
 FDP_AI__CHAT_PROVIDER=ollama
 
 # Search Backend: "sqlite" (zero-config) or "meilisearch"

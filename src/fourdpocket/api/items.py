@@ -1,5 +1,6 @@
 """Knowledge item CRUD endpoints."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
@@ -16,7 +17,93 @@ from fourdpocket.models.item import ItemCreate, ItemRead, ItemUpdate, KnowledgeI
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/items", tags=["items"])
+
+
+def _try_sync_enrich(item: KnowledgeItem, db: Session, user_id: uuid.UUID) -> None:
+    """Run lightweight synchronous AI enrichment (tagging + summarization).
+
+    Skips if:
+    - sync_enrichment is disabled in config
+    - item already has AI-generated tags (avoids duplicate enrichment)
+    - AI provider is not configured
+    """
+    from fourdpocket.ai.factory import get_resolved_ai_config
+
+    config = get_resolved_ai_config()
+    if not config.get("sync_enrichment", True):
+        return
+
+    # Skip if item already has tags (Huey may have already processed it)
+    existing_tags = db.exec(
+        select(ItemTag).where(ItemTag.item_id == item.id)
+    ).first()
+    if existing_tags:
+        return
+
+    # For URL items without content yet, run the processor synchronously first
+    if item.url and not item.content:
+        try:
+            import asyncio
+
+            from fourdpocket.processors.registry import match_processor
+
+            processor = match_processor(item.url)
+            result = asyncio.run(processor.process(item.url))
+
+            # Only overwrite title/description if user didn't provide them
+            if result.title and not item.title:
+                item.title = result.title
+            if result.description and not item.description:
+                item.description = result.description
+            if result.content:
+                item.content = result.content
+            if result.raw_content:
+                item.raw_content = result.raw_content
+            if result.media:
+                item.media = list(result.media)
+            if result.metadata:
+                item.item_metadata = {**(item.item_metadata or {}), **result.metadata}
+
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+        except Exception as e:
+            logger.warning("Sync processor failed for item %s: %s", item.id, e)
+
+    # Now run tagging + summarization (skip embedding - too heavy for sync)
+    try:
+        from fourdpocket.ai.sanitizer import sanitize_for_prompt
+        from fourdpocket.ai.tagger import auto_tag_item
+
+        auto_tag_item(
+            item_id=item.id,
+            user_id=user_id,
+            title=sanitize_for_prompt(item.title or "", max_length=2000),
+            content=sanitize_for_prompt(item.content or "", max_length=4000),
+            description=sanitize_for_prompt(item.description or "", max_length=1000),
+            db=db,
+        )
+    except Exception as e:
+        logger.warning("Sync tagging failed for item %s: %s", item.id, e)
+
+    try:
+        from fourdpocket.ai.summarizer import summarize_item
+
+        summarize_item(item.id, db)
+    except Exception as e:
+        logger.warning("Sync summarization failed for item %s: %s", item.id, e)
+
+    # Re-index with enriched content
+    try:
+        from fourdpocket.search.indexer import SearchIndexer
+
+        indexer = SearchIndexer(db)
+        indexer.index_item(item)
+    except Exception:
+        pass
 
 
 def _detect_platform(url: str) -> SourcePlatform:
@@ -98,7 +185,7 @@ def create_item(
     except Exception:
         pass  # Rules are best-effort
 
-    # Dispatch background processing workers
+    # Dispatch background processing workers (full pipeline with embeddings)
     try:
         if item.url:
             from fourdpocket.workers.fetcher import fetch_and_process_url
@@ -110,6 +197,11 @@ def create_item(
             enrich_item(str(item.id), str(current_user.id))
     except Exception:
         pass  # Worker dispatch is best-effort
+
+    # Sync enrichment fallback: run processor + tagging + summarization inline
+    # This ensures items get AI-enriched even when Huey worker is not running.
+    # Skips if item already has tags (idempotent guard against Huey double-processing).
+    _try_sync_enrich(item, db, current_user.id)
 
     return item
 

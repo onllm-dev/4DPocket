@@ -10,9 +10,8 @@ from pydantic import BaseModel, field_validator
 from sqlmodel import Session, func, select
 
 from fourdpocket.api.auth_utils import create_access_token, hash_password, verify_password
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, get_or_create_settings
 from fourdpocket.models.base import UserRole
-from fourdpocket.models.instance_settings import InstanceSettings
 from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -39,21 +38,11 @@ def _check_register_rate_limit(client_ip: str) -> None:
     _register_attempts[client_ip] = attempts
 
 
-def _get_or_create_settings(db: Session) -> InstanceSettings:
-    settings = db.get(InstanceSettings, 1)
-    if not settings:
-        settings = InstanceSettings(id=1)
-        db.add(settings)
-        db.commit()
-        db.refresh(settings)
-    return settings
-
-
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
     _check_register_rate_limit(request.client.host if request.client else "unknown")
     # Check instance registration settings
-    settings = _get_or_create_settings(db)
+    settings = get_or_create_settings(db)
     if not settings.registration_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -110,11 +99,19 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    email = form_data.username
+    identifier = form_data.username  # Can be email or username
     now = time.time()
 
+    # Resolve user by email or username
+    user = db.exec(
+        select(User).where((User.email == identifier) | (User.username == identifier))
+    ).first()
+
+    # Use canonical email as rate-limit key (prevents bypass via alternating identifiers)
+    rate_key = user.email if user else identifier
+
     # Check lockout status
-    attempts = _failed_login_attempts[email]
+    attempts = _failed_login_attempts[rate_key]
     if attempts["locked_until"] > now:
         remaining = int(attempts["locked_until"] - now)
         raise HTTPException(
@@ -125,7 +122,6 @@ def login(
             ),
         )
 
-    user = db.exec(select(User).where(User.email == email)).first()
     if not user or not verify_password(form_data.password, user.password_hash):
         # Record failed attempt
         attempts["count"] += 1
@@ -143,9 +139,8 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Reset failed attempts on success
-    attempts["count"] = 0
-    attempts["locked_until"] = 0.0
+    # Reset failed attempts on success (using canonical key)
+    _failed_login_attempts[rate_key] = {"count": 0, "locked_until": 0.0}
 
     access_token = create_access_token(user.id)
 

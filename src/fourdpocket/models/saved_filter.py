@@ -1,10 +1,16 @@
 """Saved search filter model."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import DateTime
 from sqlmodel import JSON, Column, Field, SQLModel
+
+from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class SavedFilter(SQLModel, table=True):
@@ -16,6 +22,6 @@ class SavedFilter(SQLModel, table=True):
     query: str  # Search query text
     filters: dict = Field(default_factory=dict, sa_column=Column(JSON))  # {source_platform, item_type, tags, etc.}
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

@@ -39,7 +39,6 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: React.ReactNode }[] = 
   { value: "list", label: "List", icon: <List className="h-4 w-4" /> },
 ];
 
-const AI_PROVIDERS = ["openai", "anthropic", "ollama", "groq"];
 const SHARE_MODES = ["private", "public"];
 
 export default function Settings() {
@@ -139,30 +138,6 @@ export default function Settings() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                  AI Provider
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                  Backend model provider
-                </p>
-              </div>
-              <select
-                value={settings?.ai_provider ?? ""}
-                onChange={(e) =>
-                  updateSettings.mutate({ ai_provider: e.target.value })
-                }
-                className="text-sm bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 rounded-lg border-none outline-none cursor-pointer"
-              >
-                {AI_PROVIDERS.map((p) => (
-                  <option key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
               <div>
                 <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
                   Auto-tag

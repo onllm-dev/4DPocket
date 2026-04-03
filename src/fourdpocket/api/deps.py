@@ -84,3 +84,15 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
+
+
+def get_or_create_settings(db: Session) -> "InstanceSettings":
+    from fourdpocket.models.instance_settings import InstanceSettings
+
+    settings = db.get(InstanceSettings, 1)
+    if not settings:
+        settings = InstanceSettings(id=1)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
