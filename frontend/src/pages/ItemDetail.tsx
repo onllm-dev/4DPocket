@@ -446,9 +446,7 @@ export default function ItemDetail() {
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
   const thumbnail = thumbMedia?.local_path
     ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
-    : thumbMedia?.url
-    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbMedia.url!)}`
-    : undefined;
+    : thumbMedia?.url || undefined;
   const tags = itemTags ?? [];
   const isYouTube = item.source_platform.toLowerCase() === "youtube";
   const metadata = item.item_metadata ?? {};

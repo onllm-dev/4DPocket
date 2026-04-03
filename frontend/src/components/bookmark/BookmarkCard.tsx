@@ -25,9 +25,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
   const thumbnail = thumbMedia?.local_path
     ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
-    : thumbMedia?.url
-    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbMedia.url)}`
-    : undefined;
+    : thumbMedia?.url || undefined;
 
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
