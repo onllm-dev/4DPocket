@@ -20,17 +20,7 @@ import { useToggleReadingList, useMarkAsRead } from "@/hooks/use-reading-list";
 import { useHighlights } from "@/hooks/use-highlights";
 import TextHighlighter from "@/components/content/TextHighlighter";
 import ContentRenderer from "@/components/content/ContentRenderer";
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
-}
+import { timeAgo } from "@/lib/utils";
 
 export default function NoteDetail() {
   const { id } = useParams<{ id: string }>();
@@ -105,6 +95,7 @@ export default function NoteDetail() {
             onClick={() => updateNote.mutate({ id: note.id, is_favorite: !note.is_favorite })}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title={note.is_favorite ? "Unfavorite" : "Favorite"}
+            aria-label={note.is_favorite ? "Unfavorite" : "Favorite"}
           >
             <Star className={`w-4 h-4 ${note.is_favorite ? "fill-yellow-400 text-yellow-400" : "text-gray-400"}`} />
           </button>
@@ -112,6 +103,7 @@ export default function NoteDetail() {
             onClick={() => updateNote.mutate({ id: note.id, is_archived: !note.is_archived })}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title={note.is_archived ? "Unarchive" : "Archive"}
+            aria-label={note.is_archived ? "Unarchive" : "Archive"}
           >
             <Archive className={`w-4 h-4 ${note.is_archived ? "text-sky-500" : "text-gray-400"}`} />
           </button>
@@ -119,6 +111,7 @@ export default function NoteDetail() {
             onClick={() => toggleReadingList.mutate({ id: note.id, type: "note", add: !isOnReadingList })}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title={isOnReadingList ? "Remove from Reading List" : "Add to Reading List"}
+            aria-label={isOnReadingList ? "Remove from Reading List" : "Add to Reading List"}
           >
             <BookOpen className={`w-4 h-4 ${isOnReadingList ? "text-sky-500" : "text-gray-400"}`} />
           </button>
@@ -126,6 +119,7 @@ export default function NoteDetail() {
             onClick={() => setShowCollections(!showCollections)}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title="Add to Collection"
+            aria-label="Add to Collection"
           >
             <FolderPlus className="w-4 h-4 text-gray-400" />
           </button>
@@ -133,6 +127,7 @@ export default function NoteDetail() {
             onClick={() => navigate(`/notes?edit=${note.id}`)}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             title="Edit"
+            aria-label="Edit"
           >
             <Pencil className="w-4 h-4 text-gray-400" />
           </button>
@@ -150,6 +145,7 @@ export default function NoteDetail() {
               onClick={() => setConfirmDelete(true)}
               className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
               title="Delete"
+              aria-label="Delete"
             >
               <Trash2 className="w-4 h-4 text-gray-400" />
             </button>

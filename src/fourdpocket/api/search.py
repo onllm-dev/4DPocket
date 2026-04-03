@@ -13,7 +13,7 @@ from fourdpocket.search.indexer import SearchIndexer
 router = APIRouter(prefix="/search", tags=["search"])
 
 
-@router.get("", response_model=list[ItemRead])
+@router.get("")
 def search_items(
     q: str = Query(..., min_length=1),
     db: Session = Depends(get_db),
@@ -46,9 +46,18 @@ def search_items(
         )
     ).all()
 
-    # Preserve search result ordering
+    # Preserve search result ordering and attach snippets
     item_map = {item.id: item for item in items}
-    return [item_map[iid] for iid in item_ids if iid in item_map]
+    snippet_map = {r["item_id"]: r for r in results}
+    response = []
+    for iid in item_ids:
+        if iid in item_map:
+            item_dict = ItemRead.model_validate(item_map[iid]).model_dump()
+            fts_result = snippet_map.get(str(iid), {})
+            item_dict["title_snippet"] = fts_result.get("title_snippet")
+            item_dict["content_snippet"] = fts_result.get("content_snippet")
+            response.append(item_dict)
+    return response
 
 
 @router.get("/semantic", response_model=list[ItemRead])

@@ -22,6 +22,8 @@ interface Item {
   is_archived: boolean;
   created_at: string;
   updated_at: string;
+  title_snippet?: string | null;
+  content_snippet?: string | null;
 }
 
 interface SearchFilters {
@@ -284,7 +286,15 @@ export default function Search() {
           {items.length > 0 && (
             <div className="flex flex-col gap-3">
               {items.map((item) => (
-                <BookmarkCard key={item.id} item={item} variant="list" />
+                <div key={item.id}>
+                  <BookmarkCard item={item} variant="list" />
+                  {item.content_snippet && (
+                    <p
+                      className="mt-1 ml-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_mark]:rounded-sm [&_mark]:px-0.5"
+                      dangerouslySetInnerHTML={{ __html: item.content_snippet }}
+                    />
+                  )}
+                </div>
               ))}
             </div>
           )}

@@ -17,18 +17,28 @@ interface Stats {
 }
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery<Stats>({
     queryKey: ["stats"],
     queryFn: () => api.get("/api/v1/stats"),
   });
 
-  const { data, isLoading: itemsLoading } = useItems();
+  const { data, isLoading: itemsLoading, isError: itemsError } = useItems();
 
   const [visibleCount, setVisibleCount] = useState(8);
   const allItems = data?.pages.flat() ?? [];
   const recentItems = allItems.slice(0, visibleCount);
   const hasMore = allItems.length > visibleCount;
   const totalItems = stats?.total_items ?? 0;
+
+  if (statsError || itemsError) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+          Failed to load dashboard data. Please try refreshing the page.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto space-y-8">

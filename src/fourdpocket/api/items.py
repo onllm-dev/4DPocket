@@ -9,7 +9,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Session, col, select
 from sqlmodel import delete as sql_delete
 
@@ -22,6 +22,28 @@ from fourdpocket.models.user import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/items", tags=["items"])
+
+
+def _is_safe_proxy_url(url: str) -> bool:
+    """Validate URL is safe for server-side fetching (no internal networks)."""
+    import ipaddress
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    hostname = parsed.hostname or ""
+    if hostname in ("localhost", ""):
+        return False
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            return False
+    except ValueError:
+        # hostname is not an IP, check for common internal patterns
+        if hostname.endswith(".local") or hostname.endswith(".internal"):
+            return False
+    return True
 
 
 def _try_sync_enrich(item: KnowledgeItem, db: Session, user_id: uuid.UUID) -> None:
@@ -616,6 +638,13 @@ class BulkActionRequest(BaseModel):
     tag_id: uuid.UUID | None = None
     tag_name: str | None = None
 
+    @field_validator("item_ids")
+    @classmethod
+    def validate_item_ids(cls, v: list[uuid.UUID]) -> list[uuid.UUID]:
+        if len(v) > 500:
+            raise ValueError("Maximum 500 items per bulk action")
+        return v
+
 
 @router.post("/bulk")
 def bulk_action(
@@ -725,6 +754,7 @@ def media_proxy(
     item_id: uuid.UUID,
     url: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Proxy and cache images for an item (no auth required).
@@ -740,10 +770,16 @@ def media_proxy(
     from fourdpocket.storage.local import LocalStorage
 
     item = db.exec(
-        select(KnowledgeItem).where(KnowledgeItem.id == item_id)
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id,
+            KnowledgeItem.user_id == current_user.id,
+        )
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    if not _is_safe_proxy_url(url):
+        raise HTTPException(status_code=400, detail="URL not allowed")
 
     settings = get_settings()
     storage = LocalStorage(base_path=settings.storage.base_path)
@@ -777,7 +813,8 @@ def media_proxy(
             resp = client.get(url, headers=headers)
             resp.raise_for_status()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")
+        logger.warning("Media proxy fetch failed for %s: %s", url, e)
+        raise HTTPException(status_code=502, detail="Failed to fetch image")
 
     # Detect correct extension from response content-type
     resp_ct = resp.headers.get("content-type", "").split(";")[0].strip()

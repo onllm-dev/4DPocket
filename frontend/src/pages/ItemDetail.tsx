@@ -529,6 +529,7 @@ export default function ItemDetail() {
   const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
   const { data: collections } = useCollections();
   const addToCollection = useAddItemToCollection();
@@ -653,7 +654,6 @@ export default function ItemDetail() {
   );
 
   const handleDelete = async () => {
-    if (!confirm("Delete this item?")) return;
     await deleteItem.mutateAsync(item.id);
     navigate(-1);
   };
@@ -712,9 +712,20 @@ export default function ItemDetail() {
             <Share2 className="h-4 w-4" />
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
-          <button onClick={handleDelete} aria-label="Delete" className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {confirmDelete ? (
+            <div className="flex items-center gap-1 ml-1">
+              <button onClick={handleDelete} aria-label="Confirm delete" className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 transition-all duration-200 cursor-pointer">
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={() => setConfirmDelete(false)} aria-label="Cancel delete" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-all duration-200 cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} aria-label="Delete" className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 

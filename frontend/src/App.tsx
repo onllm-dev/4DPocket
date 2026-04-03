@@ -77,6 +77,18 @@ export default function App() {
 
       {/* Public share route - no auth required */}
       <Route path="/public/:token" element={<SuspenseWrap><PublicShare /></SuspenseWrap>} />
+
+      <Route path="*" element={
+        <SuspenseWrap>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
+            <h1 className="text-6xl font-bold text-gray-300 dark:text-gray-700 mb-4">404</h1>
+            <p className="text-lg text-gray-500 dark:text-gray-400 mb-6">Page not found</p>
+            <a href="/" className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors">
+              Go to Dashboard
+            </a>
+          </div>
+        </SuspenseWrap>
+      } />
     </Routes>
   );
 }

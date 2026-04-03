@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -37,6 +37,8 @@ class HighlightUpdate(BaseModel):
 def list_highlights(
     item_id: uuid.UUID | None = None,
     note_id: uuid.UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -46,7 +48,7 @@ def list_highlights(
         query = query.where(Highlight.item_id == item_id)
     if note_id:
         query = query.where(Highlight.note_id == note_id)
-    query = query.order_by(Highlight.created_at.desc())
+    query = query.order_by(Highlight.created_at.desc()).limit(limit).offset(offset)
     return db.exec(query).all()
 
 
@@ -103,7 +105,9 @@ def delete_highlight(
 
 @router.get("/search")
 def search_highlights(
-    q: str,
+    q: str = Query(..., min_length=2),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -111,5 +115,5 @@ def search_highlights(
     query = select(Highlight).where(
         Highlight.user_id == current_user.id,
         (Highlight.text.contains(q)) | (Highlight.note.contains(q)),
-    )
+    ).limit(limit).offset(offset)
     return db.exec(query).all()

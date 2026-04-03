@@ -34,7 +34,13 @@ class LocalStorage:
         data: bytes,
     ) -> str:
         """Save a file and return its relative path."""
-        file_path = self._user_path(user_id, category) / filename
+        safe_name = Path(filename).name  # Strip directory components
+        if not safe_name or safe_name.startswith('.'):
+            raise ValueError("Invalid filename")
+        base = self._user_path(user_id, category)
+        file_path = (base / safe_name).resolve()
+        if not str(file_path).startswith(str(base.resolve())):
+            raise PermissionError("Path traversal detected")
         file_path.write_bytes(data)
         return str(file_path.relative_to(self._base))
 

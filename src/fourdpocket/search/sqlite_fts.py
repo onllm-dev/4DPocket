@@ -1,6 +1,7 @@
 """SQLite FTS5 full-text search backend."""
 
 import logging
+import re
 import uuid
 
 from sqlalchemy import text
@@ -16,6 +17,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
     item_id UNINDEXED,
     user_id UNINDEXED,
     title,
+    url,
     description,
     content,
     source_platform UNINDEXED,
@@ -24,11 +26,46 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
 );
 """
 
+NOTES_FTS_CREATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    note_id UNINDEXED,
+    user_id UNINDEXED,
+    title,
+    content,
+    tokenize='porter unicode61'
+);
+"""
+
 
 def init_fts(db: Session) -> None:
     """Create FTS5 virtual table if it doesn't exist."""
+    # Check if url column exists in the FTS table; if not, drop and recreate
+    try:
+        db.exec(text("SELECT url FROM items_fts LIMIT 0"))
+    except Exception:
+        # Schema changed - drop and recreate
+        db.exec(text("DROP TABLE IF EXISTS items_fts"))
+        db.commit()
     db.exec(text(FTS_CREATE))
     db.commit()
+
+
+def init_notes_fts(db: Session) -> None:
+    """Create notes FTS5 virtual table if it doesn't exist."""
+    db.exec(text(NOTES_FTS_CREATE))
+    db.commit()
+
+
+def _build_fts_query(query: str) -> str | None:
+    """Sanitize query and build FTS5 token query with prefix matching."""
+    safe_query = re.sub(r'[*+\-"^{}()\[\]:.]', ' ', query)
+    safe_query = re.sub(r'\b(AND|OR|NOT|NEAR)\b', '', safe_query, flags=re.IGNORECASE)
+    safe_query = ' '.join(safe_query.split())
+    tokens = safe_query.split()
+    if not tokens:
+        return None
+    # Each token gets prefix matching (word*), joined with implicit AND
+    return " ".join(f'"{t}"*' for t in tokens)
 
 
 def index_item(db: Session, item: KnowledgeItem) -> None:
@@ -41,18 +78,42 @@ def index_item(db: Session, item: KnowledgeItem) -> None:
 
     db.exec(
         text(
-            "INSERT INTO items_fts (item_id, user_id, title, description, content, "
-            "source_platform, item_type) VALUES (:item_id, :user_id, :title, "
+            "INSERT INTO items_fts (item_id, user_id, title, url, description, content, "
+            "source_platform, item_type) VALUES (:item_id, :user_id, :title, :url, "
             ":description, :content, :source_platform, :item_type)"
         ),
         params={
             "item_id": str(item.id),
             "user_id": str(item.user_id),
             "title": item.title or "",
+            "url": item.url or "",
             "description": item.description or "",
             "content": (item.content or "")[:50000],  # cap content size
             "source_platform": item.source_platform.value if item.source_platform else "",
             "item_type": item.item_type.value if item.item_type else "",
+        },
+    )
+    db.commit()
+
+
+def index_note(db: Session, note) -> None:
+    """Index a note in FTS5."""
+    db.exec(
+        text("DELETE FROM notes_fts WHERE note_id = :note_id"),
+        params={"note_id": str(note.id)},
+    )
+    # Strip HTML tags for indexing
+    content = re.sub(r'<[^>]+>', ' ', note.content or '')
+    db.exec(
+        text(
+            "INSERT INTO notes_fts (note_id, user_id, title, content) "
+            "VALUES (:note_id, :user_id, :title, :content)"
+        ),
+        params={
+            "note_id": str(note.id),
+            "user_id": str(note.user_id),
+            "title": note.title or "",
+            "content": content[:50000],
         },
     )
     db.commit()
@@ -80,8 +141,9 @@ def search(
     if not query.strip():
         return []
 
-    # Escape FTS5 special characters
-    safe_query = query.replace('"', '""')
+    fts_query = _build_fts_query(query)
+    if not fts_query:
+        return []
 
     where_clauses = ["user_id = :user_id"]
     params: dict = {"user_id": str(user_id), "limit": limit, "offset": offset}
@@ -96,8 +158,9 @@ def search(
     where_sql = " AND ".join(where_clauses)
 
     sql = f"""
-        SELECT item_id, rank, snippet(items_fts, 2, '<mark>', '</mark>', '...', 32) as title_snippet,
-               snippet(items_fts, 4, '<mark>', '</mark>', '...', 64) as content_snippet
+        SELECT item_id, rank,
+               snippet(items_fts, 2, '<mark>', '</mark>', '...', 32) as title_snippet,
+               snippet(items_fts, 5, '<mark>', '</mark>', '...', 64) as content_snippet
         FROM items_fts
         WHERE items_fts MATCH :query AND {where_sql}
         ORDER BY rank
@@ -105,7 +168,7 @@ def search(
     """
 
     try:
-        result = db.exec(text(sql), params={"query": f'"{safe_query}"', **params})
+        result = db.exec(text(sql), params={"query": fts_query, **params})
         rows = result.all()
     except Exception as e:
         logger.warning("FTS5 search failed: %s", e)
@@ -120,3 +183,41 @@ def search(
         }
         for row in rows
     ]
+
+
+def search_notes(
+    db: Session,
+    query: str,
+    user_id: uuid.UUID,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    """Search notes using FTS5."""
+    if not query.strip():
+        return []
+
+    fts_query = _build_fts_query(query)
+    if not fts_query:
+        return []
+
+    sql = """
+        SELECT note_id, rank,
+               snippet(notes_fts, 2, '<mark>', '</mark>', '...', 32) as title_snippet,
+               snippet(notes_fts, 3, '<mark>', '</mark>', '...', 64) as content_snippet
+        FROM notes_fts
+        WHERE notes_fts MATCH :query AND user_id = :user_id
+        ORDER BY rank
+        LIMIT :limit OFFSET :offset
+    """
+    try:
+        result = db.exec(text(sql), params={
+            "query": fts_query, "user_id": str(user_id),
+            "limit": limit, "offset": offset,
+        })
+        return [
+            {"note_id": r[0], "rank": r[1], "title_snippet": r[2], "content_snippet": r[3]}
+            for r in result.all()
+        ]
+    except Exception as e:
+        logger.warning("Notes FTS5 search failed: %s", e)
+        return []

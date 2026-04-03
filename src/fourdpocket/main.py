@@ -26,10 +26,11 @@ async def lifespan(app: FastAPI):
     if settings.search.backend == "sqlite" and settings.database.url.startswith("sqlite"):
         from sqlmodel import Session
 
-        from fourdpocket.search.sqlite_fts import init_fts
+        from fourdpocket.search.sqlite_fts import init_fts, init_notes_fts
 
         with Session(get_engine()) as db:
             init_fts(db)
+            init_notes_fts(db)
 
     yield
 
@@ -57,6 +58,16 @@ app.add_middleware(
 
 app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
 app.add_middleware(RequestIDMiddleware)
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    return response
+
 
 # Mount frontend static files if build directory exists
 frontend_dist = Path("frontend/dist")

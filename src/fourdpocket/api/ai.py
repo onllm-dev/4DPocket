@@ -1,9 +1,12 @@
 """AI feature endpoints."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+
+logger = logging.getLogger(__name__)
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
@@ -309,9 +312,10 @@ def transcribe_audio(
             pass
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
     except Exception as e:
+        logger.exception("Transcription failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Transcription failed: {str(e)}",
+            detail="Transcription failed",
         )
 
     return {"text": transcript}

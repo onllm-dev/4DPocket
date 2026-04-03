@@ -1,9 +1,12 @@
 """Notes CRUD endpoints."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
@@ -37,6 +40,11 @@ def create_note(
     db.add(note)
     db.commit()
     db.refresh(note)
+    try:
+        from fourdpocket.search.sqlite_fts import index_note
+        index_note(db, note)
+    except Exception:
+        pass  # Non-critical
     return note
 
 
@@ -65,7 +73,22 @@ def search_notes(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ):
-    """Full-text search in notes using SQL LIKE."""
+    """Search notes using FTS5 full-text search with LIKE fallback."""
+    from fourdpocket.config import get_settings
+    from fourdpocket.search.sqlite_fts import search_notes as fts_search_notes
+
+    settings = get_settings()
+    if settings.search.backend == "sqlite" and settings.database.url.startswith("sqlite"):
+        results = fts_search_notes(db, q, current_user.id, limit=limit, offset=offset)
+        if results:
+            note_ids = [uuid.UUID(r["note_id"]) for r in results]
+            notes = db.exec(
+                select(Note).where(Note.id.in_(note_ids), Note.user_id == current_user.id)
+            ).all()
+            note_map = {n.id: n for n in notes}
+            return [note_map[nid] for nid in note_ids if nid in note_map]
+
+    # Fallback to LIKE for non-SQLite backends or empty FTS results
     query = (
         select(Note)
         .where(
@@ -115,6 +138,12 @@ def update_note(
     # Handle tags if provided
     if tags is not None:
         _sync_note_tags(note.id, tags, current_user.id, db)
+
+    try:
+        from fourdpocket.search.sqlite_fts import index_note
+        index_note(db, note)
+    except Exception:
+        pass  # Non-critical
 
     return note
 
@@ -253,9 +282,10 @@ def summarize_note_endpoint(
             detail="AI summarizer not available",
         )
     except Exception as e:
+        logger.exception("Summarization failed for note %s: %s", note_id, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Summarization failed: {e}",
+            detail="Summarization failed",
         )
 
 
@@ -292,9 +322,10 @@ def generate_note_title(
             detail="AI title generator not available",
         )
     except Exception as e:
+        logger.exception("Title generation failed for note %s: %s", note_id, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Title generation failed: {e}",
+            detail="Title generation failed",
         )
 
 

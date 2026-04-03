@@ -53,13 +53,9 @@ def get_current_user(
             db.add(user)
             db.commit()
             db.refresh(user)
-            # In single-user mode auth is bypassed, but log the generated
-            # password once so it is accessible if multi-user mode is ever
-            # enabled on this instance.
             logger.info(
-                "Single-user admin created. email=%s password=%s",
+                "Single-user admin auto-created (email=%s). Auth is bypassed in single-user mode.",
                 _email,
-                _password,
             )
         if token is None:
             return user

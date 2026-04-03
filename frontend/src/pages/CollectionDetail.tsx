@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
-import { useItems } from "@/hooks/use-items";
+import { useSearch } from "@/hooks/use-items";
 import { useAddItemToCollection } from "@/hooks/use-collections";
 
 interface Collection {
@@ -22,7 +22,7 @@ export default function CollectionDetail() {
   const [showAddItems, setShowAddItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const addItem = useAddItemToCollection();
-  const { data: searchResults } = useItems(searchQuery.length >= 2 ? {} : {});
+  const { data: searchResults } = useSearch(searchQuery);
 
   const {
     data: collection,
@@ -133,9 +133,9 @@ export default function CollectionDetail() {
               autoFocus
             />
           </div>
-          {searchResults?.pages?.[0] && searchResults.pages[0].length > 0 && (
+          {searchResults && searchResults.length > 0 && (
             <div className="max-h-48 overflow-y-auto space-y-1">
-              {searchResults.pages[0].slice(0, 10).map((item) => (
+              {searchResults.slice(0, 10).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => {
