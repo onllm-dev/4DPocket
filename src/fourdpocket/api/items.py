@@ -721,6 +721,16 @@ def media_proxy(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")
 
+    # Detect correct extension from response content-type
+    resp_ct = resp.headers.get("content-type", "").split(";")[0].strip()
+    ct_ext_map = {
+        "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
+        "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico",
+    }
+    if resp_ct in ct_ext_map:
+        ext = ct_ext_map[resp_ct]
+        filename = f"{item_id}_{url_hash}.{ext}"
+
     # Save to local storage
     path = storage.save_file(uid, "media", filename, resp.content)
 
