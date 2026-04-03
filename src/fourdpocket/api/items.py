@@ -97,6 +97,19 @@ def create_item(
     except Exception:
         pass  # Rules are best-effort
 
+    # Dispatch background processing workers
+    try:
+        if item.url:
+            from fourdpocket.workers.fetcher import fetch_and_process_url
+            from fourdpocket.workers.screenshot import capture_screenshot
+            fetch_and_process_url(str(item.id), item.url, str(current_user.id))
+            capture_screenshot(str(item.id), item.url, str(current_user.id))
+        else:
+            from fourdpocket.workers.ai_enrichment import enrich_item
+            enrich_item(str(item.id), str(current_user.id))
+    except Exception:
+        pass  # Worker dispatch is best-effort
+
     return item
 
 

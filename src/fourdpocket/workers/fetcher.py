@@ -61,6 +61,26 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
             # Index for search
             indexer.index_item(item)
 
+            # Chain: AI enrichment (content now available)
+            try:
+                from fourdpocket.workers.ai_enrichment import enrich_item
+                enrich_item(item_id, user_id)
+            except Exception as chain_err:
+                logger.warning("Failed to chain enrich_item for %s: %s", item_id, chain_err)
+
+            # Chain: download media if processor found media URLs
+            try:
+                if result.media:
+                    media_urls = [
+                        {"url": m.get("url", ""), "type": m.get("type", "unknown"), "role": m.get("role", "")}
+                        for m in result.media if m.get("url")
+                    ]
+                    if media_urls:
+                        from fourdpocket.workers.media_downloader import download_media
+                        download_media(item_id, user_id, media_urls)
+            except Exception as chain_err:
+                logger.warning("Failed to chain download_media for %s: %s", item_id, chain_err)
+
             logger.info("Successfully processed item %s", item_id)
             return {"status": "success", "item_id": item_id}
 
