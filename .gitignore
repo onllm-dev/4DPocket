@@ -53,14 +53,9 @@ Thumbs.db
 Desktop.ini
 ._*
 
-# OMC / Claude
-.omc/state/
-.omc/logs/
-.omc/notepad.md
-.omc/prd.json
-.omc/progress.txt
-.omc/plans/
-.omc/research/
+# OMC / Claude / Playwright
+.omc/
+.playwright-mcp/
 design-system/
 
 # Build artifacts
