@@ -3,15 +3,14 @@ import io
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
-from fourdpocket.models.item import KnowledgeItem, ItemRead
-from fourdpocket.models.tag import Tag, ItemTag
-from fourdpocket.models.user import User
 from fourdpocket.models.base import ItemType, SourcePlatform
+from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.user import User
 
 router = APIRouter(tags=["import-export"])
 

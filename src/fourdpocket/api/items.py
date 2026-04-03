@@ -408,9 +408,8 @@ def get_reading_queue(
         select(KnowledgeItem).where(
             KnowledgeItem.user_id == user.id,
             KnowledgeItem.content.is_not(None),
-            not KnowledgeItem.is_archived,
-            (KnowledgeItem.reading_progress.is_(None))
-            | (KnowledgeItem.reading_progress < 100),
+            KnowledgeItem.is_archived == False,  # noqa: E712
+            KnowledgeItem.reading_progress < 100,
         ).order_by(KnowledgeItem.created_at.desc()).limit(50)
     ).all()
     return items

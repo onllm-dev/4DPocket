@@ -52,11 +52,10 @@ class GenericURLProcessor(BaseProcessor):
             doc = Document(raw_html)
             readable_title = doc.title()
             readable_content = doc.summary()
-            readable_short = doc.short_title()
+            doc.short_title()
         except Exception:
             readable_title = None
             readable_content = None
-            readable_short = None
 
         # Extract OG metadata
         og_meta = self._extract_og_metadata(raw_html)

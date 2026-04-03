@@ -1,6 +1,5 @@
 """PDF processor - full-text extraction via PyMuPDF."""
 
-import io
 import logging
 
 from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
@@ -93,7 +92,7 @@ class PDFProcessor(BaseProcessor):
         description = " | ".join(description_parts)
 
         # Generate summary from first 500 chars
-        summary_text = full_text[:500] + "..." if full_text and len(full_text) > 500 else full_text
+        full_text[:500] + "..." if full_text and len(full_text) > 500 else full_text
 
         return ProcessorResult(
             title=title,

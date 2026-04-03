@@ -1,6 +1,5 @@
 """Instagram processor - extract posts via instaloader."""
 
-import json
 import logging
 import re
 
@@ -40,7 +39,7 @@ class InstagramProcessor(BaseProcessor):
         try:
             import instaloader
 
-            L = instaloader.Instaloader(
+            loader = instaloader.Instaloader(  # noqa: N806
                 download_pictures=False,
                 download_videos=False,
                 download_video_thumbnails=False,
@@ -51,7 +50,7 @@ class InstagramProcessor(BaseProcessor):
                 quiet=True,
             )
 
-            post = instaloader.Post.from_shortcode(L.context, shortcode)
+            post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
             caption = post.caption or ""
             owner = post.owner_username

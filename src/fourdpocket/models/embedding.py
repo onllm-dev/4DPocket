@@ -5,9 +5,9 @@ import uuid
 from sqlmodel import Column, Field, SQLModel
 
 try:
-    from sqlalchemy import LargeBinary, Text
+    from sqlalchemy import LargeBinary
 except ImportError:
-    from sqlmodel import LargeBinary, Text
+    from sqlmodel import LargeBinary
 
 
 class Embedding(SQLModel, table=True):

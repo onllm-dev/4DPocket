@@ -129,8 +129,8 @@ def detect_knowledge_gaps(
     user: User = Depends(get_current_user),
 ):
     """Detect potential knowledge gaps - topics with few items that could use more."""
-    from fourdpocket.models.tag import Tag, ItemTag
-    from collections import Counter
+
+    from fourdpocket.models.tag import Tag
 
     # Get all user's tags with counts
     tags = db.exec(select(Tag).where(Tag.user_id == user.id)).all()
@@ -182,7 +182,7 @@ def detect_stale_items(
     items = db.exec(
         select(KnowledgeItem).where(
             KnowledgeItem.user_id == user.id,
-            KnowledgeItem.is_archived == False,
+            KnowledgeItem.is_archived == False,  # noqa: E712
             KnowledgeItem.created_at < stale_threshold,
         ).order_by(KnowledgeItem.created_at.asc()).limit(50)
     ).all()
@@ -214,7 +214,6 @@ def find_cross_platform_connections(
     user: User = Depends(get_current_user),
 ):
     """Find items from different platforms that reference each other."""
-    from urllib.parse import urlparse
 
     items = db.exec(
         select(KnowledgeItem).where(

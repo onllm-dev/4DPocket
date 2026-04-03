@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select, col
+from sqlmodel import Session, col, select
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.item import KnowledgeItem

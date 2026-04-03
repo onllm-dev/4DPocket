@@ -4,7 +4,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from sqlmodel import Session, select, col
+from sqlmodel import Session, select
 
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.tag import ItemTag

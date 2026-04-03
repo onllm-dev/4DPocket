@@ -181,7 +181,7 @@ class GitHubProcessor(BaseProcessor):
                 except Exception:
                     pass
 
-        labels = [l.get("name", "") for l in data.get("labels", [])]
+        labels = [lbl.get("name", "") for lbl in data.get("labels", [])]
 
         content_parts = [data.get("body", "") or ""]
         if comments:

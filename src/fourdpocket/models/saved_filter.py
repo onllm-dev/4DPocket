@@ -2,7 +2,8 @@
 
 import uuid
 from datetime import datetime, timezone
-from sqlmodel import Field, SQLModel, Column, JSON
+
+from sqlmodel import JSON, Column, Field, SQLModel
 
 
 class SavedFilter(SQLModel, table=True):

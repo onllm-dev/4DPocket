@@ -23,7 +23,7 @@ def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
         .where(
             Share.item_id == item_id,
             ShareRecipient.user_id == user_id,
-            ShareRecipient.accepted == True,
+            ShareRecipient.accepted,
         )
     ).first()
     if shared:
@@ -47,7 +47,7 @@ def can_edit_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
             Share.item_id == item_id,
             ShareRecipient.user_id == user_id,
             ShareRecipient.role == ShareRecipientRole.editor,
-            ShareRecipient.accepted == True,
+            ShareRecipient.accepted,
         )
     ).first()
     return shared is not None
@@ -68,7 +68,7 @@ def can_view_collection(
         .where(
             Share.collection_id == collection_id,
             ShareRecipient.user_id == user_id,
-            ShareRecipient.accepted == True,
+            ShareRecipient.accepted,
         )
     ).first()
     return shared is not None

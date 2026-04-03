@@ -20,10 +20,7 @@ def archive_page(item_id: str, url: str, user_id: str) -> dict:
     2. Fall back to Playwright page.content() with inline resources
     3. Skip with warning if neither available
     """
-    from sqlmodel import Session
 
-    from fourdpocket.db.session import get_engine
-    from fourdpocket.models.item import KnowledgeItem
     from fourdpocket.storage.local import LocalStorage
 
     parsed = urlparse(url)

@@ -3,8 +3,6 @@
 import logging
 import uuid
 
-from fourdpocket.config import get_settings
-
 logger = logging.getLogger(__name__)
 
 _client = None

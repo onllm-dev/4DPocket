@@ -2,14 +2,14 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_db, require_admin
-from fourdpocket.models.user import User, UserRead
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.instance_settings import InstanceSettings
+from fourdpocket.models.user import User, UserRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

@@ -1,7 +1,6 @@
 """Parse search filter syntax into backend-specific expressions."""
 
 import re
-from datetime import datetime
 
 
 def parse_filters(filter_string: str) -> dict:

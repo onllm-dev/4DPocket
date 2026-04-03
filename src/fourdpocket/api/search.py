@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, col, func, select
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.item import ItemRead, KnowledgeItem
@@ -83,8 +83,8 @@ def get_search_filters(
     current_user: User = Depends(get_current_user),
 ):
     """Return available search filter facets."""
+    from fourdpocket.models.base import ItemType
     from fourdpocket.models.tag import Tag
-    from fourdpocket.models.base import ItemType, SourcePlatform
 
     platform_counts = db.exec(
         select(KnowledgeItem.source_platform, func.count()).where(

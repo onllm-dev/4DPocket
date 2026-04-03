@@ -4,14 +4,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, col, func, select
 
 from fourdpocket.api.deps import get_current_user, get_db
-from fourdpocket.models.item import KnowledgeItem
-from fourdpocket.models.tag import Tag, ItemTag
-from fourdpocket.models.note import Note
 from fourdpocket.models.collection import Collection
-from fourdpocket.models.user import User, UserRead
+from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.note import Note
+from fourdpocket.models.tag import Tag
+from fourdpocket.models.user import User
 
 router = APIRouter(tags=["stats"])
 

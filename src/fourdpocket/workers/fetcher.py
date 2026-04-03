@@ -30,12 +30,13 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
             logger.error("Item %s not found", item_id)
             return {"status": "error", "error": "Item not found"}
 
-        pipeline = ExtractionPipeline()
+        ExtractionPipeline()
         indexer = SearchIndexer(db)
 
         try:
-            from fourdpocket.processors.registry import match_processor
             import asyncio
+
+            from fourdpocket.processors.registry import match_processor
 
             processor = match_processor(url)
             result = asyncio.run(processor.process(url))

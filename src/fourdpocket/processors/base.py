@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 import httpx
 from lxml import html as lxml_html
 
-
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
@@ -91,7 +90,7 @@ class BaseProcessor(ABC):
     ) -> httpx.Response:
         """Fetch a URL with proper headers and timeout."""
         if not _is_safe_url(url):
-            raise ValueError(f"URL blocked: targets internal network")
+            raise ValueError("URL blocked: targets internal network")
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (compatible; 4DPocket/0.1; "
