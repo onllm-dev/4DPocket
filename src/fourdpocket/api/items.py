@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, col, select
 from sqlmodel import delete as sql_delete
@@ -669,22 +670,23 @@ def download_item_video(
 def media_proxy(
     item_id: uuid.UUID,
     url: str,
-    current_user: Annotated[User, Depends(get_current_user)],
     db: Session = Depends(get_db),
 ):
     """
-    Proxy and cache images for an item.
-    Fetches the URL server-side, caches locally, then serves from cache.
-    Handles CORS-blocked and auth-protected URLs (e.g. LinkedIn, Twitter).
+    Proxy and cache images for an item (no auth required).
+    Item IDs are UUIDs (unguessable). Fetches the URL server-side,
+    caches locally, then serves from cache.
+    Handles CORS-blocked and hotlink-protected URLs (e.g. LinkedIn).
     """
+    import hashlib
+
+    import httpx
+
     from fourdpocket.config import get_settings
     from fourdpocket.storage.local import LocalStorage
-    import hashlib, httpx
 
     item = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.id == item_id, KnowledgeItem.user_id == current_user.id
-        )
+        select(KnowledgeItem).where(KnowledgeItem.id == item_id)
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -692,9 +694,12 @@ def media_proxy(
     settings = get_settings()
     storage = LocalStorage(base_path=settings.storage.base_path)
     url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
-    uid = current_user.id
-    ext = url.rsplit(".", 1)[-1].lower() if "." in url else "bin"
-    ext = ext[:10]
+    uid = item.user_id
+    # Extract extension from URL path only (not query/domain)
+    from urllib.parse import urlparse as _urlparse
+    _path = _urlparse(url).path
+    _parts = _path.rsplit(".", 1)
+    ext = _parts[-1].lower() if len(_parts) > 1 and len(_parts[-1]) <= 5 else "bin"
     filename = f"{item_id}_{url_hash}.{ext}"
     relative_path = f"{uid}/media/{filename}"
 

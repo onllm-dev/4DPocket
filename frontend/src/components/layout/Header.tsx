@@ -15,8 +15,8 @@ export function Header() {
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
 
   return (
-    <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 min-h-[60px]">
-      <div className="flex-1 max-w-xl relative">
+    <header className="flex items-center justify-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 min-h-[60px]">
+      <div className="flex-1 max-w-2xl relative">
         <Search
           size={16}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
