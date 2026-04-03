@@ -140,6 +140,10 @@ def download_video(url: str, output_dir: str, max_quality: str = "720") -> str |
     import subprocess
     from pathlib import Path
 
+    if not _is_safe_media_url(url):
+        logger.warning("SSRF blocked video download: %s", url)
+        return None
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_template = str(Path(output_dir) / "%(title)s.%(ext)s")
 

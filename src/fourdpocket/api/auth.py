@@ -16,9 +16,14 @@ from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# In-memory rate limiting for failed login attempts
-# Note: For production, persist to database
+# In-memory rate limiting for failed login attempts.
+# NOTE: For production multi-instance deployments, replace with a Redis- or
+# database-backed store so limits survive restarts and are shared across nodes.
 _failed_login_attempts: dict[str, dict] = defaultdict(lambda: {"count": 0, "locked_until": 0.0})
+
+# Constant-time padding: always run a password verification even when the user
+# does not exist, preventing timing side-channels that reveal registered emails.
+_DUMMY_HASH: str = hash_password("dummy-constant-time-padding-xT9qZ")
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATIONS = [5, 10, 20, 40, 80]  # Minutes for consecutive failures
 
@@ -121,6 +126,11 @@ def login(
                 f"Try again in {remaining} seconds."
             ),
         )
+
+    if not user:
+        # Always verify against a dummy hash to prevent timing attacks that
+        # reveal whether an email/username is registered.
+        verify_password(form_data.password, _DUMMY_HASH)
 
     if not user or not verify_password(form_data.password, user.password_hash):
         # Record failed attempt

@@ -6,6 +6,7 @@ import subprocess
 import uuid
 from urllib.parse import urlparse
 
+from fourdpocket.utils.ssrf import is_safe_url
 from fourdpocket.workers import huey
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ def archive_page(item_id: str, url: str, user_id: str) -> dict:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError(f"Invalid URL scheme: {parsed.scheme!r}")
+
+    if not is_safe_url(url):
+        return {"status": "blocked", "reason": "URL blocked by SSRF protection"}
 
     logger.info("Archiving page %s for item %s", url, item_id)
     storage = LocalStorage()

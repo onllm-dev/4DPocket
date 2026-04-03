@@ -76,6 +76,7 @@ def get_dashboard_stats(
 def get_public_profile(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     user = db.get(User, user_id)
     if not user or not user.is_active:

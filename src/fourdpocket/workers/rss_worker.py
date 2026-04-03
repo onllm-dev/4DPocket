@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rss_feed import RSSFeed
+from fourdpocket.utils.ssrf import is_safe_url
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,10 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
     """Fetch new entries from an RSS feed. Returns count of new items."""
     try:
         import xml.etree.ElementTree as ET
+
+        if not is_safe_url(feed.url):
+            logger.warning("SSRF blocked: RSS feed URL %s targets internal network", feed.url)
+            return 0
 
         resp = httpx.get(feed.url, timeout=15, follow_redirects=True)
         resp.raise_for_status()
@@ -43,6 +48,10 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
                 url = link_el.text or ""
 
             if not url:
+                continue
+
+            if not is_safe_url(url):
+                logger.warning("SSRF blocked: RSS entry URL %s targets internal network", url)
                 continue
 
             title = title_el.text if title_el is not None else url

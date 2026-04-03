@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -14,17 +15,27 @@ from fourdpocket.models.user import User
 router = APIRouter(prefix="/rules", tags=["rules"])
 
 
+class RuleCondition(BaseModel):
+    type: Literal["url_matches", "source_platform", "title_contains", "content_contains", "has_tag"]
+    value: str
+
+
+class RuleAction(BaseModel):
+    type: Literal["add_tag", "add_to_collection", "set_favorite", "archive"]
+    value: str | None = None
+
+
 class RuleCreate(BaseModel):
     name: str
-    condition: dict  # JSON condition object
-    action: dict     # JSON action object
+    condition: RuleCondition
+    action: RuleAction
     is_active: bool = True
 
 
 class RuleUpdate(BaseModel):
     name: str | None = None
-    condition: dict | None = None
-    action: dict | None = None
+    condition: RuleCondition | None = None
+    action: RuleAction | None = None
     is_active: bool | None = None
 
 

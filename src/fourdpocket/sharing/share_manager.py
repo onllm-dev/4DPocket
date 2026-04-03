@@ -38,7 +38,7 @@ def create_share(
         tag_id=tag_id,
     )
     if public:
-        share.public_token = secrets.token_urlsafe(32)
+        share.public_token = secrets.token_urlsafe(48)
     if expires_hours:
         share.expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_hours)
 

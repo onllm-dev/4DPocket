@@ -198,9 +198,14 @@ def create_item(
     except Exception:
         pass  # Worker dispatch is best-effort
 
-    # Sync enrichment fallback: run processor + tagging + summarization inline
+    # Sync enrichment fallback: run processor + tagging + summarization inline.
     # This ensures items get AI-enriched even when Huey worker is not running.
-    # Skips if item already has tags (idempotent guard against Huey double-processing).
+    # Defense-in-depth design: sync runs first for immediate UX responsiveness;
+    # Huey handles the full pipeline (including embeddings, which sync skips).
+    # Double-processing is safe: _try_sync_enrich checks for existing tags and
+    # returns early if tags are already present, making it idempotent. If Huey
+    # runs first and adds tags, sync enrichment skips. If sync runs first and
+    # adds tags, Huey's tagging step finds existing tags and skips.
     _try_sync_enrich(item, db, current_user.id)
 
     return item

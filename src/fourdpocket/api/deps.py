@@ -1,5 +1,7 @@
 """FastAPI dependency injection."""
 
+import logging
+import secrets
 import uuid
 
 from fastapi import Cookie, Depends, HTTPException, status
@@ -11,6 +13,8 @@ from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_session
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User
+
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -37,16 +41,26 @@ def get_current_user(
     if settings.auth.mode == "single":
         user = db.exec(select(User).where(User.role == UserRole.admin)).first()
         if user is None:
+            _password = secrets.token_urlsafe(32)
+            _email = f"admin-{secrets.token_hex(4)}@localhost"
             user = User(
-                email="admin@localhost",
+                email=_email,
                 username="admin",
-                password_hash=hash_password("admin"),
+                password_hash=hash_password(_password),
                 display_name="Admin",
                 role=UserRole.admin,
             )
             db.add(user)
             db.commit()
             db.refresh(user)
+            # In single-user mode auth is bypassed, but log the generated
+            # password once so it is accessible if multi-user mode is ever
+            # enabled on this instance.
+            logger.info(
+                "Single-user admin created. email=%s password=%s",
+                _email,
+                _password,
+            )
         if token is None:
             return user
 

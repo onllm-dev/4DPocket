@@ -42,14 +42,15 @@ app = FastAPI(
 )
 
 settings = get_settings()
-if "*" in settings.server.cors_origins:
+has_wildcard = "*" in settings.server.cors_origins
+if has_wildcard:
     logger.warning(
-        "CORS is configured with wildcard '*' - this is insecure for production deployments"
+        "CORS wildcard '*' detected - credentials disabled for security"
     )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.server.cors_origins,
-    allow_credentials=True,
+    allow_credentials=not has_wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )

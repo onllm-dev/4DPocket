@@ -307,11 +307,11 @@ _public_token_attempts: dict[str, list[float]] = {}
 
 
 def _check_public_rate_limit(client_ip: str) -> None:
-    """Rate limit public token access to 10 attempts per minute per IP."""
+    """Rate limit public token access to 5 attempts per minute per IP."""
     now = time.time()
     attempts = _public_token_attempts.get(client_ip, [])
     attempts = [t for t in attempts if now - t < 60]
-    if len(attempts) >= 10:
+    if len(attempts) >= 5:
         raise HTTPException(429, "Too many attempts. Try again later.")
     attempts.append(now)
     _public_token_attempts[client_ip] = attempts
