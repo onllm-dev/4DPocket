@@ -21,7 +21,6 @@ import {
   Repeat2,
   Pencil,
   FolderPlus,
-  BookOpen,
   LinkIcon,
   Plus,
   X,
@@ -35,7 +34,6 @@ import { api } from "@/api/client";
 import { useItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useCollections, useAddItemToCollection } from "@/hooks/use-collections";
 import { useItemLinks, useAddItemLink, useRemoveItemLink } from "@/hooks/use-item-links";
-import { useToggleReadingList } from "@/hooks/use-reading-list";
 import { formatDate } from "@/lib/utils";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
 import { EditBookmarkForm } from "@/components/bookmark/BookmarkForm";
@@ -373,7 +371,7 @@ export default function ItemDetail() {
   const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
   const { data: collections } = useCollections();
   const addToCollection = useAddItemToCollection();
-  const toggleReadingList = useToggleReadingList();
+
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   const { data: relatedItems } = useQuery<Array<{
@@ -545,9 +543,6 @@ export default function ItemDetail() {
           </button>
           <button onClick={() => setCollectionPickerOpen((p) => !p)} aria-label="Add to Collection" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <FolderPlus className="h-4 w-4" />
-          </button>
-          <button onClick={() => toggleReadingList.mutate({ id: item.id, type: "item", add: item.reading_status !== "reading_list" })} aria-label="Reading List" className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${item.reading_status === "reading_list" ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600" : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"}`}>
-            <BookOpen className="h-4 w-4" />
           </button>
           <button onClick={() => setShareOpen(true)} aria-label="Share" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <Share2 className="h-4 w-4" />
