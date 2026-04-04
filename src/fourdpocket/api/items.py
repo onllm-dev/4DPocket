@@ -176,7 +176,7 @@ def create_item(
         if existing:
             raise HTTPException(
                 409,
-                detail={"message": "You already saved this URL", "existing_id": str(existing.id)},
+                detail="You already saved this URL",
             )
 
     item = KnowledgeItem(

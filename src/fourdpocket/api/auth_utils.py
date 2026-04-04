@@ -8,6 +8,9 @@ import jwt
 
 from fourdpocket.config import get_settings
 
+# Hardcoded to prevent algorithm confusion attacks (e.g. "none" algorithm)
+_JWT_ALGORITHM = "HS256"
+
 
 def hash_password(password: str) -> str:
     password_bytes = password.encode("utf-8")
@@ -35,14 +38,14 @@ def create_access_token(user_id: uuid.UUID, expires_delta: timedelta | None = No
         "iat": now,
         "iss": "4dpocket",
     }
-    return jwt.encode(payload, settings.auth.secret_key, algorithm=settings.auth.algorithm)
+    return jwt.encode(payload, settings.auth.secret_key, algorithm=_JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict:
     settings = get_settings()
     try:
         payload = jwt.decode(
-            token, settings.auth.secret_key, algorithms=[settings.auth.algorithm]
+            token, settings.auth.secret_key, algorithms=[_JWT_ALGORITHM]
         )
         return payload
     except jwt.ExpiredSignatureError:

@@ -45,14 +45,16 @@ def _check_register_rate_limit(client_ip: str) -> None:
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
-    _check_register_rate_limit(request.client.host if request.client else "unknown")
-    # Check instance registration settings
+    # Check instance registration settings BEFORE rate limiting to prevent
+    # attackers from exhausting the rate limit when registration is disabled.
     settings = get_or_create_settings(db)
     if not settings.registration_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Registration is currently disabled",
         )
+
+    _check_register_rate_limit(request.client.host if request.client else "unknown")
 
     # Check max users
     if settings.max_users is not None:
@@ -163,7 +165,7 @@ def login(
         value=access_token,
         httponly=True,
         secure=is_secure,
-        samesite="lax",
+        samesite="strict",
         max_age=cookie_settings.auth.token_expire_minutes * 60,
     )
     return {"access_token": access_token, "token_type": "bearer"}

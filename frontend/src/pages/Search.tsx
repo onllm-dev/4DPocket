@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { api } from "@/api/client";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 import NoteCard from "@/components/bookmark/NoteCard";
@@ -291,7 +292,7 @@ export default function Search() {
                   {item.content_snippet && (
                     <p
                       className="mt-1 ml-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_mark]:rounded-sm [&_mark]:px-0.5"
-                      dangerouslySetInnerHTML={{ __html: item.content_snippet }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content_snippet, { ALLOWED_TAGS: ["mark"] }) }}
                     />
                   )}
                 </div>

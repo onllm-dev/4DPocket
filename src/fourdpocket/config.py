@@ -18,20 +18,32 @@ if "pytest" not in _sys.modules:
 
 
 def _get_or_create_secret_key() -> str:
-    """Get secret key from env, file, or generate and persist one."""
+    """Get secret key from env, file, or generate and persist one.
+
+    Uses file locking to prevent TOCTOU race conditions when multiple
+    processes start simultaneously.
+    """
+    import fcntl
     import os
 
     env_key = os.environ.get("FDP_AUTH__SECRET_KEY")
     if env_key:
         return env_key
-    key_file = Path.home() / ".4dpocket" / "secret_key"
-    if key_file.exists():
-        return key_file.read_text().strip()
-    key = secrets.token_urlsafe(32)
-    key_file.parent.mkdir(parents=True, exist_ok=True)
-    key_file.write_text(key)
-    key_file.chmod(0o600)  # Owner read/write only
-    return key
+    key_dir = Path.home() / ".4dpocket"
+    key_dir.mkdir(parents=True, exist_ok=True)
+    key_file = key_dir / "secret_key"
+    lock_file = key_dir / "secret_key.lock"
+    with open(lock_file, "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            if key_file.exists():
+                return key_file.read_text().strip()
+            key = secrets.token_urlsafe(32)
+            key_file.write_text(key)
+            key_file.chmod(0o600)  # Owner read/write only
+            return key
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
 
 
 class DatabaseSettings(BaseSettings):
@@ -45,7 +57,7 @@ class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_AUTH__")
 
     secret_key: str = Field(default_factory=_get_or_create_secret_key)
-    algorithm: str = "HS256"
+    algorithm: str = "HS256"  # Hardcoded in auth_utils — do not change
     token_expire_minutes: int = 10080  # 7 days
     mode: str = "single"  # "single" or "multi"
 

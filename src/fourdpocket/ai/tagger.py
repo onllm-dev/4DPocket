@@ -39,7 +39,7 @@ Output: {"tags": [{"name": "sourdough", "confidence": 0.97}, {"name": "bread", "
 
 
 def _slugify_tag(name: str) -> str:
-    slug = name.lower().strip()
+    slug = name.lower().strip()[:100]  # Cap tag length to prevent DoS
     slug = re.sub(r"[^\w\s/-]", "", slug)
     slug = re.sub(r"[\s]+", "-", slug)
     return slug
@@ -103,12 +103,26 @@ def auto_tag_item(
 
     for tag_data in raw_tags:
         tag_name = tag_data.get("name", "").strip().lower()
-        confidence = float(tag_data.get("confidence", 0))
+        confidence = tag_data.get("confidence", 0)
 
-        if not tag_name or confidence < suggest_threshold:
+        # Validate AI output: name must be a sane string, confidence a number
+        if not isinstance(tag_name, str) or not tag_name:
+            continue
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            continue
+        confidence = max(0.0, min(1.0, confidence))
+        # Reject tags with invalid characters or excessive length
+        if len(tag_name) > 100 or re.search(r'[<>"\';&]', tag_name):
+            continue
+
+        if confidence < suggest_threshold:
             continue
 
         slug = _slugify_tag(tag_name)
+        if not slug:
+            continue
         auto_applied = confidence >= auto_threshold
 
         # Find or create tag
@@ -180,12 +194,25 @@ def auto_tag_note(
 
     for tag_data in raw_tags:
         tag_name = tag_data.get("name", "").strip().lower()
-        confidence = float(tag_data.get("confidence", 0))
+        confidence = tag_data.get("confidence", 0)
 
-        if not tag_name or confidence < suggest_threshold:
+        # Validate AI output: name must be a sane string, confidence a number
+        if not isinstance(tag_name, str) or not tag_name:
+            continue
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            continue
+        confidence = max(0.0, min(1.0, confidence))
+        if len(tag_name) > 100 or re.search(r'[<>"\';&]', tag_name):
+            continue
+
+        if confidence < suggest_threshold:
             continue
 
         slug = _slugify_tag(tag_name)
+        if not slug:
+            continue
         auto_applied = confidence >= auto_threshold
 
         # Find or create tag
