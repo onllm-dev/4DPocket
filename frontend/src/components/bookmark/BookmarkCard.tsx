@@ -118,7 +118,9 @@ function PlatformMeta({ platform, metadata }: { platform: string; metadata?: Rec
 
 export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   const updateItem = useUpdateItem();
-  const thumbMedia = item.media?.find((m) => m.role === "thumbnail");
+  // Prefer thumbnail with local_path (cached) over remote URL
+  const thumbMedia = item.media?.find((m) => m.role === "thumbnail" && m.local_path)
+    || item.media?.find((m) => m.role === "thumbnail");
   const thumbUrl = thumbMedia?.url?.replaceAll("&amp;", "&");
   // LinkedIn and Reddit block hotlinking - proxy those images through backend
   const needsProxy = thumbUrl && (

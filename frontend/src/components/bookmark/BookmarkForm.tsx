@@ -263,7 +263,13 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
         </button>
 
         {createItem.isError && (
-          <p className="text-red-500 text-sm text-center">Failed to save. Please try again.</p>
+          <p className={`text-sm text-center ${
+            createItem.error?.message?.toLowerCase().includes("already saved")
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-red-500"
+          }`}>
+            {createItem.error?.message || "Failed to save. Please try again."}
+          </p>
         )}
       </form>
     </div>
@@ -337,7 +343,9 @@ export function EditBookmarkForm({ item, onClose, onUpdated }: EditBookmarkFormP
         </button>
 
         {updateItem.isError && (
-          <p className="text-red-500 text-sm text-center">Failed to save. Please try again.</p>
+          <p className="text-red-500 text-sm text-center">
+            {updateItem.error?.message || "Failed to save. Please try again."}
+          </p>
         )}
       </form>
     </div>

@@ -54,7 +54,14 @@ export const api = {
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const err = await res.json();
+        detail = err.detail || detail;
+      } catch {}
+      throw new Error(detail);
+    }
     return res.json();
   },
 
@@ -63,7 +70,14 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const err = await res.json();
+        detail = err.detail || detail;
+      } catch {}
+      throw new Error(detail);
+    }
     return res.json();
   },
 

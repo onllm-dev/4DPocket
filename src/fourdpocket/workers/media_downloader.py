@@ -135,14 +135,26 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
         except Exception as e:
             logger.warning("Failed to download media %s: %s", media_url, e)
 
-    # Update item with local media paths
+    # Update item with local media paths (update existing entries, don't duplicate)
     if downloaded:
         engine = get_engine()
         with Session(engine) as db:
             item = db.get(KnowledgeItem, uuid.UUID(item_id))
             if item:
                 existing_media = list(item.media) if item.media else []
-                item.media = existing_media + downloaded
+                for dl in downloaded:
+                    # Find existing entry by matching original URL or role
+                    matched = False
+                    for i, em in enumerate(existing_media):
+                        if em.get("url") == dl.get("original_url") or (
+                            em.get("role") == dl["role"] and em.get("role") in ("thumbnail",)
+                        ):
+                            existing_media[i] = {**em, **dl, "url": em.get("url", dl.get("original_url", ""))}
+                            matched = True
+                            break
+                    if not matched:
+                        existing_media.append(dl)
+                item.media = existing_media
                 db.add(item)
                 db.commit()
 
