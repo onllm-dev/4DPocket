@@ -10,168 +10,37 @@
 
 <p align="center">
   <strong>Self-hosted, AI-powered personal knowledge base</strong><br/>
-  Inspired by Doraemon's 4D Pocket - a magical, bottomless pocket where anything you've ever saved is instantly retrievable.
+  Save content from 17+ platforms. AI auto-tags, summarizes, and connects it. Find anything instantly.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-active%20development-brightgreen" alt="Active Development" />
+  <img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python 3.12+" />
+  <img src="https://img.shields.io/badge/react-19-61DAFB" alt="React 19" />
   <img src="https://img.shields.io/badge/license-GNU%20GPLv3-blue" alt="GNU GPLv3 License" />
+  <img src="https://img.shields.io/badge/tests-73%20passing-brightgreen" alt="73 Tests Passing" />
 </p>
 
-> **This project is in active development and is being updated regularly.** New features, processors, and improvements ship frequently. Star the repo to stay updated!
-
 <p align="center">
-  <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> · <a href="https://onllm.dev">onllm.dev</a> · <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
+  <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> &middot; <a href="https://onllm.dev">onllm.dev</a> &middot; <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
 </p>
 
 ---
 
-## The Idea
+## Why 4DPocket?
 
-Everyone saves things - bookmarks, articles, videos, code snippets, social media posts - across dozens of platforms. Then can never find them again.
+Everyone saves things — bookmarks, articles, videos, code snippets, social posts — across dozens of platforms. Then can never find them again.
 
-**4DPocket** is different. It's not a bookmark manager - it's a **magic library**. Throw anything in - URLs, notes, YouTube videos, Reddit threads, GitHub repos, tweets, PDFs, images - and the pocket **understands** it, **connects** it to what you already know, and **serves** it back when you need it.
+**4DPocket** is not a bookmark manager. It's a **knowledge base that thinks**. Paste a URL — the system extracts the full content, auto-tags it, generates a summary, connects it to what you already know, and makes it instantly searchable. Notes, highlights, collections, reading lists, RSS feeds, and automation rules turn it into a second brain.
 
-Just like Doraemon reaches into his 4D Pocket and pulls out the perfect gadget for any situation, you reach into yours and pull out exactly the knowledge you need.
-
-### Core Philosophy
+Inspired by Doraemon's 4D Pocket — a magical, bottomless pocket where anything you've ever saved is instantly retrievable.
 
 | Principle | What It Means |
 |-----------|--------------|
-| **Knowledge-First** | Every item is extracted, enriched, indexed, and connected. Your pocket *understands* what's inside it. |
-| **Retrieval-First** | Everything is designed around getting things *out* fast. Search is instant, smart, and forgiving. |
-| **Local-First** | Runs entirely on your machine by default. Your data never leaves unless you choose external APIs. |
-| **Zero-Friction Capture** | Save anything in 1-2 actions. Paste a URL and everything is handled automatically. |
-| **Smart by Default** | AI auto-tags, auto-summarizes, auto-connects. You don't organize - the pocket organizes itself. |
-| **Private by Default** | Each user's knowledge base is their own. Sharing is explicit, granular, and revocable. |
-
----
-
-## Features
-
-### Universal Capture - 17 Platform Processors
-
-Save a URL and 4DPocket automatically detects the platform and deeply extracts content - not just metadata, but the actual knowledge.
-
-| Platform | What's Extracted |
-|----------|-----------------|
-| **Generic URL** | Title, description, full article content (readability), OG metadata, favicon |
-| **YouTube** | Title, channel, duration, full transcript, chapters, thumbnails |
-| **Reddit** | Post title, selftext, top 10 comments, subreddit, score |
-| **GitHub** | Repo metadata, README content, stars, language, issues/PRs with comments, gists |
-| **Twitter/X** | Tweet text, author, media attachments, engagement stats (via fxtwitter) |
-| **Instagram** | Caption, images/carousel, hashtags, alt text (via instaloader) |
-| **Hacker News** | Title, author, score, top comments tree (via Algolia API) |
-| **Stack Overflow** | Question, accepted answer, top answers, tags, code blocks |
-| **TikTok** | Description, author, thumbnail, hashtags, view count (via yt-dlp) |
-| **Threads** | Author, content, media (OG metadata extraction) |
-| **Mastodon** | Toot content, media, boosts, favourites (auto-detects instance) |
-| **Substack** | Full article text, author, newsletter name (readability) |
-| **Medium** | Full article text, author, publication (readability) |
-| **LinkedIn** | Post text, author (public posts only) |
-| **Spotify** | Track/album/playlist name, artist, cover art (oEmbed API) |
-| **Image** | EXIF data, OCR text extraction (pytesseract) |
-| **PDF** | Full text extraction, metadata, page count (PyMuPDF) |
-
-### AI-Powered Smart Organization
-
-The brain of 4DPocket - what transforms it from a link saver into a knowledge base that thinks.
-
-- **Auto-Tagging** - AI reads extracted content and assigns tags with confidence scores (0-1). High-confidence tags are applied automatically, lower ones are suggested.
-- **Smart Tag Hierarchy** - Tags auto-organize into parent-child trees. `python` nests under `programming/python`, `react` under `frontend/react`.
-- **Auto-Summarization** - Every saved item gets a 2-3 sentence AI summary.
-- **Related Items** - The moment you save something, 4DPocket shows you what's related in your library using semantic similarity (0.5 weight), shared tags (0.3), and same-source analysis (0.2).
-- **Multi-Provider AI** - Works with Ollama (local), Groq, NVIDIA, or any OpenAI/Anthropic-compatible API (MiniMax, Together, Fireworks, OpenRouter, etc.). No vendor lock-in.
-- **Sync Enrichment** - AI enriches items inline when saved, even without a background worker running. Tags + summaries appear immediately.
-- **Prompt Injection Protection** - All user content is sanitized before reaching AI models. XML delimiters isolate user data from system instructions.
-
-### Powerful Search
-
-- **Full-Text Search** - SQLite FTS5 (zero-config) or Meilisearch (optional upgrade). Typo-tolerant, instant results.
-- **Semantic Search** - Vector similarity search using sentence-transformers + ChromaDB. Find "that article about React performance" even if those exact words aren't in the title.
-- **Search Filters** - Filter by platform, content type, tags, date ranges. Command palette (Cmd+K) for instant access.
-
-### Multi-User Knowledge Bases
-
-Every user gets their own isolated pocket. Knowledge is private by default, shareable by choice.
-
-- **Per-User Isolation** - Items, tags, collections, AI enrichments are all scoped to the user.
-- **Selective Sharing** - Share individual items, entire collections, or tag-based groups with specific users.
-- **Public Links** - Generate public URLs for sharing outside your instance (with optional expiry).
-- **Knowledge Feeds** - Follow other users' public items. Their saves appear in your feed.
-- **Comments** - Discuss shared items with collaborators.
-- **Roles** - Admin (full instance management), User (full knowledge base), Guest (view shared only).
-
-### Admin Control Panel
-
-- **User Management** - List, activate/deactivate, change roles for all users.
-- **Registration Control** - Toggle registration on/off, set mode (open/invite/disabled).
-- **Instance Settings** - Configure instance name, default user role, max users.
-- **AI Configuration** - Change AI provider, API keys, model, base URL from the admin panel. Admin settings override .env values at runtime.
-
-### Automation Rules
-
-- **Condition-Action Rules** - "If saved from reddit.com, auto-tag 'reddit' and add to 'Reddit Saves' collection."
-- **CRUD API** - Create, read, update, delete rules via REST API.
-
-### Import & Export
-
-- **Import From** - Chrome bookmarks (HTML), Pocket export (HTML), generic JSON.
-- **Export To** - JSON, HTML bookmarks (Netscape format), CSV, Markdown.
-
-### PWA - Works Everywhere
-
-4DPocket is a Progressive Web App. Install it on any device.
-
-- **Installable** - Add to home screen on Android, iOS, desktop.
-- **Offline Support** - Service worker caches static assets for offline access.
-- **Share Target** - Share URLs directly from your phone's share sheet to 4DPocket.
-- **Responsive** - Optimized for mobile (bottom nav, touch-friendly), tablet (collapsible sidebar), and desktop (full sidebar, keyboard shortcuts).
-- **Dark Mode** - System-aware with manual toggle.
-
-### Chrome Extension
-
-Save pages with one click, highlight text on any page, and view highlights in a sidebar - all from your browser.
-
-**Install (Developer Mode):**
-
-```bash
-cd extension
-pnpm install
-pnpm build
-```
-
-Then in Chrome:
-1. Go to `chrome://extensions`
-2. Enable **Developer mode** (top right toggle)
-3. Click **Load unpacked**
-4. Select the `extension/dist/chrome-mv3` folder
-
-**Setup:**
-1. Click the 4DPocket extension icon, then **Open Settings**
-2. Enter your server URL (e.g. `https://your-server.com` or `http://localhost:4040`)
-3. Click **Test** to verify the connection
-4. Login with your 4DPocket username and password
-
-**What it does:**
-- **One-click save** - Click the icon to save the current page
-- **Right-click save** - Right-click any page or selected text to save
-- **Auto-detect** - Badge shows a checkmark on pages you've already saved
-- **Highlight capture** - Select text on any page, click the floating tooltip to save it as a highlight
-- **Sidebar panel** - View all your highlights for the current page in Chrome's side panel
-
-> Firefox, Edge, and Safari extensions are planned.
-
-### Native Apps (Coming Soon)
-
-- **Android** - Native Android app with share intent integration and offline support.
-- **iOS** - Native iOS app with share extension and widget support.
-
-### Keyboard-First UX
-
-- **Command Palette** - `Cmd+K` / `Ctrl+K` to search anything, navigate pages, find items instantly.
-- **Shortcuts** - `n` to add new item, `/` to open search.
-- **Bulk Actions** - Select multiple items, then bulk tag, archive, or delete.
+| **Knowledge-First** | Every item is extracted, enriched, indexed, and connected |
+| **Retrieval-First** | Search is instant, fuzzy, semantic, and forgiving |
+| **Local-First** | Runs entirely on your machine. Your data never leaves |
+| **Zero-Friction** | Save anything in 1-2 actions. AI handles organization |
+| **Private by Default** | Per-user isolation. Sharing is explicit and revocable |
 
 ---
 
@@ -180,31 +49,234 @@ Then in Chrome:
 ### Local (Zero Config)
 
 ```bash
-# Clone
 git clone https://github.com/onllm-dev/4DPocket.git
 cd 4DPocket
 
-# Install & run backend
+# Backend
 uv sync --all-extras
 uv run uvicorn fourdpocket.main:app --port 4040
 
-# Install & run frontend (separate terminal)
-cd frontend
-pnpm install
-pnpm dev
+# Frontend (separate terminal)
+cd frontend && pnpm install && pnpm dev
 ```
 
-Open http://localhost:5173 - no login needed in single-user mode.
+Open http://localhost:5173 — no login needed in single-user mode.
 
 ### Docker
 
 ```bash
-cp .env.example .env
-# Edit .env with your API keys (optional)
+cp .env.example .env    # Edit with your API keys (optional)
 docker compose up
 ```
 
 Open http://localhost:4040
+
+### Multi-User Mode
+
+```bash
+FDP_AUTH__MODE=multi uv run uvicorn fourdpocket.main:app --port 4040
+```
+
+First registered user automatically becomes admin.
+
+---
+
+## Features
+
+### Universal Capture — 17 Platform Processors
+
+Paste a URL and 4DPocket detects the platform, deeply extracts content, and enriches it with AI — all automatically.
+
+| Platform | What's Extracted |
+|----------|-----------------|
+| **Generic URL** | Title, description, full article (readability), OG metadata, favicon |
+| **YouTube** | Title, channel, duration, full transcript, chapters, thumbnails |
+| **Reddit** | Post, selftext, top 10 comments, subreddit, score, crosspost info |
+| **GitHub** | Repo metadata, README, stars, language, issues/PRs with comments, gists |
+| **Twitter/X** | Tweet text, author, media, engagement stats (via fxtwitter API) |
+| **Instagram** | Caption, images/carousel, hashtags, alt text |
+| **Hacker News** | Title, author, score, threaded comments (via Algolia API) |
+| **Stack Overflow** | Question, accepted answer, top answers, tags, code blocks |
+| **TikTok** | Description, author, thumbnail, hashtags, view count |
+| **Mastodon** | Toot content, media, boosts, favourites (auto-detects instance) |
+| **Threads** | Author, content, media |
+| **Substack** | Full article, author, newsletter name |
+| **Medium** | Full article via JSON API + readability fallback |
+| **LinkedIn** | Post text, author (public posts) |
+| **Spotify** | Track/album/playlist, artist, cover art (oEmbed) |
+| **Image** | EXIF data, OCR text extraction |
+| **PDF** | Full text, metadata, page count |
+
+### AI-Powered Organization
+
+| Feature | Description |
+|---------|-------------|
+| **Auto-Tagging** | AI reads content and assigns tags with confidence scores. High-confidence tags applied automatically |
+| **Auto-Summarization** | Every item gets a 2-3 sentence AI summary |
+| **AI Title Generation** | Generate better titles for notes and items |
+| **Related Items** | Semantic similarity (0.5) + shared tags (0.3) + same-source (0.2) |
+| **Knowledge Gap Analysis** | AI identifies topics you've been collecting but lack depth in |
+| **Cross-Platform Insights** | Discover connections between content saved from different platforms |
+| **Smart Collection Suggestions** | AI suggests which collection an item belongs in |
+| **Stale Content Detection** | Surface items that may need revisiting or updating |
+| **Voice Transcription** | Transcribe audio recordings to text |
+| **Prompt Injection Protection** | Content sanitized before AI — homoglyph normalization, URL-decode, zero-width stripping |
+
+**Multi-Provider AI** — Ollama (local), Groq, NVIDIA, or any OpenAI/Anthropic-compatible API. No vendor lock-in.
+
+### Search — Four Modes
+
+| Mode | How It Works |
+|------|-------------|
+| **Full-Text** | SQLite FTS5 with BM25 ranking, porter stemming, prefix matching |
+| **Fuzzy** | Automatic fallback when FTS5 returns nothing — catches typos and partial matches |
+| **Semantic** | Vector similarity via sentence-transformers + ChromaDB |
+| **Hybrid** | FTS5 + semantic combined via Reciprocal Rank Fusion (RRF, k=60) |
+
+**Unified search** returns items AND notes together. URL-aware query parsing tokenizes domains and paths. Inline filter syntax: `docker tag:devops is:favorite after:2024-01`. Filter chips for tags, favorites, archived. Results cached with per-user TTL invalidation.
+
+### Notes
+
+Full-featured note-taking with a rich text editor (Tiptap).
+
+- Create, edit, and organize notes alongside saved items
+- Rich text editing — headings, bold, italic, strikethrough, code, lists, task lists, blockquotes, highlights
+- Tag notes independently, search them alongside items
+- AI summarization and title generation per note
+- Highlights can link to notes (not just items)
+- Notes appear in collections, knowledge base, and unified search
+
+### Reading List & Progress Tracking
+
+- **Reading List** — Dedicated "To Read" and "Read" tabs for managing your reading queue
+- **Reading Progress** — Track reading progress (percentage) on any item
+- **Reading Status** — Items move through `unread` → `reading` → `read`
+- **Timeline View** — Browse your knowledge base chronologically
+
+### Collections
+
+- Create named collections to organize items and notes
+- Add items and notes to multiple collections
+- Drag-and-drop reorder within collections
+- **Smart Items** — AI suggests items that belong in a collection based on its contents
+- **Collection RSS** — Every collection exposes an RSS feed for external consumption
+
+### Highlights & Annotations
+
+- Highlight text within items or notes with color options
+- Add annotation notes to highlights
+- Position tracking (paragraph, sentence, start, end)
+- Search across all highlights
+- Chrome extension captures highlights directly from web pages
+
+### RSS Feed Management
+
+- Subscribe to RSS/Atom/JSON feeds
+- **Auto mode** — New entries automatically saved to your knowledge base
+- **Approval mode** — Entries queued for manual approve/reject
+- Keyword filters per feed
+- Manual fetch trigger, error tracking, entry management
+
+### Automation Rules
+
+- **Condition-Action rules** — "If URL matches `reddit.com`, auto-tag `reddit` and add to collection"
+- Conditions: URL regex, source platform, title/content keywords, has tag
+- Actions: add tag, add to collection, set favorite, archive
+- ReDoS-safe regex execution with cross-platform timeout
+
+### Sharing & Collaboration
+
+- **Share items, collections, or tag groups** with specific users
+- **Public links** — Generate public URLs with optional expiry
+- **Roles** — Viewer or editor per share recipient
+- **Comments** — Discuss shared items with collaborators
+- **Knowledge Feed** — Follow other users' shared content
+- **Shared With Me** — View all content shared to you
+
+### Import & Export
+
+| Direction | Formats |
+|-----------|---------|
+| **Import** | Chrome bookmarks (HTML), Pocket export (HTML), JSON |
+| **Export** | JSON, HTML bookmarks (Netscape), CSV, Markdown |
+
+URL validation on import, content size caps (1MB content, 50K description), XSS-safe HTML export.
+
+### Admin Panel
+
+- **User Management** — List, activate/deactivate, change roles, delete users (with full cascade cleanup)
+- **Registration Control** — Toggle open/invite/disabled, set max users
+- **AI Configuration** — Change provider, API keys, model, base URL at runtime. Admin settings override `.env`
+- **Instance Settings** — Name, default role, feature toggles
+
+### Saved Filters
+
+- Save complex search/filter combinations for quick re-use
+- Execute saved filters with one click
+- Full CRUD management
+
+### Tag Management
+
+- Full CRUD with slug generation
+- **Tag Merge** — Merge duplicate tags, combining their usage counts
+- **Merge Suggestions** — AI suggests similar tags that could be consolidated
+- Usage count tracking (auto-maintained on item/note add/remove)
+- Browse items by tag
+
+---
+
+## Security
+
+4DPocket is hardened for self-hosted production deployment:
+
+| Protection | Implementation |
+|------------|---------------|
+| **Authentication** | JWT (HS256 hardcoded) + httpOnly strict-SameSite cookies |
+| **Rate Limiting** | Database-backed (shared across workers), escalating lockout |
+| **SSRF Protection** | Per-hop redirect validation on all 17 processors + RSS + media downloads |
+| **DNS Rebinding** | IP pinning on media downloads |
+| **XSS Prevention** | DOMPurify on all HTML render + write paths, HTML stripping on comments/highlights |
+| **AI Safety** | Prompt injection filtering, homoglyph normalization, URL-decode, zero-width stripping |
+| **Input Validation** | Pydantic `extra="forbid"` on create schemas, content size caps, URL scheme rejection |
+| **Password Security** | bcrypt + constant-time dummy hash (prevents user enumeration) |
+| **Foreign Keys** | SQLite FK enforcement via PRAGMA |
+| **Security Headers** | X-Content-Type-Options, X-Frame-Options, CSP |
+| **Storage Safety** | Path traversal protection, user-scoped file storage |
+
+---
+
+## PWA & Chrome Extension
+
+### Progressive Web App
+
+- Installable on Android, iOS, desktop
+- Service worker caches static assets for offline access
+- Share Target — share URLs from your phone's share sheet directly to 4DPocket
+- Responsive — mobile (bottom nav), tablet (collapsible sidebar), desktop (full sidebar + shortcuts)
+- Dark mode — system-aware with manual toggle (Doraemon Blue theme)
+
+### Chrome Extension
+
+Save pages with one click, highlight text on any page, view highlights in a sidebar.
+
+```bash
+cd extension && pnpm install && pnpm build
+```
+
+Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions`.
+
+- One-click save current page
+- Right-click context menu save
+- Auto-detect already-saved pages (badge indicator)
+- Text highlight capture with floating tooltip
+- Side panel for browsing highlights
+
+### Keyboard Shortcuts
+
+- `Cmd+K` / `Ctrl+K` — Command palette (search, navigate, quick actions)
+- `n` — Add new item
+- `/` — Focus search
+- Bulk select + bulk tag/archive/delete
 
 ---
 
@@ -212,104 +284,114 @@ Open http://localhost:4040
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | FastAPI, SQLModel, Alembic, Python 3.12+ |
+| **Backend** | FastAPI, SQLModel, Python 3.12+ |
 | **Database** | SQLite (default) / PostgreSQL |
 | **Search** | SQLite FTS5 (default) / Meilisearch |
-| **Vector DB** | ChromaDB (in-process) |
-| **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) |
-| **Embeddings** | sentence-transformers (local) / NVIDIA nv-embed-v1 |
-| **Background Jobs** | Huey (SQLite backend) |
+| **Vectors** | ChromaDB + sentence-transformers |
+| **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI/Anthropic-compatible) |
+| **Jobs** | Huey (SQLite backend) |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | **State** | TanStack Query (server) + Zustand (client) |
+| **Editor** | Tiptap (rich text) |
 | **Icons** | Lucide React |
+
+---
 
 ## Configuration
 
-All config via environment variables with `FDP_` prefix. See [`.env.example`](.env.example) for all options.
+All config via environment variables with `FDP_` prefix. See [`.env.example`](.env.example).
 
 ```bash
-# AI Provider: "ollama", "groq", "nvidia", or "custom"
-FDP_AI__CHAT_PROVIDER=ollama
-
-# Search Backend: "sqlite" (zero-config) or "meilisearch"
-FDP_SEARCH__BACKEND=sqlite
-
-# Auth Mode: "single" (no login) or "multi" (JWT)
-FDP_AUTH__MODE=single
+FDP_AI__CHAT_PROVIDER=ollama          # ollama, groq, nvidia, or custom
+FDP_SEARCH__BACKEND=sqlite            # sqlite (zero-config) or meilisearch
+FDP_AUTH__MODE=single                 # single (no login) or multi (JWT)
+FDP_AUTH__SECRET_KEY=your-secret      # Set in production (auto-generated otherwise)
 ```
 
-## API
+---
+
+## API Reference
 
 Interactive docs at http://localhost:4040/docs when running.
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/v1/items` | Save a URL or note |
-| `GET /api/v1/items` | List items (paginated, filtered) |
-| `GET /api/v1/search?q=...` | Full-text search |
-| `GET /api/v1/search/semantic?q=...` | Semantic vector search |
-| `GET /api/v1/search/filters` | Available filter facets |
-| `POST /api/v1/items/bulk` | Bulk tag, archive, delete |
-| `GET /api/v1/items/{id}/related` | AI-suggested related items |
-| `POST /api/v1/auth/register` | Register user |
-| `POST /api/v1/auth/login` | Login (returns JWT) |
-| `GET/PATCH /api/v1/settings` | User preferences |
-| `GET /api/v1/stats` | Dashboard statistics |
-| `POST/GET/DELETE /api/v1/shares` | Sharing management |
-| `GET /api/v1/feeds` | Knowledge feed |
-| `POST /api/v1/import/{source}` | Import bookmarks |
-| `GET /api/v1/export/{format}` | Export data |
-| `GET/POST/PATCH/DELETE /api/v1/rules` | Automation rules |
-| Full CRUD | Items, Notes, Tags, Collections, Comments |
+**Items** — `POST /items`, `GET /items`, `GET /items/{id}`, `PATCH /items/{id}`, `DELETE /items/{id}`, `POST /items/bulk`, `POST /items/{id}/archive`, `POST /items/{id}/reprocess`, `GET /items/{id}/related`, `PATCH /items/{id}/reading-progress`, `POST /items/{id}/download-video`, `GET /items/{id}/media-proxy`
+
+**Notes** — `POST /notes`, `GET /notes`, `GET /notes/{id}`, `PATCH /notes/{id}`, `DELETE /notes/{id}`, `POST /notes/{id}/summarize`, `POST /notes/{id}/generate-title`
+
+**Search** — `GET /search` (full-text), `GET /search/unified` (items + notes), `GET /search/hybrid` (RRF fusion), `GET /search/semantic` (vectors), `GET /search/filters`
+
+**Tags** — Full CRUD, `GET /tags/{id}/items`, `GET /tags/suggestions/merge`, `POST /tags/merge`
+
+**Collections** — Full CRUD, item/note management, `GET /collections/{id}/smart-items`, `GET /collections/{id}/rss`, `PUT /collections/{id}/items/reorder`
+
+**Reading List** — `GET /items/reading-list`, `GET /items/read`, `GET /items/reading-queue`, `GET /items/timeline`
+
+**AI** — `GET /ai/status`, `POST /ai/items/{id}/enrich`, `GET /ai/suggest-collection`, `GET /ai/knowledge-gaps`, `GET /ai/stale-items`, `GET /ai/cross-platform`, `POST /ai/transcribe`
+
+**RSS** — `GET /rss`, `POST /rss`, `PATCH /rss/{id}`, `DELETE /rss/{id}`, `POST /rss/{id}/fetch`, `GET /rss/{id}/entries`, `POST /rss/{id}/entries/{id}/approve`
+
+**Sharing** — `POST /shares`, `GET /shares`, `DELETE /shares/{id}`, `GET /public/{token}`
+
+**Highlights** — Full CRUD, `GET /highlights/search`
+
+**Comments** — `POST /items/{id}/comments`, `GET /items/{id}/comments`, `DELETE /items/{id}/comments/{id}`
+
+**Admin** — User management, AI config, instance settings, saved filters
+
+**Auth** — Register, login, logout, profile update, password change
+
+**Import/Export** — `POST /import/{source}`, `GET /export/{format}`
+
+---
 
 ## Project Structure
 
 ```
 4dpocket/
-├── src/fourdpocket/          # Python backend
-│   ├── api/                  # FastAPI endpoints (19 routers)
-│   ├── models/               # SQLModel database models
-│   ├── processors/           # Content extractors (17 platforms)
-│   ├── ai/                   # AI providers + tagging + summarization + sanitizer
-│   ├── search/               # FTS5 + Meilisearch + ChromaDB semantic
-│   ├── sharing/              # Share manager, permissions, feed manager
-│   ├── workers/              # Huey background tasks
-│   └── storage/              # File storage (user-scoped)
-├── frontend/                 # React PWA
+├── src/fourdpocket/           # Python backend (110 files)
+│   ├── api/                   # 25 FastAPI routers
+│   ├── models/                # 21 SQLModel tables
+│   ├── processors/            # 17 platform extractors
+│   ├── ai/                    # Providers, tagger, summarizer, sanitizer
+│   ├── search/                # FTS5, Meilisearch, ChromaDB, hybrid RRF
+│   ├── sharing/               # Share manager, permissions, feed manager
+│   ├── workers/               # Background tasks (fetcher, media, AI, RSS, rules)
+│   └── storage/               # User-scoped file storage
+├── frontend/                  # React 19 PWA (56 files)
 │   └── src/
-│       ├── pages/            # 21 page components
-│       ├── components/       # Layout, BookmarkCard, ShareDialog, CommandPalette
-│       ├── hooks/            # TanStack Query data hooks + keyboard shortcuts
-│       └── stores/           # Zustand UI state
-├── extension/                # Chrome browser extension
-│   ├── src/core/            # Shared logic (auth, API client, types)
-│   ├── src/entrypoints/     # Popup, options, sidepanel, content script, background
-│   └── dist/                # Built extension (load in Chrome)
-├── tests/                    # pytest test suite (65+ tests)
-├── Dockerfile               # Multi-stage Python build
-├── docker-compose.yml       # Full stack orchestration
-└── .env.example             # Configuration reference
+│       ├── pages/             # 22 page components
+│       ├── components/        # UI components (editor, cards, dialogs, layout)
+│       ├── hooks/             # TanStack Query hooks + keyboard shortcuts
+│       └── stores/            # Zustand UI state
+├── extension/                 # Chrome browser extension
+├── tests/                     # 73+ pytest tests
+├── Dockerfile                 # Multi-stage build
+├── docker-compose.yml         # Full stack orchestration
+└── .env.example               # Configuration reference
 ```
+
+---
 
 ## Development
 
 ```bash
-# Run tests
-make test
-
-# Lint
-make lint
-
-# Format
-make format
-
-# Generate migration
-make migrate-gen msg="description"
+make test       # Run test suite (73+ tests)
+make lint       # ruff check
+make format     # ruff format
 ```
+
+---
+
+## Native Apps (Coming Soon)
+
+- **Android** — Native app with share intent and offline support
+- **iOS** — Native app with share extension and widget support
+
+---
 
 ## License
 
-GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
+GNU General Public License v3.0 — see [LICENSE](LICENSE) for details.
 
 ---
 
@@ -318,5 +400,5 @@ GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
 </p>
 
 <p align="center">
-  <a href="https://onllm.dev">onllm.dev</a> · <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> · <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
+  <a href="https://onllm.dev">onllm.dev</a> &middot; <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> &middot; <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
 </p>
