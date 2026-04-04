@@ -107,6 +107,7 @@ class ServerSettings(BaseSettings):
     port: int = 4040
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4040"]
     secure_cookies: bool = False  # Set True behind HTTPS in production
+    trust_proxy: bool = False  # Set True when behind a reverse proxy (nginx, caddy, etc.)
 
 
 class Settings(BaseSettings):

@@ -50,7 +50,3 @@ def sanitize_for_prompt(text: str, max_length: int = 4000) -> str:
     return text
 
 
-def wrap_user_content(text: str, label: str = "content") -> str:
-    """Wrap sanitized user text in XML delimiters for LLM prompt boundaries."""
-    cleaned = sanitize_for_prompt(text)
-    return f"<user_{label}>\n{cleaned}\n</user_{label}>"

@@ -45,16 +45,16 @@ def enrich_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # Always run synchronously - Huey silently queues without raising when consumer is down
-    from fourdpocket.ai.sanitizer import sanitize_for_prompt
     from fourdpocket.ai.summarizer import summarize_item
     from fourdpocket.ai.tagger import auto_tag_item
 
+    # Don't pre-sanitize here — auto_tag_item -> generate_tags already sanitizes via sanitize_for_prompt
     tags = auto_tag_item(
         item_id=item.id,
         user_id=current_user.id,
-        title=sanitize_for_prompt(item.title or "", max_length=2000),
-        content=sanitize_for_prompt(item.content or "", max_length=4000),
-        description=sanitize_for_prompt(item.description or "", max_length=1000),
+        title=item.title or "",
+        content=item.content or "",
+        description=item.description or "",
         db=db,
     )
     summary = summarize_item(item.id, db)
@@ -76,7 +76,7 @@ def enrich_item(
 
 @router.get("/suggest-collection")
 def suggest_collection_for_item(
-    item_id: str,
+    item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
