@@ -25,6 +25,8 @@ def generate_title(content: str) -> str | None:
     result = chat.generate(prompt, system_prompt=TITLE_SYSTEM_PROMPT)
 
     if result:
-        # Cap length to prevent LLM producing excessively long titles
-        return result.strip()[:200]
+        # Strip any HTML tags from LLM output and cap length
+        import re as _re
+        cleaned = _re.sub(r'<[^>]+>', '', result).strip()[:200]
+        return cleaned
     return None

@@ -122,6 +122,10 @@ def delete_feed(
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
+    # Cascade: remove feed entries
+    from fourdpocket.models.feed_entry import FeedEntry
+    for entry in db.exec(select(FeedEntry).where(FeedEntry.feed_id == feed_id)).all():
+        db.delete(entry)
     db.delete(feed)
     db.commit()
 

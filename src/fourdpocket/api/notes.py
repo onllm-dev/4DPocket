@@ -158,12 +158,17 @@ def delete_note(
     if not note or note.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
 
-    # Cascade delete associated data
+    # Cascade delete associated data and decrement tag usage counts
     from fourdpocket.models.note_tag import NoteTag
     from fourdpocket.models.highlight import Highlight
     from fourdpocket.models.collection_note import CollectionNote
+    from fourdpocket.models.tag import Tag
 
     for row in db.exec(select(NoteTag).where(NoteTag.note_id == note_id)).all():
+        tag = db.get(Tag, row.tag_id)
+        if tag and tag.usage_count > 0:
+            tag.usage_count = Tag.usage_count - 1
+            db.add(tag)
         db.delete(row)
     for row in db.exec(select(Highlight).where(Highlight.note_id == note_id)).all():
         db.delete(row)

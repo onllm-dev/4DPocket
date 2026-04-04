@@ -108,11 +108,18 @@ def delete_collection(
             status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found"
         )
 
-    links = db.exec(
-        select(CollectionItem).where(CollectionItem.collection_id == collection_id)
-    ).all()
-    for link in links:
+    # Cascade: remove CollectionItem, CollectionNote, and Share references
+    from fourdpocket.models.collection_note import CollectionNote
+    from fourdpocket.models.share import Share, ShareRecipient
+
+    for link in db.exec(select(CollectionItem).where(CollectionItem.collection_id == collection_id)).all():
         db.delete(link)
+    for link in db.exec(select(CollectionNote).where(CollectionNote.collection_id == collection_id)).all():
+        db.delete(link)
+    for share in db.exec(select(Share).where(Share.collection_id == collection_id)).all():
+        for sr in db.exec(select(ShareRecipient).where(ShareRecipient.share_id == share.id)).all():
+            db.delete(sr)
+        db.delete(share)
 
     db.delete(collection)
     db.commit()

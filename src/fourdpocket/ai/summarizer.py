@@ -43,8 +43,10 @@ def generate_summary(
     summary = chat.generate(prompt, system_prompt=SUMMARY_SYSTEM_PROMPT)
 
     if summary:
-        # Cap length to prevent LLM producing excessively long summaries
-        return summary.strip()[:2000]
+        # Strip any HTML tags from LLM output and cap length
+        import re as _re
+        cleaned = _re.sub(r'<[^>]+>', '', summary).strip()[:2000]
+        return cleaned
     return None
 
 

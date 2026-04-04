@@ -465,8 +465,15 @@ def delete_item(
     from fourdpocket.models.item_link import ItemLink
     from fourdpocket.models.share import Share
 
+    # Decrement tag usage counts before removing links
+    for tag_link in db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all():
+        tag = db.get(Tag, tag_link.tag_id)
+        if tag and tag.usage_count > 0:
+            tag.usage_count = Tag.usage_count - 1
+            db.add(tag)
+        db.delete(tag_link)
+
     for model, fk in [
-        (ItemTag, ItemTag.item_id),
         (Highlight, Highlight.item_id),
         (Comment, Comment.item_id),
         (Embedding, Embedding.item_id),
