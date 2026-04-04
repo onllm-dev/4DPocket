@@ -25,5 +25,6 @@ def generate_title(content: str) -> str | None:
     result = chat.generate(prompt, system_prompt=TITLE_SYSTEM_PROMPT)
 
     if result:
-        return result.strip()
+        # Cap length to prevent LLM producing excessively long titles
+        return result.strip()[:200]
     return None

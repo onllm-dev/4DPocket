@@ -19,7 +19,7 @@ class RSSFeedCreate(BaseModel):
     url: str
     title: str | None = None
     category: str | None = None
-    target_collection_id: str | None = None
+    target_collection_id: uuid.UUID | None = None
     poll_interval: int = 3600
     format: str = "rss"
     mode: str = "auto"

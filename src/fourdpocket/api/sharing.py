@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
@@ -32,7 +32,7 @@ class ShareCreate(BaseModel):
     collection_id: uuid.UUID | None = None
     tag_id: uuid.UUID | None = None
     public: bool = False
-    expires_hours: int | None = None
+    expires_hours: int | None = Field(default=None, ge=1, le=8760)  # 1 hour to 1 year
     recipient_email: str | None = None
     permission: str = "viewer"  # "viewer" or "editor"
 
