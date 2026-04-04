@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+
+const TiptapEditor = lazy(() => import("@/components/editor/TiptapEditor"));
 import {
   ArrowLeft,
   Star,
@@ -190,13 +192,13 @@ export default function NoteDetail() {
             placeholder="Note title..."
             className="w-full px-3 py-2 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
           />
-          <textarea
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            rows={8}
-            placeholder="Note content..."
-            className="w-full px-3 py-2 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"
-          />
+          <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />}>
+            <TiptapEditor
+              content={editContent}
+              onChange={setEditContent}
+              placeholder="Note content..."
+            />
+          </Suspense>
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setIsEditing(false)}

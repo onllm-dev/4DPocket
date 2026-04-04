@@ -26,11 +26,13 @@ async def lifespan(app: FastAPI):
     if settings.search.backend == "sqlite" and settings.database.url.startswith("sqlite"):
         from sqlmodel import Session
 
-        from fourdpocket.search.sqlite_fts import init_fts, init_notes_fts
+        from fourdpocket.search.sqlite_fts import init_fts, init_notes_fts, reindex_all_items
 
         with Session(get_engine()) as db:
-            init_fts(db)
+            recreated = init_fts(db)
             init_notes_fts(db)
+            if recreated:
+                reindex_all_items(db)
 
     yield
 

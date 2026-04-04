@@ -37,8 +37,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
 """
 
 
-def init_fts(db: Session) -> None:
-    """Create FTS5 virtual table if it doesn't exist."""
+def init_fts(db: Session) -> bool:
+    """Create FTS5 virtual table if it doesn't exist. Returns True if table was recreated."""
+    recreated = False
     # Check if url column exists in the FTS table; if not, drop and recreate
     try:
         db.exec(text("SELECT url FROM items_fts LIMIT 0"))
@@ -46,8 +47,22 @@ def init_fts(db: Session) -> None:
         # Schema changed - drop and recreate
         db.exec(text("DROP TABLE IF EXISTS items_fts"))
         db.commit()
+        recreated = True
     db.exec(text(FTS_CREATE))
     db.commit()
+    return recreated
+
+
+def reindex_all_items(db: Session) -> int:
+    """Re-index all knowledge items in FTS5. Returns count indexed."""
+    from fourdpocket.models.item import KnowledgeItem as _KI
+    from sqlmodel import select as _select
+
+    items = db.exec(_select(_KI)).all()
+    for item in items:
+        index_item(db, item)
+    logger.info("Re-indexed %d items in FTS5", len(items))
+    return len(items)
 
 
 def init_notes_fts(db: Session) -> None:
