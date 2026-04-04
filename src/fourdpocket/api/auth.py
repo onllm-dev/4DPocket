@@ -1,8 +1,6 @@
 """Authentication endpoints."""
 
 import re
-import time
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -11,53 +9,17 @@ from sqlmodel import Session, func, select
 
 from fourdpocket.api.auth_utils import create_access_token, hash_password, verify_password
 from fourdpocket.api.deps import get_current_user, get_db, get_or_create_settings
+from fourdpocket.api.rate_limit import check_rate_limit, record_attempt, reset_rate_limit
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# In-memory rate limiting for failed login attempts.
-# NOTE: For production multi-instance deployments, replace with a Redis- or
-# database-backed store so limits survive restarts and are shared across nodes.
-_MAX_TRACKED_KEYS = 10000
-_failed_login_attempts: dict[str, dict] = defaultdict(lambda: {"count": 0, "locked_until": 0.0})
 
 # Constant-time padding: always run a password verification even when the user
 # does not exist, preventing timing side-channels that reveal registered emails.
 _DUMMY_HASH: str = hash_password("dummy-constant-time-padding-xT9qZ")
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATIONS = [5, 10, 20, 40, 80]  # Minutes for consecutive failures
-
-# In-memory rate limiting for registration attempts (10 per hour per IP)
-_register_attempts: dict[str, list[float]] = {}
-
-
-def _evict_stale_login_entries() -> None:
-    """Evict stale entries from rate limit dicts to prevent unbounded memory growth."""
-    now = time.time()
-    if len(_failed_login_attempts) > _MAX_TRACKED_KEYS:
-        stale = [k for k, v in _failed_login_attempts.items()
-                 if v["count"] == 0 and v["locked_until"] < now]
-        for k in stale:
-            del _failed_login_attempts[k]
-    if len(_register_attempts) > _MAX_TRACKED_KEYS:
-        stale = [k for k, v in _register_attempts.items()
-                 if all(now - t > 3600 for t in v)]
-        for k in stale:
-            del _register_attempts[k]
-
-
-def _check_register_rate_limit(client_ip: str) -> None:
-    _evict_stale_login_entries()
-    now = time.time()
-    attempts = [t for t in _register_attempts.get(client_ip, []) if now - t < 3600]
-    if len(attempts) >= 10:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many registration attempts. Try again later.",
-        )
-    attempts.append(now)
-    _register_attempts[client_ip] = attempts
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -71,7 +33,9 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
             detail="Registration is currently disabled",
         )
 
-    _check_register_rate_limit(request.client.host if request.client else "unknown")
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(db, key=client_ip, action="register", max_attempts=10, window_seconds=3600, lockout_minutes=60)
+    record_attempt(db, key=client_ip, action="register")
 
     # Check max users
     if settings.max_users is not None:
@@ -124,7 +88,6 @@ def login(
     db: Session = Depends(get_db),
 ):
     identifier = form_data.username  # Can be email or username
-    now = time.time()
 
     # Resolve user by email or username
     user = db.exec(
@@ -134,17 +97,12 @@ def login(
     # Use canonical email as rate-limit key (prevents bypass via alternating identifiers)
     rate_key = user.email if user else identifier
 
-    # Check lockout status
-    attempts = _failed_login_attempts[rate_key]
-    if attempts["locked_until"] > now:
-        remaining = int(attempts["locked_until"] - now)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"Account locked due to too many failed attempts. "
-                f"Try again in {remaining} seconds."
-            ),
-        )
+    # Check lockout status (DB-backed, shared across workers)
+    check_rate_limit(
+        db, key=rate_key, action="login",
+        max_attempts=MAX_FAILED_ATTEMPTS, window_seconds=3600,
+        escalating_lockout=LOCKOUT_DURATIONS,
+    )
 
     if not user:
         # Always verify against a dummy hash to prevent timing attacks that
@@ -152,16 +110,19 @@ def login(
         verify_password(form_data.password, _DUMMY_HASH)
 
     if not user or not verify_password(form_data.password, user.password_hash):
-        # Record failed attempt
-        attempts["count"] += 1
-        if attempts["count"] >= MAX_FAILED_ATTEMPTS:
-            lockout_idx = min(attempts["count"] - MAX_FAILED_ATTEMPTS, len(LOCKOUT_DURATIONS) - 1)
-            lockout_duration = LOCKOUT_DURATIONS[lockout_idx]
-            attempts["locked_until"] = now + (lockout_duration * 60)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many failed attempts. Account locked for {lockout_duration} minutes.",
+        # Record failed attempt in DB
+        record_attempt(db, key=rate_key, action="login")
+        db.commit()
+
+        # Re-check if we just hit the limit
+        try:
+            check_rate_limit(
+                db, key=rate_key, action="login",
+                max_attempts=MAX_FAILED_ATTEMPTS, window_seconds=3600,
+                escalating_lockout=LOCKOUT_DURATIONS,
             )
+        except HTTPException:
+            raise
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -169,7 +130,7 @@ def login(
         )
 
     # Reset failed attempts on success (using canonical key)
-    _failed_login_attempts[rate_key] = {"count": 0, "locked_until": 0.0}
+    reset_rate_limit(db, key=rate_key, action="login")
 
     access_token = create_access_token(user.id)
 

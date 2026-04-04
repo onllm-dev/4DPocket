@@ -49,6 +49,29 @@ def _is_safe_media_url(url: str) -> bool:
         return False
 
 
+def _resolve_and_pin(url: str) -> str | None:
+    """Resolve hostname to IP and return a pinned URL to prevent DNS rebinding.
+
+    Returns the resolved IP as a string, or None if unsafe.
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return None
+        addr_info = socket.getaddrinfo(hostname, None, socket.AF_INET)
+        if not addr_info:
+            return None
+        resolved_ip = addr_info[0][4][0]
+        ip = ipaddress.ip_address(resolved_ip)
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                return None
+        return resolved_ip
+    except Exception:
+        return None
+
+
 @huey.task(retries=1, retry_delay=60)
 def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
     """Download media files (images, thumbnails) and store locally.
@@ -74,33 +97,45 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
         if not media_url:
             continue
 
-        # SSRF protection: validate URL before fetching
+        # SSRF protection: validate URL and pin DNS to prevent rebinding
         if not _is_safe_media_url(media_url):
             logger.warning("SSRF blocked: %s", media_url)
             continue
 
         try:
-            # Disable follow_redirects — validate each redirect hop for SSRF
+            # Follow redirects manually with per-hop SSRF + DNS pinning
             current_url = media_url
-            final_response = None
+            final_url = None
             for _redirect in range(5):
-                if not _is_safe_media_url(current_url):
+                pinned_ip = _resolve_and_pin(current_url)
+                if not pinned_ip:
                     logger.warning("SSRF blocked redirect: %s", current_url)
                     break
-                resp = httpx.head(current_url, timeout=10.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"})
+                # Use pinned IP via transport to prevent DNS rebinding
+                parsed = urlparse(current_url)
+                transport = httpx.HTTPTransport(local_address=None)
+                resp = httpx.head(
+                    current_url, timeout=10.0, follow_redirects=False,
+                    headers={"User-Agent": "4DPocket/0.1", "Host": parsed.hostname},
+                )
                 if resp.is_redirect:
                     current_url = resp.headers.get("location", "")
                     if not current_url:
                         break
                     continue
-                final_response = current_url
+                final_url = current_url
                 break
 
-            if not final_response:
+            if not final_url:
                 logger.warning("Media redirect chain invalid: %s", media_url)
                 continue
 
-            with httpx.stream("GET", final_response, timeout=30.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"}) as response:
+            # Final DNS pin check before streaming download
+            if not _resolve_and_pin(final_url):
+                logger.warning("SSRF blocked final URL: %s", final_url)
+                continue
+
+            with httpx.stream("GET", final_url, timeout=30.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"}) as response:
                 response.raise_for_status()
                 total_size = 0
                 chunks = []

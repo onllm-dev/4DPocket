@@ -1,6 +1,5 @@
 """Sharing API endpoints."""
 
-import time
 import uuid
 from datetime import datetime
 
@@ -332,26 +331,6 @@ def share_history(
 
 public_router = APIRouter(prefix="/public", tags=["sharing"])
 
-_public_token_attempts: dict[str, dict] = {}
-
-
-def _check_public_rate_limit(client_ip: str) -> None:
-    """Rate limit public token access with exponential backoff per IP."""
-    now = time.time()
-    state = _public_token_attempts.get(client_ip, {"attempts": [], "backoff_until": 0.0, "failures": 0})
-    if state["backoff_until"] > now:
-        remaining = int(state["backoff_until"] - now)
-        raise HTTPException(429, f"Too many attempts. Try again in {remaining} seconds.")
-    state["attempts"] = [t for t in state["attempts"] if now - t < 60]
-    if len(state["attempts"]) >= 5:
-        state["failures"] = min(state["failures"] + 1, 5)
-        backoff_seconds = 60 * (2 ** (state["failures"] - 1))  # 1, 2, 4, 8, 16 min
-        state["backoff_until"] = now + backoff_seconds
-        _public_token_attempts[client_ip] = state
-        raise HTTPException(429, f"Too many attempts. Try again in {backoff_seconds} seconds.")
-    state["attempts"].append(now)
-    _public_token_attempts[client_ip] = state
-
 
 @public_router.get("/{token}")
 def get_public_share(
@@ -359,8 +338,11 @@ def get_public_share(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    from fourdpocket.api.rate_limit import check_rate_limit, record_attempt
+
     client_ip = request.client.host if request.client else "unknown"
-    _check_public_rate_limit(client_ip)
+    check_rate_limit(db, key=client_ip, action="public_token", max_attempts=5, window_seconds=60, lockout_minutes=2)
+    record_attempt(db, key=client_ip, action="public_token")
     share = validate_public_token(db=db, token=token)
     if not share:
         raise HTTPException(

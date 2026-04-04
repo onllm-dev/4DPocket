@@ -1,5 +1,6 @@
 """Comment API endpoints."""
 
+import re
 import uuid
 from datetime import datetime
 
@@ -49,10 +50,12 @@ def add_comment(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
         )
+    # Strip HTML tags from comment content for defense-in-depth
+    clean_content = re.sub(r"<[^>]+>", "", body.content)
     comment = Comment(
         user_id=current_user.id,
         item_id=item_id,
-        content=body.content,
+        content=clean_content,
     )
     db.add(comment)
     db.commit()

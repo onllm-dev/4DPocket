@@ -13,6 +13,7 @@ from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.item_link import ItemLink
 from fourdpocket.models.note import Note
 from fourdpocket.models.note_tag import NoteTag
+from fourdpocket.models.rate_limit import RateLimitEntry
 from fourdpocket.models.rss_feed import RSSFeed
 from fourdpocket.models.rule import Rule
 from fourdpocket.models.saved_filter import SavedFilter
@@ -36,6 +37,7 @@ __all__ = [
     "KnowledgeItem",
     "Note",
     "NoteTag",
+    "RateLimitEntry",
     "RSSFeed",
     "ReadingStatus",
     "Rule",

@@ -1,7 +1,8 @@
 """Execute automation rules on item events."""
 
 import re
-import signal
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from sqlmodel import Session, select
 
@@ -11,32 +12,26 @@ _REGEX_TIMEOUT_SECS = 2
 # Patterns that cause catastrophic backtracking: nested quantifiers like (a+)+
 _DANGEROUS_PATTERN = re.compile(r"\([^)]*[+*][^)]*\)[+*{]")
 
-
-class _RegexTimeout(Exception):
-    pass
-
-
-def _timeout_handler(signum, frame):
-    raise _RegexTimeout("Regex execution timed out")
+# Single-thread pool for regex execution with timeout (cross-platform)
+_regex_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="regex-guard")
 
 
 def _safe_regex_match(pattern: str, text: str) -> bool:
-    """Execute regex with timeout and complexity guard."""
+    """Execute regex with timeout and complexity guard. Cross-platform."""
     if _DANGEROUS_PATTERN.search(pattern):
         return False
     try:
         compiled = re.compile(pattern)
     except re.error:
         return False
-    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-    signal.alarm(_REGEX_TIMEOUT_SECS)
     try:
-        return bool(compiled.search(text))
-    except _RegexTimeout:
+        future = _regex_executor.submit(compiled.search, text)
+        result = future.result(timeout=_REGEX_TIMEOUT_SECS)
+        return bool(result)
+    except TimeoutError:
         return False
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
+    except Exception:
+        return False
 
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem

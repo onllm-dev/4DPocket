@@ -1,5 +1,6 @@
 """Highlights & annotations endpoints."""
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -69,12 +70,13 @@ def create_highlight(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _strip = lambda s: re.sub(r"<[^>]+>", "", s) if s else s
     highlight = Highlight(
         user_id=current_user.id,
         item_id=body.item_id,
         note_id=body.note_id,
-        text=body.text,
-        note=body.note,
+        text=_strip(body.text),
+        note=_strip(body.note),
         color=body.color,
         position=body.position,
     )
@@ -95,6 +97,8 @@ def update_highlight(
     if not h:
         raise HTTPException(status_code=404, detail="Highlight not found")
     for field, value in body.model_dump(exclude_unset=True).items():
+        if field == "note" and value:
+            value = re.sub(r"<[^>]+>", "", value)
         setattr(h, field, value)
     db.commit()
     db.refresh(h)
