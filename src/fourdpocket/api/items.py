@@ -457,10 +457,41 @@ def delete_item(
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
-    # Delete associated tags
-    tags = db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all()
-    for tag_link in tags:
-        db.delete(tag_link)
+    # Cascade delete all associated data
+    from fourdpocket.models.comment import Comment
+    from fourdpocket.models.collection import CollectionItem
+    from fourdpocket.models.embedding import Embedding
+    from fourdpocket.models.highlight import Highlight
+    from fourdpocket.models.item_link import ItemLink
+    from fourdpocket.models.share import Share
+
+    for model, fk in [
+        (ItemTag, ItemTag.item_id),
+        (Highlight, Highlight.item_id),
+        (Comment, Comment.item_id),
+        (Embedding, Embedding.item_id),
+        (CollectionItem, CollectionItem.item_id),
+        (ItemLink, ItemLink.item_id),
+    ]:
+        for row in db.exec(select(model).where(fk == item_id)).all():
+            db.delete(row)
+
+    # Delete shares referencing this item
+    for share in db.exec(select(Share).where(Share.item_id == item_id)).all():
+        from fourdpocket.models.share import ShareRecipient
+        for sr in db.exec(select(ShareRecipient).where(ShareRecipient.share_id == share.id)).all():
+            db.delete(sr)
+        db.delete(share)
+
+    # Remove from FTS index
+    try:
+        from fourdpocket.config import get_settings
+        _settings = get_settings()
+        if _settings.search.backend == "sqlite" and _settings.database.url.startswith("sqlite"):
+            from fourdpocket.search.sqlite_fts import delete_item as fts_delete
+            fts_delete(db, item_id)
+    except Exception:
+        pass
 
     db.delete(item)
     db.commit()

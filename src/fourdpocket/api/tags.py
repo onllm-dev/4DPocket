@@ -119,10 +119,20 @@ def delete_tag(
     if not tag or tag.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
 
-    # Remove all item-tag associations
-    links = db.exec(select(ItemTag).where(ItemTag.tag_id == tag_id)).all()
-    for link in links:
+    # Remove all item-tag and note-tag associations
+    from fourdpocket.models.note_tag import NoteTag
+
+    for link in db.exec(select(ItemTag).where(ItemTag.tag_id == tag_id)).all():
         db.delete(link)
+    for link in db.exec(select(NoteTag).where(NoteTag.tag_id == tag_id)).all():
+        db.delete(link)
+
+    # Remove shares referencing this tag
+    from fourdpocket.models.share import Share, ShareRecipient
+    for share in db.exec(select(Share).where(Share.tag_id == tag_id)).all():
+        for sr in db.exec(select(ShareRecipient).where(ShareRecipient.share_id == share.id)).all():
+            db.delete(sr)
+        db.delete(share)
 
     # Unparent child tags
     children = db.exec(select(Tag).where(Tag.parent_id == tag_id)).all()

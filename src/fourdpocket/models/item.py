@@ -21,7 +21,7 @@ class KnowledgeItem(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     item_type: ItemType = Field(default=ItemType.url)
     source_platform: SourcePlatform = Field(default=SourcePlatform.generic)
-    url: str | None = None
+    url: str | None = Field(default=None, index=True)
     title: str | None = None
     description: str | None = None
     content: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
@@ -42,7 +42,7 @@ class KnowledgeItem(SQLModel, table=True):
     )
     created_at: datetime = Field(
         default_factory=utc_now,
-        sa_column=Column(DateTime(timezone=True), nullable=False),
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
     updated_at: datetime = Field(
         default_factory=utc_now,

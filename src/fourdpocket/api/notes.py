@@ -157,6 +157,29 @@ def delete_note(
     note = db.get(Note, note_id)
     if not note or note.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    # Cascade delete associated data
+    from fourdpocket.models.note_tag import NoteTag
+    from fourdpocket.models.highlight import Highlight
+    from fourdpocket.models.collection_note import CollectionNote
+
+    for row in db.exec(select(NoteTag).where(NoteTag.note_id == note_id)).all():
+        db.delete(row)
+    for row in db.exec(select(Highlight).where(Highlight.note_id == note_id)).all():
+        db.delete(row)
+    for row in db.exec(select(CollectionNote).where(CollectionNote.note_id == note_id)).all():
+        db.delete(row)
+
+    # Remove from FTS index
+    try:
+        from fourdpocket.config import get_settings as _get_settings
+        _s = _get_settings()
+        if _s.search.backend == "sqlite" and _s.database.url.startswith("sqlite"):
+            from sqlalchemy import text as _text
+            db.exec(_text("DELETE FROM notes_fts WHERE note_id = :nid"), params={"nid": str(note_id)})
+    except Exception:
+        pass
+
     db.delete(note)
     db.commit()
 

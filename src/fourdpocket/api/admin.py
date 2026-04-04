@@ -75,6 +75,107 @@ def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    # Cascade delete ALL user-owned data (GDPR-compliant full removal)
+    from fourdpocket.models.collection import Collection, CollectionItem
+    from fourdpocket.models.collection_note import CollectionNote
+    from fourdpocket.models.comment import Comment
+    from fourdpocket.models.embedding import Embedding
+    from fourdpocket.models.feed import KnowledgeFeed
+    from fourdpocket.models.feed_entry import FeedEntry
+    from fourdpocket.models.highlight import Highlight
+    from fourdpocket.models.item import KnowledgeItem
+    from fourdpocket.models.item_link import ItemLink
+    from fourdpocket.models.note import Note
+    from fourdpocket.models.note_tag import NoteTag
+    from fourdpocket.models.rule import Rule
+    from fourdpocket.models.rss_feed import RSSFeed
+    from fourdpocket.models.saved_filter import SavedFilter
+    from fourdpocket.models.share import Share, ShareRecipient
+    from fourdpocket.models.tag import ItemTag, Tag
+
+    uid = user_id
+
+    # 1. Delete share recipients (both sent and received)
+    user_shares = db.exec(select(Share).where(Share.owner_id == uid)).all()
+    for share in user_shares:
+        for sr in db.exec(select(ShareRecipient).where(ShareRecipient.share_id == share.id)).all():
+            db.delete(sr)
+        db.delete(share)
+    # Remove as recipient from others' shares
+    for sr in db.exec(select(ShareRecipient).where(ShareRecipient.user_id == uid)).all():
+        db.delete(sr)
+
+    # 2. Delete item-level data
+    user_items = db.exec(select(KnowledgeItem).where(KnowledgeItem.user_id == uid)).all()
+    item_ids = [i.id for i in user_items]
+    if item_ids:
+        for row in db.exec(select(ItemTag).where(ItemTag.item_id.in_(item_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(Highlight).where(Highlight.item_id.in_(item_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(Comment).where(Comment.item_id.in_(item_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(Embedding).where(Embedding.item_id.in_(item_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(CollectionItem).where(CollectionItem.item_id.in_(item_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(ItemLink).where(ItemLink.item_id.in_(item_ids))).all():
+            db.delete(row)
+
+    # 3. Delete note-level data
+    user_notes = db.exec(select(Note).where(Note.user_id == uid)).all()
+    note_ids = [n.id for n in user_notes]
+    if note_ids:
+        for row in db.exec(select(NoteTag).where(NoteTag.note_id.in_(note_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(Highlight).where(Highlight.note_id.in_(note_ids))).all():
+            db.delete(row)
+        for row in db.exec(select(CollectionNote).where(CollectionNote.note_id.in_(note_ids))).all():
+            db.delete(row)
+
+    # 4. Delete collections
+    for coll in db.exec(select(Collection).where(Collection.user_id == uid)).all():
+        for ci in db.exec(select(CollectionItem).where(CollectionItem.collection_id == coll.id)).all():
+            db.delete(ci)
+        for cn in db.exec(select(CollectionNote).where(CollectionNote.collection_id == coll.id)).all():
+            db.delete(cn)
+        db.delete(coll)
+
+    # 5. Delete tags, notes, items
+    for tag in db.exec(select(Tag).where(Tag.user_id == uid)).all():
+        db.delete(tag)
+    for note in user_notes:
+        db.delete(note)
+    for item in user_items:
+        db.delete(item)
+
+    # 6. Delete RSS feeds, feed entries, rules, saved filters, knowledge feeds
+    for feed in db.exec(select(RSSFeed).where(RSSFeed.user_id == uid)).all():
+        for entry in db.exec(select(FeedEntry).where(FeedEntry.feed_id == feed.id)).all():
+            db.delete(entry)
+        db.delete(feed)
+    for row in db.exec(select(Rule).where(Rule.user_id == uid)).all():
+        db.delete(row)
+    for row in db.exec(select(SavedFilter).where(SavedFilter.user_id == uid)).all():
+        db.delete(row)
+    for row in db.exec(select(KnowledgeFeed).where(KnowledgeFeed.user_id == uid)).all():
+        db.delete(row)
+    # Also delete comments on others' items
+    for row in db.exec(select(Comment).where(Comment.user_id == uid)).all():
+        db.delete(row)
+
+    # 7. Clean up FTS indexes
+    try:
+        from fourdpocket.config import get_settings as _get_settings
+        _s = _get_settings()
+        if _s.search.backend == "sqlite" and _s.database.url.startswith("sqlite"):
+            from sqlalchemy import text as _text
+            db.exec(_text("DELETE FROM items_fts WHERE user_id = :uid"), params={"uid": str(uid)})
+            db.exec(_text("DELETE FROM notes_fts WHERE user_id = :uid"), params={"uid": str(uid)})
+    except Exception:
+        pass
+
     db.delete(user)
     db.commit()
 
