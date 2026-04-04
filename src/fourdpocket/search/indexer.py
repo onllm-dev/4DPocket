@@ -33,7 +33,6 @@ class SearchIndexer:
             sqlite_fts.index_item(self._db, item)
         elif self._backend == "meilisearch":
             from fourdpocket.search.meilisearch_backend import index_item as meili_index
-
             meili_index(item)
 
     def delete_item(self, item_id: uuid.UUID) -> None:
@@ -43,7 +42,6 @@ class SearchIndexer:
             sqlite_fts.delete_item(self._db, item_id)
         elif self._backend == "meilisearch":
             from fourdpocket.search.meilisearch_backend import delete_item as meili_delete
-
             meili_delete(item_id)
 
     def search(
@@ -52,6 +50,11 @@ class SearchIndexer:
         user_id: uuid.UUID,
         item_type: str | None = None,
         source_platform: str | None = None,
+        is_favorite: bool | None = None,
+        is_archived: bool | None = None,
+        tags: list[str] | None = None,
+        after: str | None = None,
+        before: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict]:
@@ -59,10 +62,18 @@ class SearchIndexer:
         if self._backend == "sqlite":
             from fourdpocket.search import sqlite_fts
             return sqlite_fts.search(
-                self._db, query, user_id, item_type, source_platform, limit, offset
+                self._db, query, user_id,
+                item_type=item_type,
+                source_platform=source_platform,
+                is_favorite=is_favorite,
+                is_archived=is_archived,
+                tags=tags,
+                after=after,
+                before=before,
+                limit=limit,
+                offset=offset,
             )
         elif self._backend == "meilisearch":
             from fourdpocket.search.meilisearch_backend import search as meili_search
-
             return meili_search(query, user_id, item_type, source_platform, limit, offset)
         return []

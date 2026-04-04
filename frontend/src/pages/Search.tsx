@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote } from "lucide-react";
+import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote, Zap, Tag, Calendar, Star, Archive } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import { api } from "@/api/client";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 import NoteCard from "@/components/bookmark/NoteCard";
-import { useSearchNotes } from "@/hooks/use-notes";
 
 interface Item {
   id: string;
@@ -25,12 +24,19 @@ interface Item {
   updated_at: string;
   title_snippet?: string | null;
   content_snippet?: string | null;
+  sources?: string[];
 }
 
 interface SearchFilters {
   platforms: Array<{ name: string; count: number }>;
   types: string[];
   tags: Array<{ name: string; slug: string; count: number }>;
+}
+
+interface UnifiedResult {
+  items: Item[];
+  notes: Array<{ id: string; title: string | null; content: string; created_at: string; updated_at: string }>;
+  total: number;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -65,6 +71,8 @@ const TYPE_LABELS: Record<string, string> = {
   file: "File",
 };
 
+type SearchMode = "fulltext" | "semantic" | "hybrid";
+
 function formatPlatformLabel(raw: string | undefined | null): string {
   if (!raw) return "";
   const cleaned = raw.replace(/^SourcePlatform\./, "");
@@ -81,45 +89,74 @@ export default function Search() {
   const initialQuery = searchParams.get("q") ?? "";
   const [input, setInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
-  const [semantic, setSemantic] = useState(false);
+  const [mode, setMode] = useState<SearchMode>("fulltext");
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data: filters } = useQuery<SearchFilters>({
     queryKey: ["search-filters"],
     queryFn: () => api.get("/api/v1/search/filters"),
   });
 
-  // Build semantic search URL with optional filters
+  // Build filter params
+  const filterParams = new URLSearchParams();
+  if (selectedPlatform) filterParams.set("source_platform", selectedPlatform);
+  if (selectedType) filterParams.set("item_type", selectedType);
+  if (selectedTag) filterParams.set("tag", selectedTag);
+  if (showFavorites) filterParams.set("is_favorite", "true");
+  if (showArchived) filterParams.set("is_archived", "true");
+  const filterStr = filterParams.toString() ? `&${filterParams.toString()}` : "";
+
+  // Unified search (items + notes) — default mode
+  const unifiedUrl = query.length >= 2
+    ? `/api/v1/search/unified?q=${encodeURIComponent(query)}${filterStr}`
+    : null;
+
+  const { data: unifiedResults, isLoading: unifiedLoading, isFetching: unifiedFetching } =
+    useQuery<UnifiedResult>({
+      queryKey: ["search-unified", query, selectedPlatform, selectedType, selectedTag, showFavorites, showArchived],
+      queryFn: () => api.get(unifiedUrl!),
+      enabled: mode === "fulltext" && query.length >= 2,
+    });
+
+  // Semantic search
   const semanticUrl = query.length >= 2
-    ? `/api/v1/search/semantic?q=${encodeURIComponent(query)}${selectedPlatform ? `&source_platform=${selectedPlatform}` : ""}${selectedType ? `&item_type=${selectedType}` : ""}`
+    ? `/api/v1/search/semantic?q=${encodeURIComponent(query)}${filterStr}`
     : null;
 
   const { data: semanticResults, isLoading: semanticLoading, isFetching: semanticFetching } =
     useQuery<Item[]>({
       queryKey: ["search-semantic", query, selectedPlatform, selectedType],
       queryFn: () => api.get(semanticUrl!),
-      enabled: semantic && query.length >= 2,
+      enabled: mode === "semantic" && query.length >= 2,
     });
 
-  // Full-text search (existing hook) - but we need filter support too
-  const fulltextUrl = query.length >= 2
-    ? `/api/v1/search?q=${encodeURIComponent(query)}${selectedPlatform ? `&source_platform=${selectedPlatform}` : ""}${selectedType ? `&item_type=${selectedType}` : ""}`
-    : "";
+  // Hybrid search
+  const hybridUrl = query.length >= 2
+    ? `/api/v1/search/hybrid?q=${encodeURIComponent(query)}${filterStr}`
+    : null;
 
-  const { data: fulltextResults, isLoading: fulltextLoading, isFetching: fulltextFetching } =
+  const { data: hybridResults, isLoading: hybridLoading, isFetching: hybridFetching } =
     useQuery<Item[]>({
-      queryKey: ["search", query, selectedPlatform, selectedType],
-      queryFn: () => api.get(fulltextUrl),
-      enabled: !semantic && query.length >= 2,
+      queryKey: ["search-hybrid", query, selectedPlatform, selectedType],
+      queryFn: () => api.get(hybridUrl!),
+      enabled: mode === "hybrid" && query.length >= 2,
     });
 
-  // Note search
-  const { data: noteResults, isLoading: notesLoading } = useSearchNotes(query);
+  const items = mode === "fulltext"
+    ? (unifiedResults?.items ?? [])
+    : mode === "semantic"
+    ? (semanticResults ?? [])
+    : (hybridResults ?? []);
 
-  const results = semantic ? semanticResults : fulltextResults;
-  const isLoading = semantic ? semanticLoading : fulltextLoading;
-  const isFetching = semantic ? semanticFetching : fulltextFetching;
+  const notes = mode === "fulltext" ? (unifiedResults?.notes ?? []) : [];
+  const isLoading = mode === "fulltext" ? unifiedLoading : mode === "semantic" ? semanticLoading : hybridLoading;
+  const isFetching = mode === "fulltext" ? unifiedFetching : mode === "semantic" ? semanticFetching : hybridFetching;
+  const totalResults = items.length + notes.length;
+  const showSkeleton = (isLoading || isFetching) && query.length >= 2;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -133,10 +170,11 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [input, setSearchParams]);
 
-  const items = results ?? [];
-  const notes = noteResults ?? [];
-  const totalResults = items.length + notes.length;
-  const showSkeleton = (isLoading || isFetching || notesLoading) && query.length >= 2;
+  const modes: { key: SearchMode; label: string; icon: typeof AlignLeft; desc: string }[] = [
+    { key: "fulltext", label: "Full-text", icon: AlignLeft, desc: "Keyword search with fuzzy fallback" },
+    { key: "hybrid", label: "Hybrid", icon: Zap, desc: "Keyword + AI semantic combined" },
+    { key: "semantic", label: "Semantic", icon: Sparkles, desc: "AI meaning-based search" },
+  ];
 
   return (
     <div className="animate-fade-in p-6 max-w-5xl mx-auto">
@@ -153,7 +191,7 @@ export default function Search() {
           type="search"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Search your knowledge base..."
+          placeholder="Search your knowledge base... (try tag:ml is:favorite after:2024-01)"
           autoFocus
           className="w-full pl-12 pr-12 py-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-600 transition-all duration-200 shadow-sm"
         />
@@ -164,39 +202,56 @@ export default function Search() {
 
       {/* Search mode toggle */}
       <div className="flex items-center gap-2 mb-4">
+        {modes.map(({ key, label, icon: Icon, desc }) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            title={desc}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+              mode === key
+                ? "bg-sky-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Quick filter toggles */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
-          onClick={() => setSemantic(false)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
-            !semantic
-              ? "bg-sky-600 text-white"
-              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
+          onClick={() => setShowFavorites(!showFavorites)}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+            showFavorites
+              ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 ring-1 ring-amber-300 dark:ring-amber-700"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
           }`}
         >
-          <AlignLeft className="h-3.5 w-3.5" />
-          Full-text
+          <Star className="h-3 w-3" />
+          Favorites
         </button>
         <button
-          onClick={() => setSemantic(true)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
-            semantic
-              ? "bg-sky-600 text-white"
-              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
+          onClick={() => setShowArchived(!showArchived)}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+            showArchived
+              ? "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-400"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
           }`}
         >
-          <Sparkles className="h-3.5 w-3.5" />
-          Semantic
+          <Archive className="h-3 w-3" />
+          Archived
         </button>
       </div>
 
-      {/* Filter chips */}
-      {(filters?.platforms?.length || filters?.types?.length) ? (
+      {/* Platform + Type + Tag filter chips */}
+      {(filters?.platforms?.length || filters?.types?.length || filters?.tags?.length) ? (
         <div className="flex flex-wrap gap-2 mb-6">
-          {filters.platforms?.map((p) => (
+          {filters?.platforms?.map((p) => (
             <button
               key={p.name}
-              onClick={() =>
-                setSelectedPlatform(selectedPlatform === p.name ? null : p.name)
-              }
+              onClick={() => setSelectedPlatform(selectedPlatform === p.name ? null : p.name)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
                 selectedPlatform === p.name
                   ? "bg-sky-600 text-white"
@@ -206,12 +261,10 @@ export default function Search() {
               {formatPlatformLabel(p.name)} ({p.count})
             </button>
           ))}
-          {filters.types?.map((type) => (
+          {filters?.types?.map((type) => (
             <button
               key={type}
-              onClick={() =>
-                setSelectedType(selectedType === type ? null : type)
-              }
+              onClick={() => setSelectedType(selectedType === type ? null : type)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
                 selectedType === type
                   ? "bg-violet-600 text-white"
@@ -219,6 +272,20 @@ export default function Search() {
               }`}
             >
               {formatTypeLabel(type)}
+            </button>
+          ))}
+          {filters?.tags?.slice(0, 15).map((t) => (
+            <button
+              key={t.slug}
+              onClick={() => setSelectedTag(selectedTag === t.slug ? null : t.slug)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                selectedTag === t.slug
+                  ? "bg-emerald-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-sm"
+              }`}
+            >
+              <Tag className="h-3 w-3" />
+              {t.name} ({t.count})
             </button>
           ))}
         </div>
@@ -230,8 +297,11 @@ export default function Search() {
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             Search your knowledge base
           </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            Type at least 2 characters to search across all your saved content
+          <p className="text-sm text-gray-400 dark:text-gray-500 max-w-md mx-auto">
+            Type at least 2 characters. Try URLs, keywords, or filters like{" "}
+            <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-xs">tag:ml</code>{" "}
+            <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-xs">is:favorite</code>{" "}
+            <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-xs">after:2024-01</code>
           </p>
         </div>
       ) : showSkeleton && totalResults === 0 ? (
@@ -254,15 +324,17 @@ export default function Search() {
             No results for &ldquo;{query}&rdquo;
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500">
-            Try different keywords or switch to {semantic ? "full-text" : "semantic"} search
+            {mode === "fulltext"
+              ? "Try different keywords, a URL, or switch to Hybrid/Semantic search"
+              : "Try different keywords or switch to Full-text search"}
           </p>
         </div>
       ) : (
         <div>
           {totalResults > 0 && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {totalResults} result{totalResults !== 1 ? "s" : ""} for &ldquo;
-              {query}&rdquo;
+              {totalResults} result{totalResults !== 1 ? "s" : ""} for &ldquo;{query}&rdquo;
+              {mode === "hybrid" && <span className="ml-1 text-xs text-sky-500">(keyword + semantic fusion)</span>}
             </p>
           )}
 
