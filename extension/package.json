@@ -1,0 +1,19 @@
+{
+  "name": "4dpocket-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt --browser firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build --browser firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip --browser firefox"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wxt": "^0.19.0",
+    "typescript": "^5.5.0"
+  }
+}

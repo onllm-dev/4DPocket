@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4DPocket Highlights</title>
+  <script type="module" crossorigin src="/chunks/sidepanel-R5bbuIM1.js"></script>
+  <link rel="modulepreload" crossorigin href="/chunks/auth-C4kx9BHk.js">
+  <link rel="modulepreload" crossorigin href="/chunks/items-BcXKT9tZ.js">
+  <link rel="stylesheet" crossorigin href="/assets/sidepanel-DZsNxMlg.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>4DPocket</h1>
+      <p class="subtitle" id="page-info">Highlights for this page</p>
+    </header>
+
+    <div id="state-loading" class="state">
+      <div class="spinner"></div>
+      <p>Loading highlights...</p>
+    </div>
+
+    <div id="state-not-connected" class="state">
+      <p>Not connected to 4DPocket</p>
+      <button id="open-options" class="btn btn-primary">Open Settings</button>
+    </div>
+
+    <div id="state-empty" class="state">
+      <p class="empty-text">No highlights on this page</p>
+      <p class="empty-hint">Select text on any page and click "Save to 4DPocket" to create highlights</p>
+    </div>
+
+    <div id="state-not-saved" class="state">
+      <p>This page hasn't been saved yet</p>
+      <p class="empty-hint">Save this page first, then highlights will appear here</p>
+    </div>
+
+    <div id="state-highlights" class="state">
+      <div id="highlights-list"></div>
+    </div>
+
+    <div id="state-error" class="state">
+      <p class="error-text" id="error-message">Failed to load highlights</p>
+      <button id="retry-btn" class="btn btn-secondary">Retry</button>
+    </div>
+  </div>
+
+</body>
+</html>

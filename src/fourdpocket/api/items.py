@@ -383,6 +383,24 @@ def get_read_items(
     return items
 
 
+@router.get("/check-url")
+def check_url(
+    url: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check if a URL is already saved by the current user."""
+    item = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.url == url,
+        )
+    ).first()
+    if item:
+        return {"exists": True, "item_id": str(item.id), "title": item.title}
+    return {"exists": False}
+
+
 @router.get("/{item_id}", response_model=ItemRead)
 def get_item(
     item_id: uuid.UUID,

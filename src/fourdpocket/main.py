@@ -50,8 +50,24 @@ if has_wildcard:
     logger.warning(
         "CORS wildcard '*' detected - credentials disabled for security"
     )
+
+
+class ExtensionCORSMiddleware(CORSMiddleware):
+    """CORS middleware that also allows browser extension origins.
+
+    Chrome/Edge extensions use ``chrome-extension://<id>`` and Firefox
+    extensions use ``moz-extension://<id>``.  The extension ID changes per
+    install, so we allow all of them automatically.
+    """
+
+    def is_allowed_origin(self, origin: str) -> bool:
+        if origin.startswith(("chrome-extension://", "moz-extension://")):
+            return True
+        return super().is_allowed_origin(origin=origin)
+
+
 app.add_middleware(
-    CORSMiddleware,
+    ExtensionCORSMiddleware,
     allow_origins=settings.server.cors_origins,
     allow_credentials=not has_wildcard,
     allow_methods=["*"],

@@ -200,3 +200,58 @@ def test_remove_tag_from_item(client, auth_headers):
 
     response = client.delete(f"/api/v1/items/{item_id}/tags/{tag_id}", headers=auth_headers)
     assert response.status_code == 204
+
+
+def test_check_url_exists(client, auth_headers):
+    """Should return exists=True with item details when URL is already saved."""
+    create_resp = client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com/saved", "title": "Saved Article"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    item_id = create_resp.json()["id"]
+
+    response = client.get(
+        "/api/v1/items/check-url?url=https://example.com/saved",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["item_id"] == item_id
+    assert data["title"] == "Saved Article"
+
+
+def test_check_url_not_exists(client, auth_headers):
+    """Should return exists=False when URL is not saved."""
+    response = client.get(
+        "/api/v1/items/check-url?url=https://example.com/not-saved",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+
+
+def test_check_url_user_scoped(client, auth_headers, second_user_headers):
+    """Should not find URLs saved by other users."""
+    client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com/user1-only"},
+        headers=auth_headers,
+    )
+
+    response = client.get(
+        "/api/v1/items/check-url?url=https://example.com/user1-only",
+        headers=second_user_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+
+
+def test_check_url_requires_auth(client):
+    """Should return 401 when no auth headers provided."""
+    response = client.get("/api/v1/items/check-url?url=https://example.com")
+    assert response.status_code == 401

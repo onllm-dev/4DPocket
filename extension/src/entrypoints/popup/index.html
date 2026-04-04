@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>4DPocket</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">4D</div>
+      <h1>4DPocket</h1>
+    </header>
+
+    <!-- Not Connected -->
+    <div id="state-not-connected" class="state state-message">
+      <div class="icon">&#128268;</div>
+      <p>No server configured.<br>Set up your 4DPocket server first.</p>
+      <button class="link-btn" id="open-options-connect">Open Settings</button>
+    </div>
+
+    <!-- Not Logged In -->
+    <div id="state-not-logged-in" class="state state-message">
+      <div class="icon">&#128274;</div>
+      <p>You're not logged in.<br>Sign in to start saving.</p>
+      <button class="link-btn" id="open-options-login">Open Settings</button>
+    </div>
+
+    <!-- Loading -->
+    <div id="state-loading" class="state state-loading">
+      <div class="spinner"></div>
+      <p>Checking page...</p>
+    </div>
+
+    <!-- Ready to Save -->
+    <div id="state-ready" class="state">
+      <div class="page-info">
+        <div class="page-title" id="page-title"></div>
+        <div class="page-url" id="page-url"></div>
+      </div>
+      <button class="btn btn-primary" id="save-btn">Save to 4DPocket</button>
+    </div>
+
+    <!-- Saving -->
+    <div id="state-saving" class="state state-saving">
+      <div class="spinner"></div>
+      <p>Saving...</p>
+    </div>
+
+    <!-- Saved Successfully -->
+    <div id="state-saved" class="state state-saved">
+      <div class="checkmark-circle">
+        <svg viewBox="0 0 24 24">
+          <polyline points="6 12 10 16 18 8"></polyline>
+        </svg>
+      </div>
+      <div class="saved-title">Saved!</div>
+      <div class="saved-subtitle" id="saved-subtitle"></div>
+      <button class="btn btn-primary" id="view-saved-btn">View in 4DPocket</button>
+    </div>
+
+    <!-- Already Saved -->
+    <div id="state-already-saved" class="state state-already-saved">
+      <div class="already-saved-icon">&#9989;</div>
+      <div class="saved-title">Already Saved</div>
+      <div class="saved-subtitle" id="already-saved-title"></div>
+      <button class="btn btn-primary" id="view-existing-btn">View in 4DPocket</button>
+    </div>
+
+    <!-- Error -->
+    <div id="state-error" class="state state-error">
+      <div class="error-icon">!</div>
+      <div class="error-title">Save Failed</div>
+      <div class="error-detail" id="error-detail"></div>
+      <button class="btn btn-danger" id="retry-btn">Retry</button>
+    </div>
+
+    <!-- Footer (shown when logged in) -->
+    <div id="footer" class="footer" style="display:none;">
+      <span class="user-tag">Signed in as <strong id="footer-username"></strong></span>
+      <button class="settings-btn" id="open-settings" title="Settings">&#9881;</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

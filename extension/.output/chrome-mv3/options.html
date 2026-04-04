@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4DPocket Settings</title>
+  <script type="module" crossorigin src="/chunks/options-DF3jaevs.js"></script>
+  <link rel="modulepreload" crossorigin href="/chunks/auth-C4kx9BHk.js">
+  <link rel="stylesheet" crossorigin href="/assets/options-CyTw-_vy.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>4DPocket</h1>
+      <p class="subtitle">Connect to your knowledge base</p>
+    </header>
+
+    <section id="connection-section">
+      <h2>Server Connection</h2>
+      <div class="field">
+        <label for="server-url">Server URL</label>
+        <div class="input-row">
+          <input type="url" id="server-url" placeholder="http://localhost:4040">
+          <button id="test-btn" class="btn btn-secondary">Test</button>
+        </div>
+        <div id="connection-status" class="status hidden"></div>
+      </div>
+    </section>
+
+    <section id="auth-section">
+      <div id="login-form-container">
+        <h2>Login</h2>
+        <form id="login-form">
+          <div class="field">
+            <label for="username">Username or Email</label>
+            <input type="text" id="username" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" required autocomplete="current-password">
+          </div>
+          <div id="login-error" class="status status-error hidden"></div>
+          <button type="submit" id="login-btn" class="btn btn-primary">Login</button>
+        </form>
+      </div>
+
+      <div id="logged-in-container" class="hidden">
+        <h2>Connected</h2>
+        <div class="user-info">
+          <span id="user-display">Logged in as <strong id="username-display"></strong></span>
+          <button id="logout-btn" class="btn btn-secondary">Logout</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,218 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+  width: 100%;
+}
+
+.container {
+  padding: 16px;
+}
+
+header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+header h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0096C7;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* State containers */
+.state {
+  display: none;
+}
+
+.state.active {
+  display: block;
+}
+
+/* Loading state */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #0096C7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 24px auto 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#state-loading {
+  text-align: center;
+  padding: 24px 0;
+}
+
+#state-loading p {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Not connected state */
+#state-not-connected {
+  text-align: center;
+  padding: 24px 0;
+}
+
+#state-not-connected p {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+/* Empty state */
+.empty-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  text-align: center;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.4;
+  padding: 0 12px;
+}
+
+/* Not saved state */
+#state-not-saved {
+  text-align: center;
+  padding: 24px 0;
+}
+
+#state-not-saved p:first-child {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+/* Error state */
+.error-text {
+  font-size: 13px;
+  color: #dc2626;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#state-error {
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Highlight cards */
+#highlights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.highlight-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #FCD34D;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.highlight-text {
+  font-size: 13px;
+  font-style: italic;
+  color: #334155;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.highlight-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.highlight-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.highlight-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.highlight-note {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+  line-height: 1.4;
+}
+
+/* Buttons */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #0096C7;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #0077a8;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* Highlight color variants */
+.color-yellow { border-left-color: #FCD34D; }
+.color-green { border-left-color: #4ADE80; }
+.color-blue { border-left-color: #60A5FA; }
+.color-red { border-left-color: #F87171; }
+.color-purple { border-left-color: #C084FC; }
