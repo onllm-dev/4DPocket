@@ -42,12 +42,43 @@ def list_feeds(
     return db.exec(select(RSSFeed).where(RSSFeed.user_id == current_user.id).order_by(RSSFeed.created_at.desc())).all()
 
 
+def _is_safe_feed_url(url: str) -> bool:
+    """Validate RSS feed URL is safe (SSRF protection at creation time)."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname or hostname in ("localhost",):
+            return False
+        if hostname.endswith(".local") or hostname.endswith(".internal"):
+            return False
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for family, _, _, _, sockaddr in addr_info:
+                ip = ipaddress.ip_address(sockaddr[0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    return False
+        except socket.gaierror:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 @router.post("", status_code=201)
 def create_feed(
     body: RSSFeedCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not _is_safe_feed_url(body.url):
+        raise HTTPException(status_code=400, detail="Feed URL targets a blocked network")
+
     feed = RSSFeed(
         user_id=current_user.id,
         url=body.url,

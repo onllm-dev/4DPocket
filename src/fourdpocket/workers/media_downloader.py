@@ -80,7 +80,27 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
             continue
 
         try:
-            with httpx.stream("GET", media_url, timeout=30.0, follow_redirects=True, headers={"User-Agent": "4DPocket/0.1"}) as response:
+            # Disable follow_redirects — validate each redirect hop for SSRF
+            current_url = media_url
+            final_response = None
+            for _redirect in range(5):
+                if not _is_safe_media_url(current_url):
+                    logger.warning("SSRF blocked redirect: %s", current_url)
+                    break
+                resp = httpx.head(current_url, timeout=10.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"})
+                if resp.is_redirect:
+                    current_url = resp.headers.get("location", "")
+                    if not current_url:
+                        break
+                    continue
+                final_response = current_url
+                break
+
+            if not final_response:
+                logger.warning("Media redirect chain invalid: %s", media_url)
+                continue
+
+            with httpx.stream("GET", final_response, timeout=30.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"}) as response:
                 response.raise_for_status()
                 total_size = 0
                 chunks = []

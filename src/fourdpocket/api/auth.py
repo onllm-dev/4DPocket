@@ -19,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # In-memory rate limiting for failed login attempts.
 # NOTE: For production multi-instance deployments, replace with a Redis- or
 # database-backed store so limits survive restarts and are shared across nodes.
+_MAX_TRACKED_KEYS = 10000
 _failed_login_attempts: dict[str, dict] = defaultdict(lambda: {"count": 0, "locked_until": 0.0})
 
 # Constant-time padding: always run a password verification even when the user
@@ -31,7 +32,23 @@ LOCKOUT_DURATIONS = [5, 10, 20, 40, 80]  # Minutes for consecutive failures
 _register_attempts: dict[str, list[float]] = {}
 
 
+def _evict_stale_login_entries() -> None:
+    """Evict stale entries from rate limit dicts to prevent unbounded memory growth."""
+    now = time.time()
+    if len(_failed_login_attempts) > _MAX_TRACKED_KEYS:
+        stale = [k for k, v in _failed_login_attempts.items()
+                 if v["count"] == 0 and v["locked_until"] < now]
+        for k in stale:
+            del _failed_login_attempts[k]
+    if len(_register_attempts) > _MAX_TRACKED_KEYS:
+        stale = [k for k, v in _register_attempts.items()
+                 if all(now - t > 3600 for t in v)]
+        for k in stale:
+            del _register_attempts[k]
+
+
 def _check_register_rate_limit(client_ip: str) -> None:
+    _evict_stale_login_entries()
     now = time.time()
     attempts = [t for t in _register_attempts.get(client_ip, []) if now - t < 3600]
     if len(attempts) >= 10:

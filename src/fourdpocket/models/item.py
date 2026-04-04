@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import ItemType, ReadingStatus, SourcePlatform, utc_now
@@ -57,6 +57,17 @@ class ItemCreate(BaseModel):
     content: str | None = None
     item_type: ItemType = ItemType.url
     source_platform: SourcePlatform = SourcePlatform.generic
+
+    @field_validator("url")
+    @classmethod
+    def validate_url_scheme(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        from urllib.parse import urlparse
+        parsed = urlparse(v)
+        if parsed.scheme and parsed.scheme not in ("http", "https"):
+            raise ValueError("Only http and https URLs are allowed")
+        return v
 
 
 class ItemRead(BaseModel):

@@ -805,15 +805,27 @@ def media_proxy(
         mime_type = mime_map.get(resolved.suffix.lower()) or mimetypes.guess_type(str(resolved))[0] or "application/octet-stream"
         return FileResponse(resolved, media_type=mime_type)
 
-    # Fetch from source
+    # Fetch from source — validate each redirect hop for SSRF
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         }
-        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-            resp = client.get(url, headers=headers)
-            resp.raise_for_status()
+        current_fetch_url = url
+        with httpx.Client(timeout=10.0, follow_redirects=False) as client:
+            for _hop in range(5):
+                if not _is_safe_proxy_url(current_fetch_url):
+                    raise HTTPException(status_code=400, detail="URL not allowed")
+                resp = client.get(current_fetch_url, headers=headers)
+                if resp.is_redirect:
+                    current_fetch_url = resp.headers.get("location", "")
+                    if not current_fetch_url:
+                        raise HTTPException(status_code=502, detail="Empty redirect")
+                    continue
+                resp.raise_for_status()
+                break
+            else:
+                raise HTTPException(status_code=502, detail="Too many redirects")
     except Exception as e:
         logger.warning("Media proxy fetch failed for %s: %s", url, e)
         raise HTTPException(status_code=502, detail="Failed to fetch image")
@@ -876,6 +888,11 @@ def serve_media(
 
     settings = get_settings()
     storage = LocalStorage(base_path=settings.storage.base_path)
+
+    # Ensure path belongs to the requesting user's directory (prevent cross-user access)
+    user_prefix = str(current_user.id) + "/"
+    if not path.startswith(user_prefix):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     try:
         file_bytes = storage.get_file(path)
