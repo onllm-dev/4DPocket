@@ -45,6 +45,8 @@ class TagCreate(BaseModel):
     color: str | None = None
     parent_id: uuid.UUID | None = None
 
+    model_config = {"extra": "forbid"}
+
 
 class TagRead(BaseModel):
     id: uuid.UUID

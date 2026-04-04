@@ -373,13 +373,19 @@ def get_public_share(
         tag_ids = [tl.tag_id for tl in tag_links]
         tags = db.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
         owner = db.get(User, item.user_id)
+        import re as _re
+        def _strip_html(text: str | None) -> str | None:
+            if not text:
+                return text
+            return _re.sub(r"<[^>]+>", "", text)
+
         return {
             "id": str(item.id),
-            "title": item.title,
+            "title": _strip_html(item.title),
             "url": item.url,
-            "description": item.description,
-            "content": item.content,
-            "summary": item.summary,
+            "description": _strip_html(item.description),
+            "content": _strip_html(item.content),
+            "summary": _strip_html(item.summary),
             "source_platform": item.source_platform,
             "created_at": item.created_at.isoformat() if item.created_at else None,
             "tags": [t.name for t in tags],

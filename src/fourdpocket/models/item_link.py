@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import utc_now
@@ -34,6 +34,16 @@ class ItemLinkCreate(BaseModel):
     title: str | None = None
     domain: str | None = None
     position: int = 0
+
+    model_config = {"extra": "forbid"}
+
+    @field_validator("url")
+    @classmethod
+    def reject_dangerous_schemes(cls, v: str) -> str:
+        lowered = v.lower().strip()
+        if any(lowered.startswith(s) for s in ("javascript:", "data:", "vbscript:")):
+            raise ValueError("URL scheme not permitted")
+        return v
 
 
 class ItemLinkRead(BaseModel):

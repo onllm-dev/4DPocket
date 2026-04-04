@@ -13,6 +13,9 @@ from fourdpocket.models.user import User
 router = APIRouter(prefix="/highlights", tags=["highlights"])
 
 
+_ALLOWED_POSITION_KEYS = {"start", "end", "paragraph", "sentence"}
+
+
 class HighlightCreate(BaseModel):
     item_id: uuid.UUID | None = None
     note_id: uuid.UUID | None = None
@@ -26,6 +29,12 @@ class HighlightCreate(BaseModel):
             raise ValueError("Either item_id or note_id must be provided")
         if self.item_id and self.note_id:
             raise ValueError("Only one of item_id or note_id should be provided")
+        if self.position is not None:
+            for key in self.position:
+                if key not in _ALLOWED_POSITION_KEYS:
+                    raise ValueError(f"position key '{key}' not allowed")
+                if not isinstance(self.position[key], (int, float)):
+                    raise ValueError(f"position['{key}'] must be a number")
 
 
 class HighlightUpdate(BaseModel):

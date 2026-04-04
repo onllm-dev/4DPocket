@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole
+from fourdpocket.models.tag import ItemTag
 
 
 def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
@@ -31,6 +32,21 @@ def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
     ).first()
     if shared:
         return True
+    # Check if item is accessible via tag shares
+    item_tags = db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all()
+    for it in item_tags:
+        tag_shared = db.exec(
+            select(ShareRecipient)
+            .join(Share, Share.id == ShareRecipient.share_id)
+            .where(
+                Share.tag_id == it.tag_id,
+                ShareRecipient.user_id == user_id,
+                ShareRecipient.accepted,
+                (Share.expires_at == None) | (Share.expires_at > now),  # noqa: E711
+            )
+        ).first()
+        if tag_shared:
+            return True
     # Check if item is in any shared collection
     collection_items = db.exec(
         select(CollectionItem).where(CollectionItem.item_id == item_id)

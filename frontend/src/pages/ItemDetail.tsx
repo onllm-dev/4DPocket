@@ -1115,7 +1115,7 @@ function ItemLinksSection({ itemId }: { itemId: string }) {
             />
             <div className="flex-1 min-w-0">
               <a
-                href={link.url}
+                href={link.url.match(/^https?:\/\//i) ? link.url : '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-gray-800 dark:text-gray-200 hover:text-sky-600 truncate block"

@@ -171,6 +171,27 @@ def download_video(url: str, output_dir: str, max_quality: str = "720") -> str |
         logger.warning("SSRF blocked video download: %s", url)
         return None
 
+    # Resolve URL through redirects with SSRF validation per hop before handing to yt-dlp
+    try:
+        current_url = url
+        for _redirect in range(5):
+            if not _is_safe_media_url(current_url):
+                logger.warning("SSRF blocked video redirect: %s", current_url)
+                return None
+            resp = httpx.head(current_url, timeout=10.0, follow_redirects=False, headers={"User-Agent": "4DPocket/0.1"})
+            if resp.is_redirect:
+                current_url = resp.headers.get("location", "")
+                if not current_url:
+                    return None
+                continue
+            break
+        # Final URL must also be safe
+        if not _is_safe_media_url(current_url):
+            logger.warning("SSRF blocked video final URL: %s", current_url)
+            return None
+    except Exception:
+        return None
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_template = str(Path(output_dir) / "%(title)s.%(ext)s")
 
@@ -183,7 +204,7 @@ def download_video(url: str, output_dir: str, max_quality: str = "720") -> str |
                 "--merge-output-format", "mp4",
                 "-o", output_template,
                 "--max-filesize", "500M",
-                url,
+                current_url,
             ],
             capture_output=True, text=True, timeout=600,
         )

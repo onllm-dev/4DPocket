@@ -2,11 +2,19 @@
 
 import json
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 
 import httpx
 from huey import crontab
 from sqlmodel import Session, select
+
+
+def _strip_html_tags(text: str | None) -> str | None:
+    """Strip HTML tags from RSS content to prevent stored XSS."""
+    if not text:
+        return text
+    return re.sub(r"<[^>]+>", "", text).strip()
 
 from fourdpocket.models.base import ItemType, SourcePlatform
 from fourdpocket.models.item import KnowledgeItem
@@ -55,7 +63,7 @@ def _parse_json_feed(feed: RSSFeed, content: str, db: Session) -> int:
             continue
 
         title = entry.get("title") or url
-        description = entry.get("summary") or entry.get("content_text") or None
+        description = _strip_html_tags(entry.get("summary") or entry.get("content_text") or None)
 
         # Apply keyword filters if set
         if feed.filters:
@@ -159,7 +167,7 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
                 continue
 
             title = title_el.text if title_el is not None else url
-            description = desc_el.text if desc_el is not None else None
+            description = _strip_html_tags(desc_el.text) if desc_el is not None else None
 
             # Apply keyword filters if set
             if feed.filters:

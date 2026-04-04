@@ -142,8 +142,12 @@ def delete_user(
             db.delete(cn)
         db.delete(coll)
 
-    # 5. Delete tags, notes, items
+    # 5. Delete tags (with ItemTag cleanup), notes, items
     for tag in db.exec(select(Tag).where(Tag.user_id == uid)).all():
+        for it_row in db.exec(select(ItemTag).where(ItemTag.tag_id == tag.id)).all():
+            db.delete(it_row)
+        for nt_row in db.exec(select(NoteTag).where(NoteTag.tag_id == tag.id)).all():
+            db.delete(nt_row)
         db.delete(tag)
     for note in user_notes:
         db.delete(note)

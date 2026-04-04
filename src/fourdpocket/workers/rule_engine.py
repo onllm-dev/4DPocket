@@ -1,10 +1,42 @@
 """Execute automation rules on item events."""
 
 import re
+import signal
 
 from sqlmodel import Session, select
 
 MAX_PATTERN_LEN = 200
+_REGEX_TIMEOUT_SECS = 2
+
+# Patterns that cause catastrophic backtracking: nested quantifiers like (a+)+
+_DANGEROUS_PATTERN = re.compile(r"\([^)]*[+*][^)]*\)[+*{]")
+
+
+class _RegexTimeout(Exception):
+    pass
+
+
+def _timeout_handler(signum, frame):
+    raise _RegexTimeout("Regex execution timed out")
+
+
+def _safe_regex_match(pattern: str, text: str) -> bool:
+    """Execute regex with timeout and complexity guard."""
+    if _DANGEROUS_PATTERN.search(pattern):
+        return False
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return False
+    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(_REGEX_TIMEOUT_SECS)
+    try:
+        return bool(compiled.search(text))
+    except _RegexTimeout:
+        return False
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem
@@ -20,11 +52,7 @@ def evaluate_condition(condition: dict, item: KnowledgeItem, db: Session | None 
         pattern = condition.get("pattern", "")
         if not pattern or len(pattern) > MAX_PATTERN_LEN:
             return False
-        try:
-            compiled = re.compile(pattern)
-        except re.error:
-            return False
-        return bool(item.url and compiled.search(item.url[:2000]))
+        return bool(item.url and _safe_regex_match(pattern, item.url[:2000]))
 
     elif cond_type == "source_platform":
         return item.source_platform == condition.get("platform", "")

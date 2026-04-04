@@ -101,10 +101,17 @@ def _import_json(json_str: str, user_id, db: Session) -> int:
     for entry in items:
         url = entry.get("url", "")
         title = entry.get("title", url)
+        # Cap individual field sizes to prevent storage DoS
+        description = entry.get("description")
+        content = entry.get("content")
+        if description and len(description) > 50_000:
+            description = description[:50_000]
+        if content and len(content) > 1_000_000:
+            content = content[:1_000_000]
         item = KnowledgeItem(
-            user_id=user_id, url=url or None, title=title,
-            description=entry.get("description"),
-            content=entry.get("content"),
+            user_id=user_id, url=url or None, title=title[:500] if title else None,
+            description=description,
+            content=content,
             item_type=ItemType.url, source_platform=SourcePlatform.generic,
         )
         db.add(item)
@@ -153,7 +160,7 @@ def export_bookmarks(
         for i in items:
             safe_url = _safe_href(i.url)
             if safe_url:
-                title = (i.title or i.url).replace("<", "&lt;").replace(">", "&gt;")
+                title = (i.title or i.url).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
                 lines.append(f'    <DT><A HREF="{safe_url}">{title}</A>')
         lines.append('</DL><p>')
         content = "\n".join(lines)
