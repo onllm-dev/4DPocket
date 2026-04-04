@@ -2,6 +2,18 @@
 
 import base64
 import re
+import urllib.parse
+
+# Cyrillic/Greek homoglyphs that look identical to ASCII
+_HOMOGLYPH_MAP = str.maketrans({
+    '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p',
+    '\u0441': 'c', '\u0456': 'i', '\u0458': 'j', '\u0455': 's',
+    '\u0445': 'x', '\u043d': 'h', '\u0443': 'y', '\u0442': 't',
+    '\u03bf': 'o', '\u03bd': 'v',  # Greek
+})
+
+# Zero-width and invisible characters
+_INVISIBLE_CHARS = re.compile(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad\u200e\u200f]+')
 
 # Patterns commonly used in prompt injection attacks
 _INJECTION_PATTERNS = [
@@ -35,6 +47,20 @@ def sanitize_for_prompt(text: str, max_length: int = 4000) -> str:
         return ""
 
     text = text[:max_length]
+
+    # Strip invisible/zero-width characters
+    text = _INVISIBLE_CHARS.sub('', text)
+
+    # Normalize unicode homoglyphs (Cyrillic/Greek lookalikes → ASCII)
+    text = text.translate(_HOMOGLYPH_MAP)
+
+    # URL-decode and re-check (catches %3Cscript%3E etc.)
+    try:
+        decoded = urllib.parse.unquote(text)
+        if decoded != text:
+            text = decoded
+    except Exception:
+        pass
 
     for pattern in _COMPILED_PATTERNS:
         text = pattern.sub("[content filtered]", text)

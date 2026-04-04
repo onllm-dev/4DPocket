@@ -99,6 +99,8 @@ def validate_public_token(db: Session, token: str) -> Share | None:
     share = db.exec(select(Share).where(Share.public_token == token)).first()
     if not share:
         return None
+    if not share.public:
+        return None
     if share.expires_at and share.expires_at < datetime.now(timezone.utc):
         return None
     return share

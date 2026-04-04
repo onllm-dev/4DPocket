@@ -258,9 +258,13 @@ def update_ai_settings(
     # Only accept known AI config keys
     for key, value in update_dict.items():
         if key in AI_CONFIG_KEYS:
-            # Don't overwrite key with masked value
-            if key.endswith("_key") and value and "..." in value:
+            # Don't overwrite secrets with masked value
+            if (key.endswith("_key") or key.endswith("_url")) and value and "..." in value:
                 continue
+            # Validate URL fields point to valid http(s) endpoints
+            if key.endswith("_url") and value:
+                if not value.startswith(("http://", "https://")):
+                    continue
             ai_config[key] = value
 
     extra["ai_config"] = ai_config

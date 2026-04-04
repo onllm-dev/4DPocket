@@ -124,7 +124,16 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
             logger.warning("SSRF blocked: RSS feed URL %s targets internal network", feed.url)
             return 0
 
-        resp = httpx.get(feed.url, timeout=15, follow_redirects=True)
+        resp = httpx.get(feed.url, timeout=15, follow_redirects=False)
+        # Manually follow redirects with SSRF check per hop
+        for _ in range(5):
+            if not resp.is_redirect:
+                break
+            location = resp.headers.get("location", "")
+            if not location or not is_safe_url(location):
+                logger.warning("SSRF blocked: RSS redirect to %s", location)
+                return 0
+            resp = httpx.get(location, timeout=15, follow_redirects=False)
         resp.raise_for_status()
 
         # JSON Feed detection

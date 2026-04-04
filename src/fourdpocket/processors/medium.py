@@ -28,7 +28,11 @@ def _try_json_endpoint(url: str) -> dict | None:
 
     Medium prefixes JSON responses with `])}while(1);</x>` to prevent JSONP abuse.
     """
+    from fourdpocket.processors.base import _is_safe_url
+
     json_url = url.rstrip("/") + "?format=json"
+    if not _is_safe_url(json_url):
+        return None
     try:
         resp = httpx.get(
             json_url,
@@ -36,7 +40,7 @@ def _try_json_endpoint(url: str) -> dict | None:
                 "User-Agent": "Mozilla/5.0 (compatible; 4DPocket/1.0)",
                 "Accept": "application/json",
             },
-            follow_redirects=True,
+            follow_redirects=False,
             timeout=15,
         )
         if resp.status_code != 200:

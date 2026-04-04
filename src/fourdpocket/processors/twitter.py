@@ -46,10 +46,8 @@ class TwitterProcessor(BaseProcessor):
         fx_url = f"https://api.fxtwitter.com/{username}/status/{tweet_id}"
 
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(fx_url)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._fetch_url(fx_url, timeout=15)
+            data = response.json()
         except Exception as e:
             logger.warning("fxtwitter API failed for %s: %s", url, e)
             # Fall back to URL-only result

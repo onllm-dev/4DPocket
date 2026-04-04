@@ -31,21 +31,14 @@ class RedditProcessor(BaseProcessor):
         # Redirect redd.it short URLs
         if "redd.it/" in url:
             try:
-                async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
-                    resp = await client.head(url)
-                    json_url = str(resp.url).rstrip("/") + ".json"
+                resp = await self._fetch_url(url, timeout=15)
+                json_url = str(resp.url).rstrip("/") + ".json"
             except Exception:
                 pass
 
-        headers = {
-            "User-Agent": "4DPocket/0.1 (Knowledge Base; +https://github.com/4dpocket)",
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-                response = await client.get(json_url, headers=headers)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._fetch_url(json_url, timeout=30)
+            data = response.json()
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url,

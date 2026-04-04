@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
 from fourdpocket.config import get_settings
@@ -28,6 +29,15 @@ def get_engine():
             echo=settings.database.echo,
             connect_args=connect_args,
         )
+
+        # Enable SQLite foreign key enforcement
+        if db_url.startswith("sqlite"):
+            @event.listens_for(_engine, "connect")
+            def _set_sqlite_pragma(dbapi_conn, connection_record):
+                cursor = dbapi_conn.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+
     return _engine
 
 

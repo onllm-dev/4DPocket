@@ -58,10 +58,8 @@ class MastodonProcessor(BaseProcessor):
             status_id = match.group(2)
             api_url = f"https://{instance}/api/v1/statuses/{status_id}"
 
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(api_url)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._fetch_url(api_url, timeout=15)
+            data = response.json()
 
         except httpx.HTTPStatusError as e:
             return ProcessorResult(

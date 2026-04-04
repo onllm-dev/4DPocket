@@ -487,7 +487,7 @@ def delete_item(
     for tag_link in db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all():
         tag = db.get(Tag, tag_link.tag_id)
         if tag and tag.usage_count > 0:
-            tag.usage_count = Tag.usage_count - 1
+            tag.usage_count = tag.usage_count - 1
             db.add(tag)
         db.delete(tag_link)
 

@@ -167,7 +167,7 @@ def delete_note(
     for row in db.exec(select(NoteTag).where(NoteTag.note_id == note_id)).all():
         tag = db.get(Tag, row.tag_id)
         if tag and tag.usage_count > 0:
-            tag.usage_count = Tag.usage_count - 1
+            tag.usage_count = tag.usage_count - 1
             db.add(tag)
         db.delete(row)
     for row in db.exec(select(Highlight).where(Highlight.note_id == note_id)).all():

@@ -28,10 +28,8 @@ class SpotifyProcessor(BaseProcessor):
         oembed_url = f"https://open.spotify.com/oembed?url={url}"
 
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(oembed_url)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._fetch_url(oembed_url, timeout=15)
+            data = response.json()
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url,

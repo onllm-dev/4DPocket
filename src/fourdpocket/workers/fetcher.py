@@ -12,12 +12,34 @@ logger = logging.getLogger(__name__)
 def _fetch_favicon(item, url: str) -> None:
     """Fetch favicon for a URL and update the item.
 
-    Tries Google's favicon service first (no CORS issues), then falls back
-    to /favicon.ico. Failures are silent — favicon is best-effort only.
+    Tries Google's favicon service (no CORS issues). Skips internal/private
+    hostnames to avoid leaking network topology to Google.
     """
     try:
+        import ipaddress
+        import socket
+
         parsed = urlparse(url)
         domain = parsed.netloc or parsed.path.split("/")[0]
+        if not domain:
+            return
+        # Strip port if present
+        hostname = domain.split(":")[0]
+        # Skip IP addresses and internal hostnames
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return
+        except ValueError:
+            # Not an IP — check if hostname resolves to internal
+            try:
+                addr_info = socket.getaddrinfo(hostname, None)
+                for _, _, _, _, sockaddr in addr_info:
+                    ip = ipaddress.ip_address(sockaddr[0])
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        return
+            except socket.gaierror:
+                return
         favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
         item.favicon_url = favicon_url
     except Exception:

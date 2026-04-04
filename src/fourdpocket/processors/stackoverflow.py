@@ -35,22 +35,19 @@ class StackOverflowProcessor(BaseProcessor):
             )
 
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                q_url = (
-                    f"https://api.stackexchange.com/2.3/questions/{question_id}"
-                    "?site=stackoverflow&filter=withbody"
-                )
-                q_resp = await client.get(q_url)
-                q_resp.raise_for_status()
-                q_data = q_resp.json()
+            q_url = (
+                f"https://api.stackexchange.com/2.3/questions/{question_id}"
+                "?site=stackoverflow&filter=withbody"
+            )
+            q_resp = await self._fetch_url(q_url, timeout=15)
+            q_data = q_resp.json()
 
-                a_url = (
-                    f"https://api.stackexchange.com/2.3/questions/{question_id}/answers"
-                    "?site=stackoverflow&filter=withbody&sort=votes&pagesize=3"
-                )
-                a_resp = await client.get(a_url)
-                a_resp.raise_for_status()
-                a_data = a_resp.json()
+            a_url = (
+                f"https://api.stackexchange.com/2.3/questions/{question_id}/answers"
+                "?site=stackoverflow&filter=withbody&sort=votes&pagesize=3"
+            )
+            a_resp = await self._fetch_url(a_url, timeout=15)
+            a_data = a_resp.json()
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url,

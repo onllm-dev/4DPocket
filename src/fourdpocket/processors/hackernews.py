@@ -52,10 +52,8 @@ class HackerNewsProcessor(BaseProcessor):
 
         api_url = f"https://hn.algolia.com/api/v1/items/{item_id}"
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(api_url)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._fetch_url(api_url, timeout=15)
+            data = response.json()
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url,

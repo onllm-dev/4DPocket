@@ -4,6 +4,7 @@ import Highlight from "@tiptap/extension-highlight";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
+import DOMPurify from "dompurify";
 import {
   Bold,
   Italic,
@@ -74,7 +75,16 @@ export default function TiptapEditor({
     content,
     editable,
     onUpdate: ({ editor: e }) => {
-      onChange(e.getHTML());
+      const raw = e.getHTML();
+      const clean = DOMPurify.sanitize(raw, {
+        ALLOWED_TAGS: [
+          "p", "br", "strong", "em", "s", "code", "pre", "blockquote",
+          "h1", "h2", "h3", "ul", "ol", "li", "mark", "span",
+          "input", "label", "div",
+        ],
+        ALLOWED_ATTR: ["class", "type", "checked", "data-type", "data-checked"],
+      });
+      onChange(clean);
     },
     editorProps: {
       attributes: {
