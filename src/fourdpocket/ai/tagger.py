@@ -150,7 +150,7 @@ def auto_tag_item(
             if not existing:
                 link = ItemTag(item_id=item_id, tag_id=tag.id, confidence=confidence)
                 db.add(link)
-                tag.usage_count += 1
+                tag.usage_count = Tag.usage_count + 1  # SQL-level atomic increment
                 db.add(tag)
 
         applied_tags.append({
@@ -240,7 +240,7 @@ def auto_tag_note(
             if not existing:
                 link = NoteTag(note_id=note_id, tag_id=tag.id, confidence=confidence)
                 db.add(link)
-                tag.usage_count += 1
+                tag.usage_count = Tag.usage_count + 1  # SQL-level atomic increment
                 db.add(tag)
 
         applied_tags.append({

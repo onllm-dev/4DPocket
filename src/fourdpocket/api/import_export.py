@@ -183,9 +183,18 @@ def export_bookmarks(
     elif format == "markdown":
         lines = ["# 4DPocket Export\n"]
         for i in items:
-            title = i.title or "Untitled"
-            if i.url:
-                lines.append(f"- [{title}]({i.url})")
+            title = (i.title or "Untitled").replace("[", "\\[").replace("]", "\\]")
+            url = i.url or ""
+            # Block non-http schemes (e.g. javascript:) and escape markdown parens
+            if url:
+                from urllib.parse import urlparse as _urlparse_md
+                _scheme = _urlparse_md(url).scheme
+                if _scheme and _scheme not in ("http", "https"):
+                    url = ""
+                else:
+                    url = url.replace("(", "%28").replace(")", "%29")
+            if url:
+                lines.append(f"- [{title}]({url})")
             else:
                 lines.append(f"- {title}")
             if i.description:

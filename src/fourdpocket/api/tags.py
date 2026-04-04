@@ -140,7 +140,9 @@ def suggest_tag_merges(
     current_user: User = Depends(get_current_user),
 ):
     """Suggest tags that could be merged (similar names)."""
-    tags = db.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+    tags = db.exec(
+        select(Tag).where(Tag.user_id == current_user.id).limit(500)
+    ).all()
     suggestions = []
 
     from difflib import SequenceMatcher
