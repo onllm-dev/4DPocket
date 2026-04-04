@@ -68,3 +68,7 @@ pnpm-debug.log*
 # Test artifacts
 test-results/
 playwright-report/
+
+# Internal audit docs (not for public repo)
+docs/SECURITY_AUDIT_*.md
+docs/AUDIT_REPORT_*.md
