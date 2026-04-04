@@ -1,12 +1,28 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import DOMPurify from "dompurify";
+import { marked } from "marked";
 import { ExternalLink, Copy, Code, FileText, Check } from "lucide-react";
 
 interface ContentRendererProps {
   content: string | null;
   rawContent?: string | null;
   sourceUrl?: string | null;
+  sourcePlatform?: string | null;
   onTextSelect?: (text: string, position: { start: number; end: number }) => void;
+}
+
+// Platforms that output markdown content from their processors
+const MARKDOWN_PLATFORMS = new Set([
+  "reddit", "github", "stackoverflow", "youtube",
+  "hackernews", "medium", "substack",
+]);
+
+function isLikelyMarkdown(text: string): boolean {
+  // Detect markdown patterns: headers, bold, links, code blocks
+  return /^#{1,6}\s/m.test(text) ||
+    /\*\*[^*]+\*\*/m.test(text) ||
+    /```[\s\S]*?```/m.test(text) ||
+    /^\s*[-*]\s/m.test(text);
 }
 
 function extractDomain(url: string): string {
@@ -21,6 +37,7 @@ export default function ContentRenderer({
   content,
   rawContent,
   sourceUrl,
+  sourcePlatform,
   onTextSelect,
 }: ContentRendererProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
@@ -29,7 +46,16 @@ export default function ContentRenderer({
 
   const displayContent = content || rawContent || "";
 
-  const sanitizedHtml = DOMPurify.sanitize(displayContent, {
+  // Convert markdown to HTML for platforms that output markdown
+  const htmlContent = useMemo(() => {
+    const platform = sourcePlatform?.replace(/^SourcePlatform\./, "") || "";
+    if (MARKDOWN_PLATFORMS.has(platform) || isLikelyMarkdown(displayContent)) {
+      return marked.parse(displayContent, { async: false }) as string;
+    }
+    return displayContent;
+  }, [displayContent, sourcePlatform]);
+
+  const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
     ALLOWED_TAGS: [
       "h1", "h2", "h3", "h4", "h5", "h6",
       "p", "br", "hr",

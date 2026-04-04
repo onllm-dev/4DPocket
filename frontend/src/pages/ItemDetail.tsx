@@ -21,6 +21,7 @@ import {
   Repeat2,
   Pencil,
   FolderPlus,
+  BookOpen,
   BookMarked,
   LinkIcon,
   Plus,
@@ -711,6 +712,18 @@ export default function ItemDetail() {
           <button onClick={() => setShareOpen(true)} aria-label="Share" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <Share2 className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => toggleReadingList.mutate({ id: item.id, type: "item", add: item.reading_status !== "reading_list" })}
+            aria-label={item.reading_status === "reading_list" ? "Remove from Reading List" : "Add to Reading List"}
+            title={item.reading_status === "reading_list" ? "Remove from Reading List" : "Add to Reading List"}
+            className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+              item.reading_status === "reading_list"
+                ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+          </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
           {confirmDelete ? (
             <div className="flex items-center gap-1 ml-1">
@@ -822,9 +835,10 @@ export default function ItemDetail() {
           </h2>
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
-              <span
+              <Link
                 key={tag.tag_id}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
+                to={`/tags/${tag.tag_id}`}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs hover:opacity-80 transition-opacity cursor-pointer"
                 style={{
                   backgroundColor: tag.tag_color ? `${tag.tag_color}20` : undefined,
                   color: tag.tag_color || undefined,
@@ -841,7 +855,7 @@ export default function ItemDetail() {
                     {Math.round(tag.confidence * 100)}%
                   </span>
                 )}
-              </span>
+              </Link>
             ))}
           </div>
         </div>
@@ -862,6 +876,7 @@ export default function ItemDetail() {
             content={item.content}
             rawContent={item.raw_content}
             sourceUrl={item.url}
+            sourcePlatform={item.source_platform}
           />
         </TextHighlighter>
       )}

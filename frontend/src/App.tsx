@@ -25,6 +25,7 @@ const Timeline = lazy(() => import("./pages/Timeline"));
 const Highlights = lazy(() => import("./pages/Highlights"));
 const NoteDetail = lazy(() => import("./pages/NoteDetail"));
 const ReadingList = lazy(() => import("./pages/ReadingList"));
+const TagDetail = lazy(() => import("./pages/TagDetail"));
 
 function LoadingFallback() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/collections" element={<SuspenseWrap><Collections /></SuspenseWrap>} />
           <Route path="/collections/:id" element={<SuspenseWrap><CollectionDetail /></SuspenseWrap>} />
           <Route path="/tags" element={<SuspenseWrap><Tags /></SuspenseWrap>} />
+          <Route path="/tags/:id" element={<SuspenseWrap><TagDetail /></SuspenseWrap>} />
           <Route path="/notes" element={<SuspenseWrap><Notes /></SuspenseWrap>} />
           <Route path="/notes/:id" element={<SuspenseWrap><NoteDetail /></SuspenseWrap>} />
           <Route path="/reading-list" element={<SuspenseWrap><ReadingList /></SuspenseWrap>} />
