@@ -129,11 +129,38 @@ Every user gets their own isolated pocket. Knowledge is private by default, shar
 - **Responsive** - Optimized for mobile (bottom nav, touch-friendly), tablet (collapsible sidebar), and desktop (full sidebar, keyboard shortcuts).
 - **Dark Mode** - System-aware with manual toggle.
 
-### Browser Extensions (Coming Soon)
+### Chrome Extension
 
-- **Chrome** - Save pages, highlights, and selections with one click.
-- **Firefox** - Full extension support with context menu integration.
-- **Safari** - Native Safari extension for macOS and iOS.
+Save pages with one click, highlight text on any page, and view highlights in a sidebar - all from your browser.
+
+**Install (Developer Mode):**
+
+```bash
+cd extension
+pnpm install
+pnpm build
+```
+
+Then in Chrome:
+1. Go to `chrome://extensions`
+2. Enable **Developer mode** (top right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/dist/chrome-mv3` folder
+
+**Setup:**
+1. Click the 4DPocket extension icon, then **Open Settings**
+2. Enter your server URL (e.g. `https://your-server.com` or `http://localhost:4040`)
+3. Click **Test** to verify the connection
+4. Login with your 4DPocket username and password
+
+**What it does:**
+- **One-click save** - Click the icon to save the current page
+- **Right-click save** - Right-click any page or selected text to save
+- **Auto-detect** - Badge shows a checkmark on pages you've already saved
+- **Highlight capture** - Select text on any page, click the floating tooltip to save it as a highlight
+- **Sidebar panel** - View all your highlights for the current page in Chrome's side panel
+
+> Firefox, Edge, and Safari extensions are planned.
 
 ### Native Apps (Coming Soon)
 
@@ -254,6 +281,10 @@ Interactive docs at http://localhost:4040/docs when running.
 │       ├── components/       # Layout, BookmarkCard, ShareDialog, CommandPalette
 │       ├── hooks/            # TanStack Query data hooks + keyboard shortcuts
 │       └── stores/           # Zustand UI state
+├── extension/                # Chrome browser extension
+│   ├── src/core/            # Shared logic (auth, API client, types)
+│   ├── src/entrypoints/     # Popup, options, sidepanel, content script, background
+│   └── dist/                # Built extension (load in Chrome)
 ├── tests/                    # pytest test suite (65+ tests)
 ├── Dockerfile               # Multi-stage Python build
 ├── docker-compose.yml       # Full stack orchestration
