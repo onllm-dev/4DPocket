@@ -58,6 +58,8 @@ class ItemCreate(BaseModel):
     item_type: ItemType = ItemType.url
     source_platform: SourcePlatform = SourcePlatform.generic
 
+    model_config = {"extra": "forbid"}
+
     @field_validator("url")
     @classmethod
     def validate_url_scheme(cls, v: str | None) -> str | None:
@@ -67,6 +69,20 @@ class ItemCreate(BaseModel):
         parsed = urlparse(v)
         if parsed.scheme and parsed.scheme not in ("http", "https"):
             raise ValueError("Only http and https URLs are allowed")
+        return v
+
+    @field_validator("content")
+    @classmethod
+    def cap_content_size(cls, v: str | None) -> str | None:
+        if v and len(v) > 1_000_000:
+            return v[:1_000_000]
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def cap_description_size(cls, v: str | None) -> str | None:
+        if v and len(v) > 50_000:
+            return v[:50_000]
         return v
 
 

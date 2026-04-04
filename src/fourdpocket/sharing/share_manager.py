@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from fourdpocket.models.collection import Collection
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole, ShareType
+from fourdpocket.models.tag import Tag
 
 
 def create_share(
@@ -29,6 +30,10 @@ def create_share(
         coll = db.get(Collection, collection_id)
         if not coll or str(coll.user_id) != str(owner_id):
             raise ValueError("Collection not found or not owned by user")
+    if tag_id:
+        tag = db.get(Tag, tag_id)
+        if not tag or str(tag.user_id) != str(owner_id):
+            raise ValueError("Tag not found or not owned by user")
 
     share = Share(
         owner_id=owner_id,

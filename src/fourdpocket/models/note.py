@@ -43,6 +43,8 @@ class NoteCreate(BaseModel):
     item_id: uuid.UUID | None = None
     tags: list[str] | None = None
 
+    model_config = {"extra": "forbid"}
+
 
 class NoteRead(BaseModel):
     id: uuid.UUID

@@ -53,6 +53,8 @@ class CollectionCreate(BaseModel):
     description: str | None = None
     icon: str | None = None
 
+    model_config = {"extra": "forbid"}
+
 
 class CollectionRead(BaseModel):
     id: uuid.UUID

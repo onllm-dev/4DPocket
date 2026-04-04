@@ -36,6 +36,8 @@ class ShareCreate(BaseModel):
     recipient_email: str | None = None
     permission: str = "viewer"  # "viewer" or "editor"
 
+    model_config = {"extra": "forbid"}
+
 
 class ShareRead(BaseModel):
     id: uuid.UUID

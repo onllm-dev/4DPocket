@@ -21,6 +21,8 @@ router = APIRouter(prefix="/items/{item_id}/comments", tags=["comments"])
 class CommentCreate(BaseModel):
     content: str
 
+    model_config = {"extra": "forbid"}
+
 
 class CommentRead(BaseModel):
     id: uuid.UUID

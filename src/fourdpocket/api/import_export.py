@@ -100,6 +100,9 @@ def _import_json(json_str: str, user_id, db: Session) -> int:
     count = 0
     for entry in items:
         url = entry.get("url", "")
+        # Validate URL scheme (same as Chrome/Pocket import)
+        if url and not url.startswith(("http://", "https://")):
+            continue
         title = entry.get("title", url)
         # Cap individual field sizes to prevent storage DoS
         description = entry.get("description")
@@ -160,7 +163,7 @@ def export_bookmarks(
         for i in items:
             safe_url = _safe_href(i.url)
             if safe_url:
-                title = (i.title or i.url).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+                title = (i.title or i.url).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
                 lines.append(f'    <DT><A HREF="{safe_url}">{title}</A>')
         lines.append('</DL><p>')
         content = "\n".join(lines)

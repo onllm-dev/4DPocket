@@ -31,6 +31,8 @@ class RuleCreate(BaseModel):
     action: RuleAction
     is_active: bool = True
 
+    model_config = {"extra": "forbid"}
+
 
 class RuleUpdate(BaseModel):
     name: str | None = None

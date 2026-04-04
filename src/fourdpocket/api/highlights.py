@@ -24,6 +24,8 @@ class HighlightCreate(BaseModel):
     color: str = "yellow"
     position: dict | None = None
 
+    model_config = {"extra": "forbid"}
+
     def model_post_init(self, __context):
         if not self.item_id and not self.note_id:
             raise ValueError("Either item_id or note_id must be provided")
