@@ -33,6 +33,8 @@ class ShareCreate(BaseModel):
     tag_id: uuid.UUID | None = None
     public: bool = False
     expires_hours: int | None = None
+    recipient_email: str | None = None
+    permission: str = "viewer"  # "viewer" or "editor"
 
 
 class ShareRead(BaseModel):
@@ -111,6 +113,31 @@ def create_share_endpoint(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+    if body.recipient_email:
+        recipient_user = db.exec(
+            select(User).where(User.email == body.recipient_email)
+        ).first()
+        if not recipient_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        if recipient_user.id == current_user.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot share with yourself")
+        existing = db.exec(
+            select(ShareRecipient).where(
+                ShareRecipient.share_id == share.id,
+                ShareRecipient.user_id == recipient_user.id,
+            )
+        ).first()
+        if not existing:
+            role = ShareRecipientRole.editor if body.permission == "editor" else ShareRecipientRole.viewer
+            sr = ShareRecipient(
+                share_id=share.id,
+                user_id=recipient_user.id,
+                role=role,
+            )
+            db.add(sr)
+            db.commit()
+
     return share
 
 

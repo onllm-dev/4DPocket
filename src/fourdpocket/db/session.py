@@ -53,6 +53,8 @@ def _ensure_columns(engine):
         ("rss_feeds", "format", "VARCHAR DEFAULT 'rss'"),
         ("rss_feeds", "mode", "VARCHAR DEFAULT 'auto'"),
         ("rss_feeds", "filters", "TEXT"),
+        ("rss_feeds", "last_error", "TEXT"),
+        ("rss_feeds", "error_count", "INTEGER DEFAULT 0"),
     ]
 
     with Session(engine) as db:

@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -23,6 +23,10 @@ class FilterUpdate(BaseModel):
     name: str | None = None
     query: str | None = None
     filters: dict | None = None
+
+
+# Alias used in endpoint signatures
+SavedFilterUpdate = FilterUpdate
 
 
 @router.get("")
@@ -48,3 +52,72 @@ def delete_filter(filter_id: uuid.UUID, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=404, detail="Filter not found")
     db.delete(f)
     db.commit()
+
+
+@router.patch("/{filter_id}")
+def update_saved_filter(
+    filter_id: uuid.UUID,
+    body: SavedFilterUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    sf = db.exec(
+        select(SavedFilter).where(
+            SavedFilter.id == filter_id,
+            SavedFilter.user_id == current_user.id,
+        )
+    ).first()
+    if not sf:
+        raise HTTPException(status_code=404, detail="Filter not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(sf, field, value)
+    db.commit()
+    db.refresh(sf)
+    return sf
+
+
+@router.get("/{filter_id}/execute")
+def execute_saved_filter(
+    filter_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    sf = db.exec(
+        select(SavedFilter).where(
+            SavedFilter.id == filter_id,
+            SavedFilter.user_id == current_user.id,
+        )
+    ).first()
+    if not sf:
+        raise HTTPException(status_code=404, detail="Filter not found")
+
+    from fourdpocket.search.indexer import SearchIndexer
+
+    indexer = SearchIndexer(db)
+
+    filters = sf.filters or {}
+    results = indexer.search(
+        query=sf.query or "",
+        user_id=current_user.id,
+        item_type=filters.get("item_type"),
+        source_platform=filters.get("source_platform"),
+        limit=limit,
+        offset=offset,
+    )
+
+    if not results:
+        return []
+
+    from fourdpocket.models.item import KnowledgeItem
+
+    item_ids = [uuid.UUID(r["item_id"]) for r in results]
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id.in_(item_ids),
+            KnowledgeItem.user_id == current_user.id,
+        )
+    ).all()
+    item_map = {item.id: item for item in items}
+    return [item_map[iid] for iid in item_ids if iid in item_map]

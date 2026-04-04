@@ -1,10 +1,11 @@
 """Share permission checks."""
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from fourdpocket.models.collection import Collection
+from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole
 
@@ -16,7 +17,8 @@ def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
         return False
     if item.user_id == user_id:
         return True
-    # Check if item is shared with user
+    # Check if item is shared with user (skip expired shares)
+    now = datetime.now(timezone.utc)
     shared = db.exec(
         select(ShareRecipient)
         .join(Share, Share.id == ShareRecipient.share_id)
@@ -24,12 +26,18 @@ def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
             Share.item_id == item_id,
             ShareRecipient.user_id == user_id,
             ShareRecipient.accepted,
+            (Share.expires_at == None) | (Share.expires_at > now),  # noqa: E711
         )
     ).first()
     if shared:
         return True
-    # Check if item's collection is shared
-    # (items in a shared collection are accessible)
+    # Check if item is in any shared collection
+    collection_items = db.exec(
+        select(CollectionItem).where(CollectionItem.item_id == item_id)
+    ).all()
+    for ci in collection_items:
+        if can_view_collection(db=db, user_id=user_id, collection_id=ci.collection_id):
+            return True
     return False
 
 
@@ -40,6 +48,7 @@ def can_edit_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
         return False
     if item.user_id == user_id:
         return True
+    now = datetime.now(timezone.utc)
     shared = db.exec(
         select(ShareRecipient)
         .join(Share, Share.id == ShareRecipient.share_id)
@@ -48,6 +57,7 @@ def can_edit_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
             ShareRecipient.user_id == user_id,
             ShareRecipient.role == ShareRecipientRole.editor,
             ShareRecipient.accepted,
+            (Share.expires_at == None) | (Share.expires_at > now),  # noqa: E711
         )
     ).first()
     return shared is not None
@@ -62,6 +72,7 @@ def can_view_collection(
         return False
     if col.user_id == user_id:
         return True
+    now = datetime.now(timezone.utc)
     shared = db.exec(
         select(ShareRecipient)
         .join(Share, Share.id == ShareRecipient.share_id)
@@ -69,6 +80,7 @@ def can_view_collection(
             Share.collection_id == collection_id,
             ShareRecipient.user_id == user_id,
             ShareRecipient.accepted,
+            (Share.expires_at == None) | (Share.expires_at > now),  # noqa: E711
         )
     ).first()
     return shared is not None

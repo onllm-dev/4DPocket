@@ -41,30 +41,89 @@ function applyHighlightsToDOM(container: HTMLElement, highlights: Highlight[]) {
     parent.normalize();
   });
 
-  // Apply each highlight by searching for matching text in text nodes
-  for (const hl of highlights) {
-    if (!hl.text) continue;
+  // Build text node map with cumulative offsets (used for position-based highlights)
+  const buildTextNodeMap = () => {
+    const textNodes: { node: Text; start: number; end: number }[] = [];
+    let offset = 0;
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
     let node: Text | null;
-
     while ((node = walker.nextNode() as Text | null)) {
-      const idx = node.nodeValue?.indexOf(hl.text) ?? -1;
-      if (idx === -1) continue;
+      const len = node.nodeValue?.length ?? 0;
+      textNodes.push({ node, start: offset, end: offset + len });
+      offset += len;
+    }
+    return textNodes;
+  };
 
-      // Already inside a highlight mark? skip
-      if (node.parentElement?.closest("mark[data-highlight-id]")) continue;
+  const makeMarkElement = (hl: Highlight) => {
+    const mark = document.createElement("mark");
+    mark.setAttribute("data-highlight-id", hl.id);
+    mark.className = `rounded px-0.5 ${COLOR_MARK_CLASSES[hl.color] ?? COLOR_MARK_CLASSES.yellow}`;
+    return mark;
+  };
 
-      const range = document.createRange();
-      range.setStart(node, idx);
-      range.setEnd(node, idx + hl.text.length);
+  // Sort highlights in reverse position order so DOM mutations don't shift offsets
+  const sorted = [...highlights].sort((a, b) => {
+    const aStart = a.position?.start ?? -1;
+    const bStart = b.position?.start ?? -1;
+    return bStart - aStart;
+  });
 
-      const mark = document.createElement("mark");
-      mark.setAttribute("data-highlight-id", hl.id);
-      mark.className = `rounded px-0.5 ${COLOR_MARK_CLASSES[hl.color] ?? COLOR_MARK_CLASSES.yellow}`;
-      range.surroundContents(mark);
+  for (const hl of sorted) {
+    if (hl.position?.start != null && hl.position?.end != null) {
+      // Position-based highlighting: walk text nodes to find the correct range
+      const textNodes = buildTextNodeMap();
+      const hlStart = hl.position.start;
+      const hlEnd = hl.position.end;
 
-      // Only highlight first occurrence per highlight
-      break;
+      for (const tn of textNodes) {
+        if (tn.end <= hlStart || tn.start >= hlEnd) continue;
+
+        // Already inside a highlight mark? skip
+        if (tn.node.parentElement?.closest("mark[data-highlight-id]")) continue;
+
+        const nodeStart = Math.max(0, hlStart - tn.start);
+        const nodeEnd = Math.min(tn.node.nodeValue!.length, hlEnd - tn.start);
+
+        const range = document.createRange();
+        range.setStart(tn.node, nodeStart);
+        range.setEnd(tn.node, nodeEnd);
+
+        const mark = makeMarkElement(hl);
+        try {
+          range.surroundContents(mark);
+        } catch {
+          // Range spans multiple nodes (e.g. across inline elements), skip
+        }
+        break; // Only wrap the first matching text node
+      }
+    } else {
+      // Fallback: text-based matching for highlights without position data
+      if (!hl.text) continue;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let node: Text | null;
+
+      while ((node = walker.nextNode() as Text | null)) {
+        const idx = node.nodeValue?.indexOf(hl.text) ?? -1;
+        if (idx === -1) continue;
+
+        // Already inside a highlight mark? skip
+        if (node.parentElement?.closest("mark[data-highlight-id]")) continue;
+
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + hl.text.length);
+
+        const mark = makeMarkElement(hl);
+        try {
+          range.surroundContents(mark);
+        } catch {
+          // skip if range spans multiple nodes
+        }
+
+        // Only highlight first occurrence per highlight
+        break;
+      }
     }
   }
 }

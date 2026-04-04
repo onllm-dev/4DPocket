@@ -32,6 +32,8 @@ class RSSFeed(SQLModel, table=True):
     mode: str = Field(default="auto")  # auto (add to collection), approval (hold for review)
     filters: str | None = None  # JSON string of keyword/tag filter rules
     last_entry_id: str | None = None  # To avoid re-fetching
+    last_error: str | None = None  # Last fetch error message
+    error_count: int = Field(default=0)  # Consecutive error count
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

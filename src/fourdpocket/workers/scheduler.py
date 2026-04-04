@@ -5,13 +5,15 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from huey import crontab
+
 from fourdpocket.config import get_settings
 from fourdpocket.workers import huey
 
 logger = logging.getLogger(__name__)
 
 
-@huey.periodic_task(huey.crontab(hour="*/6"))
+@huey.periodic_task(crontab(hour="*/6"))
 def cleanup_stale_tasks():
     """Clean up orphaned task data. Runs every 6 hours."""
     logger.info("Running stale task cleanup")
