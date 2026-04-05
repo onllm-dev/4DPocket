@@ -342,10 +342,12 @@ URL validation on import, content size caps (1MB content, 50K description), XSS-
 
 Save pages with one click, highlight text on any page, view highlights in a sidebar.
 
+**Install from release:** Download `4dpocket-chrome-extension-*.zip` from the [latest release](https://github.com/onllm-dev/4DPocket/releases/latest), unzip, load in `chrome://extensions` (Developer mode > Load unpacked).
+
+**Build from source:**
 ```bash
 cd extension && pnpm install && pnpm build
 ```
-
 Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions`.
 
 - One-click save current page

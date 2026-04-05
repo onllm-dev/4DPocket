@@ -50,6 +50,27 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: extension
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Chrome extension
+        working-directory: extension
+        run: pnpm build
+
   docker:
     runs-on: ubuntu-latest
     needs: [test, frontend]
