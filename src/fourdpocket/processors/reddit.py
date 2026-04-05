@@ -2,6 +2,7 @@
 
 import json
 import logging
+from html import unescape
 
 import httpx
 
@@ -91,16 +92,17 @@ class RedditProcessor(BaseProcessor):
                     "score": comment_data.get("score", 0),
                 })
 
-        # Extract media
+        # Extract media (Reddit API returns HTML-encoded URLs with &amp; etc.)
         media = []
         if post_data.get("thumbnail") and post_data["thumbnail"].startswith("http"):
-            media.append({"type": "image", "url": post_data["thumbnail"], "role": "thumbnail"})
+            media.append({"type": "image", "url": unescape(post_data["thumbnail"]), "role": "thumbnail"})
 
         # Check for image/video post
-        if post_data.get("url") and any(
-            post_data["url"].endswith(ext) for ext in (".jpg", ".png", ".gif", ".webp")
+        post_url = unescape(post_data.get("url", ""))
+        if post_url and any(
+            post_url.endswith(ext) for ext in (".jpg", ".png", ".gif", ".webp")
         ):
-            media.append({"type": "image", "url": post_data["url"], "role": "content"})
+            media.append({"type": "image", "url": post_url, "role": "content"})
 
         # Build content
         content_parts = []
