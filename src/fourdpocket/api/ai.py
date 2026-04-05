@@ -305,11 +305,7 @@ def transcribe_audio(
         result = resp.json()
         transcript = result.get("text", "")
     except httpx.HTTPStatusError as e:
-        detail = f"Groq API error: {e.response.status_code}"
-        try:
-            detail = e.response.json().get("error", {}).get("message", detail)
-        except Exception:
-            pass
+        detail = f"Transcription service error (HTTP {e.response.status_code})"
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
     except Exception as e:
         logger.exception("Transcription failed: %s", e)

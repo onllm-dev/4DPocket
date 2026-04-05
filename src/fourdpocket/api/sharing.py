@@ -272,6 +272,14 @@ def accept_share(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Share invitation not found"
         )
+    # Check share hasn't expired
+    share = db.get(Share, share_id)
+    if share and share.expires_at:
+        from datetime import datetime, timezone
+        if share.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE, detail="Share invitation has expired"
+            )
     recipient.accepted = True
     db.add(recipient)
     db.commit()
@@ -349,36 +357,32 @@ def get_public_share(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Public share not found or expired",
         )
-    if share.item_id:
-        item = db.get(KnowledgeItem, share.item_id)
-        if not item:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared item not found")
-        tag_links = db.exec(select(ItemTag).where(ItemTag.item_id == item.id)).all()
-        tag_ids = [tl.tag_id for tl in tag_links]
-        tags = db.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
-        owner = db.get(User, item.user_id)
-        import re as _re
-        def _strip_html(text: str | None) -> str | None:
-            if not text:
-                return text
-            return _re.sub(r"<[^>]+>", "", text)
+    # Only item shares are served publicly — reject others to prevent metadata leakage
+    if not share.item_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Public share not found")
 
-        return {
-            "id": str(item.id),
-            "title": _strip_html(item.title),
-            "url": item.url,
-            "description": _strip_html(item.description),
-            "content": _strip_html(item.content),
-            "summary": _strip_html(item.summary),
-            "source_platform": item.source_platform,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
-            "tags": [t.name for t in tags],
-            "owner_display_name": owner.display_name or owner.username if owner else "Unknown",
-        }
-    return PublicShareRead(
-        share_type=share.share_type,
-        item_id=share.item_id,
-        collection_id=share.collection_id,
-        tag_id=share.tag_id,
-        created_at=share.created_at,
-    )
+    item = db.get(KnowledgeItem, share.item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared item not found")
+    tag_links = db.exec(select(ItemTag).where(ItemTag.item_id == item.id)).all()
+    tag_ids = [tl.tag_id for tl in tag_links]
+    tags = db.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
+    owner = db.get(User, item.user_id)
+    import re as _re
+    def _strip_html(text: str | None) -> str | None:
+        if not text:
+            return text
+        return _re.sub(r"<[^>]+>", "", text)
+
+    return {
+        "id": str(item.id),
+        "title": _strip_html(item.title),
+        "url": item.url,
+        "description": _strip_html(item.description),
+        "content": _strip_html(item.content),
+        "summary": _strip_html(item.summary),
+        "source_platform": item.source_platform,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "tags": [t.name for t in tags],
+        "owner_display_name": owner.display_name or owner.username if owner else "Unknown",
+    }

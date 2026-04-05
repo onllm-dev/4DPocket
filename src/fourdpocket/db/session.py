@@ -65,6 +65,8 @@ def _ensure_columns(engine):
         ("rss_feeds", "filters", "TEXT"),
         ("rss_feeds", "last_error", "TEXT"),
         ("rss_feeds", "error_count", "INTEGER DEFAULT 0"),
+        ("shares", "public", "BOOLEAN DEFAULT 0"),
+        ("users", "password_changed_at", "TIMESTAMP"),
     ]
 
     with Session(engine) as db:

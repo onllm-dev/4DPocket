@@ -212,6 +212,8 @@ def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
+    from datetime import datetime, timezone
     current_user.password_hash = hash_password(data.new_password)
+    current_user.password_changed_at = datetime.now(timezone.utc)
     db.add(current_user)
     db.commit()

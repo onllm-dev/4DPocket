@@ -72,7 +72,7 @@ def _resolve_and_pin(url: str) -> str | None:
         return None
 
 
-@huey.task(retries=1, retry_delay=60)
+@huey.task(retries=3, retry_delay=60)
 def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
     """Download media files (images, thumbnails) and store locally.
 
@@ -111,12 +111,9 @@ def download_media(item_id: str, user_id: str, media_urls: list[dict]) -> dict:
                 if not pinned_ip:
                     logger.warning("SSRF blocked redirect: %s", current_url)
                     break
-                # Use pinned IP via transport to prevent DNS rebinding
-                parsed = urlparse(current_url)
-                transport = httpx.HTTPTransport(local_address=None)
                 resp = httpx.head(
                     current_url, timeout=10.0, follow_redirects=False,
-                    headers={"User-Agent": "4DPocket/0.1", "Host": parsed.hostname},
+                    headers={"User-Agent": "4DPocket/0.1"},
                 )
                 if resp.is_redirect:
                     current_url = resp.headers.get("location", "")

@@ -34,6 +34,7 @@ class Share(SQLModel, table=True):
     item_id: uuid.UUID | None = Field(default=None, foreign_key="knowledge_items.id")
     collection_id: uuid.UUID | None = Field(default=None, foreign_key="collections.id")
     tag_id: uuid.UUID | None = Field(default=None, foreign_key="tags.id")
+    public: bool = Field(default=False)
     public_token: str | None = Field(default=None, unique=True, index=True)
     expires_at: datetime | None = Field(
         default=None,

@@ -37,7 +37,7 @@ class MastodonProcessor(BaseProcessor):
     """Extract Mastodon statuses via the instance's v1 API."""
 
     url_patterns = [
-        r"/@[^/]+/\d+",
+        r"https?://[^/]+/@[^/]+/\d+",
     ]
     priority = 8
 

@@ -9,6 +9,8 @@ from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.highlight import Highlight
+from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.note import Note
 from fourdpocket.models.user import User
 
 router = APIRouter(prefix="/highlights", tags=["highlights"])
@@ -70,6 +72,16 @@ def create_highlight(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Verify ownership of the target item/note
+    if body.item_id:
+        item = db.get(KnowledgeItem, body.item_id)
+        if not item or item.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Item not found")
+    if body.note_id:
+        note = db.get(Note, body.note_id)
+        if not note or note.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Note not found")
+
     _strip = lambda s: re.sub(r"<[^>]+>", "", s) if s else s
     highlight = Highlight(
         user_id=current_user.id,

@@ -3,11 +3,15 @@
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
 class RateLimitEntry(SQLModel, table=True):
     __tablename__ = "rate_limits"
+    __table_args__ = (
+        UniqueConstraint("key", "action", name="uq_rate_limit_key_action"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     key: str = Field(index=True)          # e.g. "login:192.168.1.1" or "register:10.0.0.1"

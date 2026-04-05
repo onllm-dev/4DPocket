@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Column, Field, SQLModel
 
 from fourdpocket.models.base import utc_now
@@ -16,6 +17,9 @@ except ImportError:
 
 class Tag(SQLModel, table=True):
     __tablename__ = "tags"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_tag_user_name"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)

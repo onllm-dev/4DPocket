@@ -1,5 +1,6 @@
 """API middleware - rate limiting and request ID."""
 
+import threading
 import time
 import uuid
 from collections import defaultdict
@@ -13,7 +14,7 @@ _MAX_TRACKED_IPS = 10000
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Simple sliding window rate limiter."""
+    """Thread-safe sliding window rate limiter."""
 
     def __init__(self, app, max_requests: int = 1000, window_seconds: int = 60, trust_proxy: bool = False):
         super().__init__(app)
@@ -21,6 +22,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.window_seconds = window_seconds
         self.trust_proxy = trust_proxy
         self._requests: dict[str, list[float]] = defaultdict(list)
+        self._lock = threading.Lock()
 
     def _get_client_ip(self, request: Request) -> str:
         """Get real client IP. Only trusts X-Forwarded-For when trust_proxy is True."""
@@ -35,24 +37,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         now = time.time()
         cutoff = now - self.window_seconds
 
-        # Clean old entries for this IP
-        self._requests[client_ip] = [
-            t for t in self._requests[client_ip] if t > cutoff
-        ]
+        with self._lock:
+            # Clean old entries for this IP
+            self._requests[client_ip] = [
+                t for t in self._requests[client_ip] if t > cutoff
+            ]
 
-        # Evict stale IPs to prevent unbounded memory growth
-        if len(self._requests) > _MAX_TRACKED_IPS:
-            stale = [k for k, v in self._requests.items() if not v]
-            for k in stale:
-                del self._requests[k]
+            # Evict stale IPs to prevent unbounded memory growth
+            if len(self._requests) > _MAX_TRACKED_IPS:
+                stale = [k for k, v in self._requests.items() if not v]
+                for k in stale:
+                    del self._requests[k]
 
-        if len(self._requests[client_ip]) >= self.max_requests:
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Too many requests"},
-            )
+            if len(self._requests[client_ip]) >= self.max_requests:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many requests"},
+                )
 
-        self._requests[client_ip].append(now)
+            self._requests[client_ip].append(now)
+
         response = await call_next(request)
         return response
 

@@ -84,6 +84,18 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
+    # Reject tokens issued before password change
+    if user.password_changed_at:
+        iat = payload.get("iat")
+        if iat and isinstance(iat, (int, float)):
+            from datetime import datetime, timezone
+            token_issued = datetime.fromtimestamp(iat, tz=timezone.utc)
+            pwd_changed = user.password_changed_at
+            if pwd_changed.tzinfo is None:
+                pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
+            if token_issued < pwd_changed:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalidated by password change")
+
     if user.is_active is False:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 

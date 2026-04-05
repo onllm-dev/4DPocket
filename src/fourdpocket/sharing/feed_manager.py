@@ -64,8 +64,11 @@ def get_feed_items(
         Share.item_id.is_not(None),
     ).where(
         (Share.public_token.is_not(None)) |  # public shares
-        (Share.id.in_(  # OR private shares this user is a recipient of
-            select(ShareRecipient.share_id).where(ShareRecipient.user_id == subscriber_id)
+        (Share.id.in_(  # OR private shares this user has accepted
+            select(ShareRecipient.share_id).where(
+                ShareRecipient.user_id == subscriber_id,
+                ShareRecipient.accepted == True,  # noqa: E712
+            )
         ))
     )
 

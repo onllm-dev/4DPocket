@@ -41,6 +41,7 @@ def create_share(
         item_id=item_id,
         collection_id=collection_id,
         tag_id=tag_id,
+        public=public,
     )
     if public:
         share.public_token = secrets.token_urlsafe(48)
