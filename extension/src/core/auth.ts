@@ -26,8 +26,7 @@ export async function login(
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(res.status === 401 ? "Invalid credentials" : `Login failed: ${text}`);
+    throw new Error(res.status === 401 ? "Invalid credentials" : "Login failed. Please check your server URL and try again.");
   }
 
   const data = await res.json();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LogIn, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useLogin } from "@/hooks/use-auth";
 
@@ -36,13 +36,17 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const login = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login.mutateAsync({ identifier, password });
-      navigate("/");
+      const returnTo = searchParams.get("returnTo") || "/";
+      // Only allow relative paths to prevent open redirect
+      const safePath = returnTo.startsWith("/") ? returnTo : "/";
+      navigate(safePath);
     } catch {
       // Error handled by mutation state
     }

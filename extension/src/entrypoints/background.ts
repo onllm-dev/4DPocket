@@ -64,11 +64,20 @@ export default defineBackground(() => {
 
   // --- Feature 5: Content script highlight messages ---
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Only accept messages from our own extension's content scripts
+    if (!sender.id || sender.id !== chrome.runtime.id) {
+      sendResponse({ status: "error", message: "Unauthorized sender" });
+      return false;
+    }
     if (message.type === "SAVE_HIGHLIGHT") {
+      if (!message.data?.url || !message.data?.text) {
+        sendResponse({ status: "error", message: "Missing required fields" });
+        return false;
+      }
       handleSaveHighlight(message.data).then(
         (result) => sendResponse({ status: "success", data: result }),
-        (err) => sendResponse({ status: "error", message: err.message })
+        () => sendResponse({ status: "error", message: "Failed to save highlight" })
       );
       return true; // Keep message channel open for async response
     }
@@ -162,5 +171,5 @@ export default defineBackground(() => {
     }
   });
 
-  console.log("4DPocket background service worker loaded");
+  // Background service worker ready
 });

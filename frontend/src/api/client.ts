@@ -35,7 +35,8 @@ export async function apiFetch(
   // Auto-redirect to login on 401 (except for auth endpoints)
   if (res.status === 401 && !url.includes("/auth/")) {
     clearLoggedIn();
-    window.location.href = "/login";
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `/login?returnTo=${returnTo}`;
   }
 
   return res;

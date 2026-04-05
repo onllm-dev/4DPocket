@@ -46,22 +46,15 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
                 detail="Maximum number of users reached",
             )
 
-    # Check if email already exists
+    # Check if email or username already exists (generic message prevents enumeration)
     existing = db.exec(select(User).where(User.email == user_data.email)).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
-
-    # Check if username already exists
     existing_username = db.exec(
         select(User).where(User.username == user_data.username)
     ).first()
-    if existing_username:
+    if existing or existing_username:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Username already taken",
+            detail="An account with this email or username already exists",
         )
 
     # First user becomes admin
