@@ -121,7 +121,7 @@ uvicorn fourdpocket.main:app --port 4040
 python -m huey.bin.huey_consumer fourdpocket.workers.huey --workers 2
 ```
 
-### From Source
+### From Source (uv)
 
 ```bash
 git clone https://github.com/onllm-dev/4DPocket.git
@@ -129,18 +129,35 @@ cd 4DPocket
 
 # Backend
 uv sync --all-extras
-uv run uvicorn fourdpocket.main:app --port 4040
+make dev                    # → http://localhost:4040
 
 # Frontend (separate terminal)
-cd frontend && pnpm install && pnpm dev
+cd frontend && pnpm install && pnpm dev   # → http://localhost:5173
 ```
 
-Open http://localhost:5173 — no login needed in single-user mode.
+No login needed in single-user mode.
+
+### Hybrid (Source + Docker Services)
+
+Run the app from source while using Docker for PostgreSQL, Meilisearch, or Ollama:
+
+```bash
+# Start PostgreSQL
+docker run -d --name 4dp-postgres -p 5432:5432 \
+  -e POSTGRES_USER=4dp -e POSTGRES_PASSWORD=4dp -e POSTGRES_DB=4dpocket \
+  postgres:16-alpine
+
+# Run backend against PostgreSQL with multi-user auth
+FDP_DATABASE__URL=postgresql://4dp:4dp@localhost:5432/4dpocket \
+FDP_AUTH__MODE=multi make dev
+```
+
+Add Meilisearch, Ollama, ChromaDB, or cloud AI — see the [Development Guide](DEVELOPMENT.md) for all combinations.
 
 ### Multi-User Mode
 
 ```bash
-FDP_AUTH__MODE=multi uv run uvicorn fourdpocket.main:app --port 4040
+FDP_AUTH__MODE=multi make dev
 ```
 
 First registered user automatically becomes admin.
@@ -440,11 +457,17 @@ Interactive docs at http://localhost:4040/docs when running.
 
 ## Development
 
+See the full [Development Guide](DEVELOPMENT.md) for detailed setup instructions, hybrid configurations, and troubleshooting.
+
 ```bash
+make dev        # Start dev server (hot reload)
 make test       # Run test suite (73+ tests)
 make lint       # ruff check
 make format     # ruff format
+make test-cov   # Tests with coverage report
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, code conventions, and how to add platform processors.
 
 ---
 
