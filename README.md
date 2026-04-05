@@ -14,10 +14,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/onllm-dev/4DPocket/releases/latest"><img src="https://img.shields.io/github/v/release/onllm-dev/4DPocket?label=release&color=blue" alt="Latest Release" /></a>
+  <a href="https://github.com/onllm-dev/4DPocket/pkgs/container/4dpocket"><img src="https://img.shields.io/badge/ghcr.io-4dpocket-blue?logo=docker" alt="Docker Image" /></a>
   <img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python 3.12+" />
   <img src="https://img.shields.io/badge/react-19-61DAFB" alt="React 19" />
   <img src="https://img.shields.io/badge/license-GNU%20GPLv3-blue" alt="GNU GPLv3 License" />
-  <img src="https://img.shields.io/badge/tests-73%20passing-brightgreen" alt="73 Tests Passing" />
+  <a href="https://github.com/onllm-dev/4DPocket/actions/workflows/ci.yml"><img src="https://github.com/onllm-dev/4DPocket/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 <p align="center">
@@ -46,24 +48,49 @@ Inspired by Doraemon's 4D Pocket — a magical, bottomless pocket where anything
 
 ## Quick Start
 
-### Docker Compose (Recommended)
+### Docker (Recommended)
+
+Pull the image from GitHub Container Registry:
 
 ```bash
-# Download config
+docker pull ghcr.io/onllm-dev/4dpocket:latest
+# or a specific version:
+docker pull ghcr.io/onllm-dev/4dpocket:0.1.0
+```
+
+**One-liner (SQLite, no external services):**
+```bash
+docker run -d --name 4dpocket -p 4040:4040 -v 4dp-data:/data \
+  ghcr.io/onllm-dev/4dpocket:latest
+```
+
+Open http://localhost:4040 — no login needed in single-user mode.
+
+### Docker Compose
+
+**Full stack** (PostgreSQL + background worker):
+
+```bash
+# Clone or download config files
 curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/.env.example
 cp .env.example .env     # Edit with your settings
 
-# Start (PostgreSQL + 4DPocket)
+# Start
 docker compose up -d
 ```
 
 Open http://localhost:4040 — first registered user becomes admin.
 
+**Minimal setup** (SQLite, single container):
+```bash
+curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/docker-compose.simple.yml
+docker compose -f docker-compose.simple.yml up -d
+```
+
 **With local AI (Ollama):**
 ```bash
 docker compose --profile ai up -d
-# Then pull a model:
 docker compose exec ollama ollama pull llama3.2
 ```
 
@@ -72,29 +99,20 @@ docker compose exec ollama ollama pull llama3.2
 SEARCH_BACKEND=meilisearch docker compose --profile search up -d
 ```
 
-**Minimal setup (SQLite, no external services):**
+**With semantic search (ChromaDB):**
 ```bash
-curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/docker-compose.simple.yml
-docker compose -f docker-compose.simple.yml up -d
+docker compose --profile vectors up -d
 ```
 
-### Docker Image
-
+**All services:**
 ```bash
-docker pull ghcr.io/onllm-dev/4dpocket:latest
-
-# Run with SQLite (simplest)
-docker run -d -p 4040:4040 -v 4dp-data:/data \
-  -e FDP_DATABASE__URL=sqlite:////data/4dpocket.db \
-  ghcr.io/onllm-dev/4dpocket:latest
+docker compose --profile ai --profile search --profile vectors up -d
 ```
 
 ### Python Package
 
 ```bash
 pip install fourdpocket
-# or with uv:
-uv pip install fourdpocket
 
 # Run the server
 uvicorn fourdpocket.main:app --port 4040
