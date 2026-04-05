@@ -1,0 +1,23 @@
+# Minimal setup: SQLite only, no external services needed.
+# Usage: docker compose -f docker-compose.simple.yml up
+services:
+  app:
+    image: ghcr.io/onllm-dev/4dpocket:${TAG:-latest}
+    build: .
+    ports:
+      - "${FDP_PORT:-4040}:4040"
+    environment:
+      - FDP_DATABASE__URL=sqlite:////data/4dpocket.db
+      - FDP_SEARCH__BACKEND=sqlite
+      - FDP_AUTH__MODE=${AUTH_MODE:-single}
+      - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
+      - FDP_AI__OLLAMA_URL=${OLLAMA_URL:-http://host.gateway.docker.internal:11434}
+      - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
+      - FDP_STORAGE__BASE_PATH=/data
+      - FDP_SERVER__SECURE_COOKIES=false
+    volumes:
+      - 4dp-data:/data
+    restart: unless-stopped
+
+volumes:
+  4dp-data:

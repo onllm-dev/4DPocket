@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from fourdpocket import __version__
 from fourdpocket.api.middleware import RateLimitMiddleware, RequestIDMiddleware
 from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_engine, init_db
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="4DPocket",
     description="Self-hosted AI-powered personal knowledge base",
-    version="0.1.0",
+    version=__version__,
     lifespan=lifespan,
 )
 

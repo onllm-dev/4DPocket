@@ -46,7 +46,64 @@ Inspired by Doraemon's 4D Pocket — a magical, bottomless pocket where anything
 
 ## Quick Start
 
-### Local (Zero Config)
+### Docker Compose (Recommended)
+
+```bash
+# Download config
+curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/.env.example
+cp .env.example .env     # Edit with your settings
+
+# Start (PostgreSQL + 4DPocket)
+docker compose up -d
+```
+
+Open http://localhost:4040 — first registered user becomes admin.
+
+**With local AI (Ollama):**
+```bash
+docker compose --profile ai up -d
+# Then pull a model:
+docker compose exec ollama ollama pull llama3.2
+```
+
+**With Meilisearch (full-text search):**
+```bash
+SEARCH_BACKEND=meilisearch docker compose --profile search up -d
+```
+
+**Minimal setup (SQLite, no external services):**
+```bash
+curl -O https://raw.githubusercontent.com/onllm-dev/4DPocket/main/docker-compose.simple.yml
+docker compose -f docker-compose.simple.yml up -d
+```
+
+### Docker Image
+
+```bash
+docker pull ghcr.io/onllm-dev/4dpocket:latest
+
+# Run with SQLite (simplest)
+docker run -d -p 4040:4040 -v 4dp-data:/data \
+  -e FDP_DATABASE__URL=sqlite:////data/4dpocket.db \
+  ghcr.io/onllm-dev/4dpocket:latest
+```
+
+### Python Package
+
+```bash
+pip install fourdpocket
+# or with uv:
+uv pip install fourdpocket
+
+# Run the server
+uvicorn fourdpocket.main:app --port 4040
+
+# Run background worker (separate terminal, optional)
+python -m huey.bin.huey_consumer fourdpocket.workers.huey --workers 2
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/onllm-dev/4DPocket.git
@@ -61,15 +118,6 @@ cd frontend && pnpm install && pnpm dev
 ```
 
 Open http://localhost:5173 — no login needed in single-user mode.
-
-### Docker
-
-```bash
-cp .env.example .env    # Edit with your API keys (optional)
-docker compose up
-```
-
-Open http://localhost:4040
 
 ### Multi-User Mode
 

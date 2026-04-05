@@ -1,77 +1,106 @@
-version: "3.8"
-
 services:
+  # ─── 4DPocket Server ──────────────────────────────────────────
   app:
+    image: ghcr.io/onllm-dev/4dpocket:${TAG:-latest}
     build: .
     ports:
-      - "4040:4040"
+      - "${FDP_PORT:-4040}:4040"
     environment:
-      - FDP_DATABASE__URL=postgresql://4dp:4dp@db:5432/4dpocket
-      - FDP_SEARCH__BACKEND=meilisearch
+      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:-4dp}@db:5432/4dpocket
+      - FDP_SEARCH__BACKEND=${SEARCH_BACKEND:-sqlite}
       - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
-      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
       - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
       - FDP_AI__OLLAMA_URL=http://ollama:11434
       - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
       - FDP_AI__NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
-      - FDP_AUTH__MODE=multi
+      - FDP_AI__CUSTOM_BASE_URL=${AI_CUSTOM_BASE_URL:-}
+      - FDP_AI__CUSTOM_API_KEY=${AI_CUSTOM_API_KEY:-}
+      - FDP_AI__CUSTOM_MODEL=${AI_CUSTOM_MODEL:-}
+      - FDP_AUTH__MODE=${AUTH_MODE:-multi}
+      - FDP_AUTH__SECRET_KEY=${AUTH_SECRET_KEY:-}
       - FDP_STORAGE__BASE_PATH=/data
+      - FDP_SERVER__SECURE_COOKIES=${SECURE_COOKIES:-false}
+      - FDP_SERVER__CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:4040"]}
     volumes:
       - 4dp-data:/data
     depends_on:
-      - db
-      - meilisearch
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # ─── Background Worker ────────────────────────────────────────
   worker:
+    image: ghcr.io/onllm-dev/4dpocket:${TAG:-latest}
     build: .
-    command: ["python", "-m", "huey.bin.huey_consumer", "fourdpocket.workers.huey", "--workers", "2"]
+    command: ["worker"]
     environment:
-      - FDP_DATABASE__URL=postgresql://4dp:4dp@db:5432/4dpocket
-      - FDP_SEARCH__BACKEND=meilisearch
+      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:-4dp}@db:5432/4dpocket
+      - FDP_SEARCH__BACKEND=${SEARCH_BACKEND:-sqlite}
       - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
-      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
       - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
       - FDP_AI__OLLAMA_URL=http://ollama:11434
       - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
       - FDP_AI__NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - FDP_AI__CUSTOM_BASE_URL=${AI_CUSTOM_BASE_URL:-}
+      - FDP_AI__CUSTOM_API_KEY=${AI_CUSTOM_API_KEY:-}
+      - FDP_AI__CUSTOM_MODEL=${AI_CUSTOM_MODEL:-}
       - FDP_STORAGE__BASE_PATH=/data
+      - HUEY_WORKERS=${HUEY_WORKERS:-2}
     volumes:
       - 4dp-data:/data
     depends_on:
-      - db
-      - meilisearch
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # ─── PostgreSQL ───────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=4dp
-      - POSTGRES_PASSWORD=4dp
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-4dp}
       - POSTGRES_DB=4dpocket
     volumes:
       - 4dp-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U 4dp -d 4dpocket"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
+  # ─── Meilisearch (optional, enable with: SEARCH_BACKEND=meilisearch) ─
   meilisearch:
     image: getmeili/meilisearch:v1.12
+    profiles: ["search"]
     environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-masterkey123}
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
     volumes:
       - 4dp-meili:/meili_data
-    ports:
-      - "7700:7700"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
 
+  # ─── ChromaDB (optional, enable with: docker compose --profile vectors up) ─
   chromadb:
     image: chromadb/chroma:latest
+    profiles: ["vectors"]
     volumes:
       - 4dp-chroma:/chroma/chroma
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
 
+  # ─── Ollama (optional, enable with: docker compose --profile ai up) ─
   ollama:
     image: ollama/ollama:latest
+    profiles: ["ai"]
     volumes:
       - 4dp-ollama:/root/.ollama
-    ports:
-      - "11434:11434"
+    restart: unless-stopped
 
 volumes:
   4dp-data:

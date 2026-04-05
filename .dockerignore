@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.pytest_cache
+.ruff_cache
+*.egg-info
+dist/
+build/
+
+# Frontend (built in Docker)
+frontend/node_modules
+frontend/dist
+frontend/.omc
+
+# Dev/IDE
+.venv
+.env
+.env.local
+*.swp
+*.swo
+.vscode
+.idea
+.DS_Store
+
+# OMC / Claude
+.omc
+.claude
+.playwright-mcp
+missions
+
+# Data
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Tests
+tests/
+htmlcov/
+.coverage
+
+# Docs
+*.md
+!pyproject.toml
+LICENSE
