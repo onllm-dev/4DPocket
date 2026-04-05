@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote, Zap, Tag, Calendar, Star, Archive } from "lucide-react";
+import { Search as SearchIcon, Loader2, Sparkles, AlignLeft, StickyNote, Zap, Tag, Star, Archive } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import { api } from "@/api/client";
 import { BookmarkCard } from "@/components/bookmark/BookmarkCard";
 import NoteCard from "@/components/bookmark/NoteCard";
+import type { Note } from "@/hooks/use-notes";
 
 interface Item {
   id: string;
@@ -35,7 +36,7 @@ interface SearchFilters {
 
 interface UnifiedResult {
   items: Item[];
-  notes: Array<{ id: string; title: string | null; content: string; created_at: string; updated_at: string }>;
+  notes: Note[];
   total: number;
 }
 
