@@ -12,8 +12,10 @@ _collection_cache: dict[str, object] = {}
 def _get_client():
     global _client
     if _client is None:
-        import chromadb
         from pathlib import Path
+
+        import chromadb
+
         from fourdpocket.config import get_settings
 
         settings = get_settings()

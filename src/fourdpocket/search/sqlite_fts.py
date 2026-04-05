@@ -103,8 +103,9 @@ def init_fts(db: Session) -> bool:
 
 def reindex_all_items(db: Session) -> int:
     """Re-index all knowledge items in FTS5. Returns count indexed."""
-    from fourdpocket.models.item import KnowledgeItem as _KI
     from sqlmodel import select as _select
+
+    from fourdpocket.models.item import KnowledgeItem as _KI
 
     items = db.exec(_select(_KI)).all()
     for item in items:

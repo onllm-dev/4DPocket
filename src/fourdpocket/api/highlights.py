@@ -82,7 +82,9 @@ def create_highlight(
         if not note or note.user_id != current_user.id:
             raise HTTPException(status_code=404, detail="Note not found")
 
-    _strip = lambda s: re.sub(r"<[^>]+>", "", s) if s else s
+    def _strip(s):
+        return re.sub(r"<[^>]+>", "", s) if s else s
+
     highlight = Highlight(
         user_id=current_user.id,
         item_id=body.item_id,

@@ -49,7 +49,7 @@ def get_session():
 
 def _ensure_columns(engine):
     """Add missing columns to existing tables (safe for SQLite, idempotent)."""
-    from sqlmodel import text, Session
+    from sqlmodel import Session, text
 
     migrations = [
         ("knowledge_items", "favicon_url", "TEXT"),

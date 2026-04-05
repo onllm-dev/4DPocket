@@ -1,14 +1,15 @@
 """Application configuration via pydantic-settings."""
 
 import secrets
+
+# Load .env file into os.environ so nested settings classes pick up the values.
+# Skip during pytest to avoid .env values interfering with test expectations.
+import sys as _sys
 from pathlib import Path
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Load .env file into os.environ so nested settings classes pick up the values.
-# Skip during pytest to avoid .env values interfering with test expectations.
-import sys as _sys
 if "pytest" not in _sys.modules:
     try:
         from dotenv import load_dotenv

@@ -4,8 +4,6 @@ import json
 import logging
 import re
 
-import httpx
-
 from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
 from fourdpocket.processors.registry import register_processor
 

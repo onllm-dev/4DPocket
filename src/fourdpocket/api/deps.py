@@ -108,7 +108,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-def get_or_create_settings(db: Session) -> "InstanceSettings":
+def get_or_create_settings(db: Session):  # -> InstanceSettings (lazy import)
     from fourdpocket.models.instance_settings import InstanceSettings
 
     settings = db.get(InstanceSettings, 1)

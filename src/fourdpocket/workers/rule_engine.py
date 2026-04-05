@@ -2,7 +2,6 @@
 
 import atexit
 import re
-import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from sqlmodel import Session, select

@@ -8,9 +8,9 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import DateTime, JSON
+    from sqlalchemy import JSON, DateTime
 except ImportError:
-    from sqlmodel import DateTime, JSON
+    from sqlmodel import JSON, DateTime
 
 
 class Rule(SQLModel, table=True):

@@ -476,8 +476,8 @@ def delete_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # Cascade delete all associated data
-    from fourdpocket.models.comment import Comment
     from fourdpocket.models.collection import CollectionItem
+    from fourdpocket.models.comment import Comment
     from fourdpocket.models.embedding import Embedding
     from fourdpocket.models.highlight import Highlight
     from fourdpocket.models.item_link import ItemLink
@@ -951,7 +951,7 @@ def serve_media(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        file_bytes = storage.get_file(path)
+        storage.get_file(path)  # Verify file exists
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Media not found")
 
