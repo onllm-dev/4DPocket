@@ -85,6 +85,43 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: 4dpocket:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Smoke test Docker image
+        run: |
+          docker run -d --name 4dp-smoke -p 4040:4040 \
+            -e FDP_DATABASE__URL=sqlite:////data/4dpocket.db \
+            -e FDP_AUTH__MODE=single \
+            4dpocket:ci
+
+          # Wait for health
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4040/api/v1/health > /dev/null 2>&1; then
+              echo "Container ready"
+              break
+            fi
+            sleep 1
+          done
+
+          # Validate SPA root serves index.html
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4040/)
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: GET / returned $STATUS (expected 200)"
+            docker logs 4dp-smoke
+            exit 1
+          fi
+          echo "SPA root: OK ($STATUS)"
+
+          # Validate API
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4040/api/v1/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: GET /api/v1/health returned $STATUS (expected 200)"
+            docker logs 4dp-smoke
+            exit 1
+          fi
+          echo "API health: OK ($STATUS)"
+
+          docker stop 4dp-smoke

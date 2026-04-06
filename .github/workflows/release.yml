@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 env:
   REGISTRY: ghcr.io
@@ -122,6 +123,48 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
+  # ─── Smoke test published image ────────────────────────────────
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: [meta, docker]
+    steps:
+      - name: Smoke test Docker image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.meta.outputs.version }}
+          docker run -d --name 4dp-smoke -p 4040:4040 \
+            -e FDP_DATABASE__URL=sqlite:////data/4dpocket.db \
+            -e FDP_AUTH__MODE=single \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.meta.outputs.version }}
+
+          # Wait for health
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4040/api/v1/health > /dev/null 2>&1; then
+              echo "Container ready"
+              break
+            fi
+            sleep 1
+          done
+
+          # Validate SPA root serves index.html
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4040/)
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: GET / returned $STATUS (expected 200)"
+            docker logs 4dp-smoke
+            exit 1
+          fi
+          echo "SPA root: OK"
+
+          # Validate API
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4040/api/v1/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: API health returned $STATUS (expected 200)"
+            docker logs 4dp-smoke
+            exit 1
+          fi
+          echo "API health: OK"
+
+          docker stop 4dp-smoke
+
   # ─── Build Python package ──────────────────────────────────────
   python:
     runs-on: ubuntu-latest
@@ -196,7 +239,7 @@ jobs:
   # ─── Create GitHub Release ─────────────────────────────────────
   release:
     runs-on: ubuntu-latest
-    needs: [meta, docker, python, extension]
+    needs: [meta, docker, python, extension, smoke-test]
     steps:
       - uses: actions/checkout@v4
 
@@ -239,7 +282,7 @@ jobs:
 
             **Python:**
             ```bash
-            pip install fourdpocket==${{ needs.meta.outputs.version }}
+            pip install 4dpocket==${{ needs.meta.outputs.version }}
             ```
 
             ## Chrome Extension
@@ -250,12 +293,13 @@ jobs:
             4. Click **Load unpacked** and select the unzipped folder
             5. Click the extension icon, open **Settings**, enter your server URL and login
 
-  # ─── Publish to PyPI (optional, requires PYPI_TOKEN secret) ───
+  # ─── Publish to PyPI (trusted publisher via OIDC) ─────────────
   pypi:
     runs-on: ubuntu-latest
-    needs: [meta, python]
-    if: ${{ vars.PUBLISH_PYPI == 'true' }}
+    needs: [meta, python, smoke-test]
     environment: pypi
+    permissions:
+      id-token: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -265,5 +309,3 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_TOKEN }}

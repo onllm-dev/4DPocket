@@ -112,7 +112,7 @@ docker compose --profile ai --profile search --profile vectors up -d
 ### Python Package
 
 ```bash
-pip install fourdpocket
+pip install 4dpocket
 
 # Run the server
 uvicorn fourdpocket.main:app --port 4040

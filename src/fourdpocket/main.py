@@ -88,12 +88,6 @@ async def add_security_headers(request, call_next):
     return response
 
 
-# Mount frontend static files if build directory exists
-frontend_dist = Path("frontend/dist")
-if frontend_dist.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_dist)), name="static")
-
-
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok"}
@@ -103,3 +97,18 @@ def health_check():
 from fourdpocket.api.router import api_router  # noqa: E402
 
 app.include_router(api_router)
+
+# SPA catch-all: must be registered AFTER API routes
+frontend_dist = Path("frontend/dist")
+if frontend_dist.exists():
+    from fastapi.responses import FileResponse
+
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    def serve_frontend(full_path: str):
+        if ".." not in full_path:
+            file_path = frontend_dist / full_path
+            if full_path and file_path.is_file():
+                return FileResponse(file_path)
+        return FileResponse(frontend_dist / "index.html")
