@@ -35,6 +35,13 @@ pnpm build                     # Production build (tsc + vite)
 FDP_AUTH__MODE=multi uv run uvicorn fourdpocket.main:app --port 4040
 ```
 
+## Versioning
+
+All three version files must stay in sync when bumping:
+- `pyproject.toml` (backend)
+- `frontend/package.json` (frontend)
+- `extension/package.json` (Chrome extension)
+
 ## Project Structure
 
 ```
