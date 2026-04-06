@@ -34,7 +34,7 @@ jobs:
   # ─── Build per-platform Docker images (native runners) ────────
   docker-build:
     needs: meta
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       matrix:
         include:
