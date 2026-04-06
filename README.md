@@ -15,6 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/onllm-dev/4DPocket/releases/latest"><img src="https://img.shields.io/github/v/release/onllm-dev/4DPocket?label=release&color=blue" alt="Latest Release" /></a>
+  <a href="https://pypi.org/project/4dpocket/"><img src="https://img.shields.io/pypi/v/4dpocket?color=blue&logo=pypi&logoColor=white" alt="PyPI" /></a>
   <a href="https://github.com/onllm-dev/4DPocket/pkgs/container/4dpocket"><img src="https://img.shields.io/badge/ghcr.io-4dpocket-blue?logo=docker" alt="Docker Image" /></a>
   <img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python 3.12+" />
   <img src="https://img.shields.io/badge/react-19-61DAFB" alt="React 19" />
@@ -55,7 +56,7 @@ Pull the image from GitHub Container Registry:
 ```bash
 docker pull ghcr.io/onllm-dev/4dpocket:latest
 # or a specific version:
-docker pull ghcr.io/onllm-dev/4dpocket:0.1.0
+docker pull ghcr.io/onllm-dev/4dpocket:0.1.4
 ```
 
 **One-liner (SQLite, no external services):**
@@ -109,7 +110,9 @@ docker compose --profile vectors up -d
 docker compose --profile ai --profile search --profile vectors up -d
 ```
 
-### Python Package
+### Python Package (PyPI)
+
+Available on [PyPI](https://pypi.org/project/4dpocket/):
 
 ```bash
 pip install 4dpocket
@@ -120,6 +123,8 @@ uvicorn fourdpocket.main:app --port 4040
 # Run background worker (separate terminal, optional)
 python -m huey.bin.huey_consumer fourdpocket.workers.huey --workers 2
 ```
+
+> **Note:** The PyPI package name is `4dpocket`, but the Python import remains `fourdpocket` (Python identifiers can't start with a digit).
 
 ### From Source (uv)
 
@@ -197,6 +202,7 @@ Paste a URL and 4DPocket detects the platform, deeply extracts content, and enri
 | **Auto-Tagging** | AI reads content and assigns tags with confidence scores. High-confidence tags applied automatically |
 | **Auto-Summarization** | Every item gets a 2-3 sentence AI summary |
 | **AI Title Generation** | Generate better titles for notes and items |
+| **Content Refresh** | Re-fetch and reprocess any item from its source URL. Manual tags, notes, and collections stay intact |
 | **Related Items** | Semantic similarity (0.5) + shared tags (0.3) + same-source (0.2) |
 | **Knowledge Gap Analysis** | AI identifies topics you've been collecting but lack depth in |
 | **Cross-Platform Insights** | Discover connections between content saved from different platforms |
@@ -338,9 +344,9 @@ URL validation on import, content size caps (1MB content, 50K description), XSS-
 - Responsive — mobile (bottom nav), tablet (collapsible sidebar), desktop (full sidebar + shortcuts)
 - Dark mode — system-aware with manual toggle (Doraemon Blue theme)
 
-### Chrome Extension
+### Chrome Extension (Beta)
 
-Save pages with one click, highlight text on any page, view highlights in a sidebar.
+Save pages with one click, highlight text on any page, view highlights in a sidebar. Currently in beta — tested with Google Chrome.
 
 **Install from release:** Download `4dpocket-chrome-extension-*.zip` from the [latest release](https://github.com/onllm-dev/4DPocket/releases/latest), unzip, load in `chrome://extensions` (Developer mode > Load unpacked).
 
