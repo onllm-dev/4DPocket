@@ -1,6 +1,6 @@
 [project]
 name = "fourdpocket"
-version = "0.1.1"
+version = "0.1.2"
 description = "Self-hosted AI-powered personal knowledge base"
 requires-python = ">=3.12"
 license = {text = "GPL-3.0"}
