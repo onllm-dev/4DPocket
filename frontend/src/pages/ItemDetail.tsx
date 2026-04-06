@@ -35,6 +35,7 @@ import {
   Tag,
   FileCode,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
 import ContentRenderer from "@/components/content/ContentRenderer";
@@ -667,6 +668,16 @@ export default function ItemDetail() {
     updateItem.mutate({ id: item.id, is_archived: !item.is_archived });
   };
 
+  const [reprocessing, setReprocessing] = useState(false);
+  const handleReprocess = async () => {
+    if (!item.url) return;
+    setReprocessing(true);
+    try {
+      await api.post(`/api/v1/items/${item.id}/reprocess`);
+    } catch {}
+    setTimeout(() => setReprocessing(false), 2000);
+  };
+
   return (
     <div className="animate-fade-in max-w-5xl mx-auto space-y-6">
       {/* Back + Actions bar */}
@@ -712,6 +723,21 @@ export default function ItemDetail() {
           <button onClick={() => setShareOpen(true)} aria-label="Share" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600 transition-all duration-200 cursor-pointer">
             <Share2 className="h-4 w-4" />
           </button>
+          {item.url && (
+            <button
+              onClick={handleReprocess}
+              disabled={reprocessing}
+              aria-label="Refresh content"
+              title="Re-fetch and reprocess content"
+              className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                reprocessing
+                  ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600"
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-600"
+              }`}
+            >
+              <RefreshCw className={`h-4 w-4 ${reprocessing ? "animate-spin" : ""}`} />
+            </button>
+          )}
           <button
             onClick={() => toggleReadingList.mutate({ id: item.id, type: "item", add: item.reading_status !== "reading_list" })}
             aria-label={item.reading_status === "reading_list" ? "Remove from Reading List" : "Add to Reading List"}
