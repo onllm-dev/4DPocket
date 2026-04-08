@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/icons/icon.svg" width="80" alt="4DPocket" />
+  <img src="frontend/public/icons/icon-192.png" width="96" alt="4DPocket" />
 </p>
 
 <h1 align="center">4DPocket</h1>
