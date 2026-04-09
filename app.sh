@@ -376,7 +376,7 @@ start_worker() {
     info "Starting Huey background worker..."
     cd "$SCRIPT_DIR"
 
-    uv run python -m huey.bin.huey_consumer fourdpocket.workers.huey \
+    uv run python -m fourdpocket.workers.huey_worker \
         --workers "${HUEY_WORKERS:-2}" --worker-type thread \
         > "$WORKER_LOG" 2>&1 &
 
@@ -797,9 +797,9 @@ do_start() {
         postgres)
             start_postgres || return 1
             start_meilisearch || return 1
-            export FDP_DATABASE__URL="postgresql://$PG_USER:$PG_PASSWORD@localhost:$PG_PORT/$PG_DB"
-            export FDP_SEARCH__BACKEND="meilisearch"
-            export FDP_SEARCH__MEILI_URL="http://localhost:7700"
+            export FDP_DATABASE__URL="${FDP_DATABASE__URL:-postgresql://$PG_USER:$PG_PASSWORD@localhost:$PG_PORT/$PG_DB}"
+            export FDP_SEARCH__BACKEND="${FDP_SEARCH__BACKEND:-meilisearch}"
+            export FDP_SEARCH__MEILI_URL="${FDP_SEARCH__MEILI_URL:-http://localhost:7700}"
             export FDP_SEARCH__MEILI_MASTER_KEY="${FDP_SEARCH__MEILI_MASTER_KEY:-devkey123}"
             info "Profile: PostgreSQL + Meilisearch"
             ;;
@@ -808,9 +808,9 @@ do_start() {
             start_meilisearch || return 1
             start_chromadb || return 1
             start_ollama || return 1
-            export FDP_DATABASE__URL="postgresql://$PG_USER:$PG_PASSWORD@localhost:$PG_PORT/$PG_DB"
-            export FDP_SEARCH__BACKEND="meilisearch"
-            export FDP_SEARCH__MEILI_URL="http://localhost:7700"
+            export FDP_DATABASE__URL="${FDP_DATABASE__URL:-postgresql://$PG_USER:$PG_PASSWORD@localhost:$PG_PORT/$PG_DB}"
+            export FDP_SEARCH__BACKEND="${FDP_SEARCH__BACKEND:-meilisearch}"
+            export FDP_SEARCH__MEILI_URL="${FDP_SEARCH__MEILI_URL:-http://localhost:7700}"
             export FDP_SEARCH__MEILI_MASTER_KEY="${FDP_SEARCH__MEILI_MASTER_KEY:-devkey123}"
             export FDP_AI__CHAT_PROVIDER="ollama"
             export FDP_AI__OLLAMA_URL="http://localhost:11434"

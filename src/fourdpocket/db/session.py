@@ -48,37 +48,42 @@ def get_session():
 
 
 def _ensure_columns(engine):
-    """Add missing columns to existing tables (safe for SQLite, idempotent)."""
-    from sqlmodel import Session, text
+    """Auto-sync: add any columns defined in models but missing from the database.
 
-    migrations = [
-        ("knowledge_items", "favicon_url", "TEXT"),
-        ("knowledge_items", "reading_status", "VARCHAR DEFAULT 'unread'"),
-        ("knowledge_items", "read_at", "TIMESTAMP"),
-        ("notes", "is_favorite", "BOOLEAN DEFAULT 0"),
-        ("notes", "is_archived", "BOOLEAN DEFAULT 0"),
-        ("notes", "reading_status", "VARCHAR DEFAULT 'unread'"),
-        ("notes", "reading_progress", "INTEGER DEFAULT 0"),
-        ("highlights", "note_id", "TEXT REFERENCES notes(id)"),
-        ("rss_feeds", "format", "VARCHAR DEFAULT 'rss'"),
-        ("rss_feeds", "mode", "VARCHAR DEFAULT 'auto'"),
-        ("rss_feeds", "filters", "TEXT"),
-        ("rss_feeds", "last_error", "TEXT"),
-        ("rss_feeds", "error_count", "INTEGER DEFAULT 0"),
-        ("shares", "public", "BOOLEAN DEFAULT 0"),
-        ("users", "password_changed_at", "TIMESTAMP"),
-    ]
+    Compares SQLModel metadata against the live database schema using
+    SQLAlchemy inspection. This eliminates the need for a manual migration
+    list — every new model column is picked up automatically on startup.
+    """
+    from sqlalchemy import inspect, text
 
-    with Session(engine) as db:
-        for table, column, col_type in migrations:
-            try:
-                db.exec(text(f"SELECT {column} FROM {table} LIMIT 0"))
-            except Exception:
+    inspector = inspect(engine)
+    db_tables = set(inspector.get_table_names())
+
+    # Map SQLAlchemy types to portable SQL type strings
+    def _sql_type(col):
+        try:
+            return col.type.compile(engine.dialect)
+        except Exception:
+            return "TEXT"
+
+    with engine.connect() as conn:
+        for table in SQLModel.metadata.sorted_tables:
+            if table.name not in db_tables:
+                continue  # table doesn't exist yet; create_all handles it
+
+            db_columns = {c["name"] for c in inspector.get_columns(table.name)}
+
+            for col in table.columns:
+                if col.name in db_columns:
+                    continue
+                col_type = _sql_type(col)
                 try:
-                    db.exec(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
-                    db.commit()
+                    conn.execute(text(
+                        f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'
+                    ))
+                    conn.commit()
                 except Exception:
-                    db.rollback()
+                    conn.rollback()
 
 
 def init_db():
