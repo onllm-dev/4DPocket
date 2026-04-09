@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter, Star, Archive, BookMarked } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
+import { version } from "../../../package.json";
 
 const navSections = [
   {
@@ -97,11 +98,20 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className={`hidden md:flex flex-col border-r border-sky-100 dark:border-gray-800 bg-white dark:bg-gray-950 transition-all duration-200 ${
-        collapsed ? "w-16" : "w-60"
-      }`}
-    >
+    <>
+      {/* Mobile overlay backdrop */}
+      {!collapsed && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-40 flex flex-col border-r border-sky-100 dark:border-gray-800 bg-white dark:bg-gray-950 transition-all duration-200 ${
+          collapsed ? "w-16 -translate-x-full md:translate-x-0" : "w-60 translate-x-0"
+        }`}
+      >
       <div className="flex items-center gap-2 p-4 border-b border-sky-100 dark:border-gray-800 min-h-[60px]">
         <button
           onClick={toggleSidebar}
@@ -187,9 +197,10 @@ export function Sidebar() {
           {!collapsed && <span>Sign out</span>}
         </button>
         {!collapsed && (
-          <span className="block text-[10px] text-gray-400 dark:text-gray-600 px-3 mt-1">v0.1.0</span>
+          <span className="block text-[10px] text-gray-400 dark:text-gray-600 px-3 mt-1">v{version}</span>
         )}
       </div>
     </aside>
+    </>
   );
 }

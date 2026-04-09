@@ -35,7 +35,19 @@ async def lifespan(app: FastAPI):
             if recreated:
                 reindex_all_items(db)
 
+    # Start Huey worker automatically
+    import subprocess, sys
+    huey_process = subprocess.Popen(
+        [sys.executable, "-m", "fourdpocket.workers.huey_worker"],
+        cwd=str(Path(__file__).parent.parent.parent),
+    )
+    logger.info("Started Huey worker (PID %s)", huey_process.pid)
+
     yield
+
+    # Shutdown Huey worker on app shutdown
+    huey_process.terminate()
+    huey_process.wait()
 
 
 app = FastAPI(

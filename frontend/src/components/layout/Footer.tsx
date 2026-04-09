@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import { version } from "../../../package.json";
 
 export function Footer() {
   return (
@@ -11,7 +12,7 @@ export function Footer() {
             <circle cx="12" cy="9" r="1.5" fill="#EF4444"/>
             <circle cx="12" cy="16" r="2" fill="#FCD34D" stroke="#D97706" strokeWidth="0.75"/>
           </svg>
-          4DPocket v0.1.0
+          4DPocket v{version}
         </span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">

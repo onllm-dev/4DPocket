@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { version } from "../../package.json";
 import {
   Settings as SettingsIcon,
   Sun,
@@ -398,7 +399,7 @@ export default function Settings() {
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Version</span>
               <span className="font-medium text-gray-900 dark:text-gray-100">
-                0.1.0
+                {version}
               </span>
             </div>
           </div>

@@ -67,37 +67,8 @@ def _try_sync_enrich(item: KnowledgeItem, db: Session, user_id: uuid.UUID) -> No
     if existing_tags:
         return
 
-    # For URL items without content yet, run the processor synchronously first
-    if item.url and not item.content:
-        try:
-            import asyncio
-
-            from fourdpocket.processors.registry import match_processor
-
-            processor = match_processor(item.url)
-            result = asyncio.run(processor.process(item.url))
-
-            # Only overwrite title/description if user didn't provide them
-            if result.title and not item.title:
-                item.title = result.title
-            if result.description and not item.description:
-                item.description = result.description
-            if result.content:
-                item.content = result.content
-            if result.raw_content:
-                item.raw_content = result.raw_content
-            if result.media:
-                item.media = list(result.media)
-            if result.metadata:
-                item.item_metadata = {**(item.item_metadata or {}), **result.metadata}
-
-            db.add(item)
-            db.commit()
-            db.refresh(item)
-        except Exception as e:
-            logger.warning("Sync processor failed for item %s: %s", item.id, e)
-
-    # Now run tagging + summarization (skip embedding - too heavy for sync)
+    # For URL items: skip inline content fetching (too slow) - let Huey handle it.
+    # Just run lightweight tagging + summarization on whatever content is already set.
     try:
         from fourdpocket.ai.sanitizer import sanitize_for_prompt
         from fourdpocket.ai.tagger import auto_tag_item

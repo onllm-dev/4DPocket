@@ -591,6 +591,16 @@ export default function ItemDetail() {
     addComment.mutate(trimmed);
   };
 
+  const [reprocessing, setReprocessing] = useState(false);
+  const handleReprocess = async () => {
+    if (!item?.url) return;
+    setReprocessing(true);
+    try {
+      await api.post(`/api/v1/items/${item.id}/reprocess`);
+    } catch {}
+    setTimeout(() => setReprocessing(false), 2000);
+  };
+
   if (isLoading) {
     return (
       <div className="animate-fade-in max-w-5xl mx-auto space-y-6">
@@ -666,16 +676,6 @@ export default function ItemDetail() {
 
   const handleArchive = () => {
     updateItem.mutate({ id: item.id, is_archived: !item.is_archived });
-  };
-
-  const [reprocessing, setReprocessing] = useState(false);
-  const handleReprocess = async () => {
-    if (!item.url) return;
-    setReprocessing(true);
-    try {
-      await api.post(`/api/v1/items/${item.id}/reprocess`);
-    } catch {}
-    setTimeout(() => setReprocessing(false), 2000);
   };
 
   return (

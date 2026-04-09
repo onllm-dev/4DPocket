@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, TrendingUp, Tags, Plus, ChevronDown, StickyNote } from "lucide-react";
+import { BookOpen, TrendingUp, Tags, Plus, ChevronDown, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
@@ -28,7 +28,6 @@ export default function Dashboard() {
   const allItems = data?.pages.flat() ?? [];
   const recentItems = allItems.slice(0, visibleCount);
   const hasMore = allItems.length > visibleCount;
-  const totalItems = stats?.total_items ?? 0;
 
   if (statsError || itemsError) {
     return (
@@ -42,27 +41,6 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto space-y-8">
-      {/* Hero header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0096C7] to-[#0077A8] dark:from-[#0096C7]/90 dark:to-[#0C1222] p-6 md:p-8 text-white">
-        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-[#FCD34D]/10 translate-y-1/2 -translate-x-1/2" />
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-2">
-            <LayoutDashboard className="h-6 w-6 text-white/80" />
-            <h1 className="text-2xl md:text-3xl font-bold">
-              Your 4DPocket
-            </h1>
-          </div>
-          <p className="text-white/70 text-sm md:text-base max-w-lg">
-            {statsLoading
-              ? "Loading your pocket..."
-              : totalItems === 0
-              ? "Your pocket is empty — time to fill it up!"
-              : `${totalItems} item${totalItems === 1 ? "" : "s"} saved. Reach in and explore.`}
-          </p>
-        </div>
-      </div>
-
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {[

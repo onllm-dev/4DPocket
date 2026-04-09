@@ -53,6 +53,10 @@ Thumbs.db
 Desktop.ini
 ._*
 
+# App runtime
+.pids/
+logs/
+
 # OMC / Claude / Playwright
 .omc/
 .playwright-mcp/
