@@ -13,8 +13,8 @@ FROM python:3.12-slim AS builder
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+COPY pyproject.toml uv.lock* hatch_build.py ./
+RUN uv sync --no-dev --all-extras --frozen 2>/dev/null || uv sync --no-dev --all-extras
 
 COPY src/ ./src/
 
