@@ -107,9 +107,9 @@ export default function Collections() {
         </div>
       ) : !collections || collections.length === 0 ? (
         <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <FolderOpen className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <FolderOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
-            No collections yet
+            No collections
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
             Create a collection to organize your saved items

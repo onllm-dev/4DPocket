@@ -56,9 +56,9 @@ export default function Timeline() {
         </div>
       ) : !timeline?.length ? (
         <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <Clock className="w-12 h-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <Clock className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">No items in the last 30 days</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">Save some content and it will appear on your timeline</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">Saved items will appear on your timeline.</p>
         </div>
       ) : (
         <div className="relative">

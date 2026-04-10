@@ -120,9 +120,10 @@ export default function Rules() {
         <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-sky-600" /></div>
       ) : !rules?.length ? (
         <div className="text-center py-20">
-          <Zap className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">No rules yet</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Create rules to auto-tag and organize new items</p>
+          <Zap className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-500 dark:text-gray-400">No rules configured</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-4">Rules auto-tag and organize items as they arrive.</p>
+          <button onClick={() => setShowForm(true)} className="text-sm text-sky-600 hover:text-sky-700 font-medium cursor-pointer">Create a rule</button>
         </div>
       ) : (
         <div className="space-y-2">

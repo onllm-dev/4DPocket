@@ -78,7 +78,7 @@ export default function ReadingList() {
           <p className="text-gray-500 dark:text-gray-400 text-lg">
             {tab === "reading"
               ? "Your reading list is empty"
-              : "No read items yet"}
+              : "No read items"}
           </p>
           <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
             {tab === "reading"

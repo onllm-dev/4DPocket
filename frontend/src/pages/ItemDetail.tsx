@@ -1027,7 +1027,7 @@ export default function ItemDetail() {
           </div>
         ) : (
           <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-            No comments yet. Be the first!
+            No comments on this item.
           </p>
         )}
       </div>

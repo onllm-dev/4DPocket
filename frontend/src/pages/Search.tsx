@@ -294,7 +294,7 @@ export default function Search() {
 
       {!query || query.length < 2 ? (
         <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <SearchIcon className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <SearchIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
             Search your knowledge base
           </p>

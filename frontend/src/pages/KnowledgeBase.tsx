@@ -217,7 +217,7 @@ export default function KnowledgeBase() {
             No items found
           </p>
           <p className="text-gray-400 dark:text-gray-500 text-sm">
-            {platform !== "All" ? `No ${platform} items yet. Try a different platform filter.` : "Try a different filter or add some content."}
+            {platform !== "All" ? `No ${platform} items found. Try a different platform filter.` : "Try a different filter or add some content."}
           </p>
         </div>
       ) : (

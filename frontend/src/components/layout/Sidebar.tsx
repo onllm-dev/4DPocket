@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter, Star, Archive, BookMarked } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
@@ -78,6 +79,15 @@ export function Sidebar() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
 
+  useEffect(() => {
+    if (collapsed) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") toggleSidebar();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [collapsed, toggleSidebar]);
+
   const allSections = user?.role === "admin"
     ? navSections.map((s) =>
         s.label === "System"
@@ -104,7 +114,10 @@ export function Sidebar() {
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-30"
           onClick={toggleSidebar}
-          aria-hidden="true"
+          onKeyDown={(e) => { if (e.key === "Escape") toggleSidebar(); }}
+          role="button"
+          tabIndex={0}
+          aria-label="Close sidebar"
         />
       )}
       <aside
@@ -173,7 +186,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-sky-100 dark:border-gray-800">
+      <div className="p-3 border-t border-sky-100 dark:border-gray-800 pb-20 md:pb-0">
         {user && !collapsed ? (
           <div className="flex items-center gap-3 mb-2 px-1">
             <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center flex-shrink-0">

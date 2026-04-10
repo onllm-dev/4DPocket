@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, TrendingUp, Tags, Plus, ChevronDown, StickyNote } from "lucide-react";
+import { BookOpen, Plus, ChevronDown, StickyNote, Inbox, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useItems } from "@/hooks/use-items";
@@ -41,49 +41,39 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto space-y-8">
-      {/* Stat cards */}
+      {/* Action tiles — verb-oriented, not vanity counts */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {[
-          { label: "Total Items", value: stats?.total_items, icon: BookOpen, color: "sky", gradient: "from-sky-50 to-white dark:from-sky-950/30 dark:to-gray-900", link: "/knowledge" },
-          { label: "This Week", value: stats?.items_this_week, icon: TrendingUp, color: "emerald", gradient: "from-emerald-50 to-white dark:from-emerald-950/20 dark:to-gray-900", link: null },
-          { label: "Notes", value: stats?.total_notes, icon: StickyNote, color: "amber", gradient: "from-amber-50 to-white dark:from-amber-950/20 dark:to-gray-900", link: "/notes" },
-          { label: "Tags", value: stats?.total_tags, icon: Tags, color: "violet", gradient: "from-violet-50 to-white dark:from-violet-950/20 dark:to-gray-900", link: null },
-        ].map((stat) => {
-          const Icon = stat.icon;
-          const colorMap: Record<string, string> = {
-            sky: "bg-[#0096C7]/10 dark:bg-sky-900/30 text-[#0096C7]",
-            emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600",
-            violet: "bg-violet-100 dark:bg-violet-900/30 text-violet-600",
-            amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600",
-          };
-          const cardContent = (
-            <>
+          { label: "Browse all", value: stats?.total_items, suffix: "items", icon: BookOpen, link: "/knowledge" },
+          { label: "Added this week", value: stats?.items_this_week, suffix: "new", icon: Inbox, link: "/knowledge" },
+          { label: "Open notes", value: stats?.total_notes, suffix: "notes", icon: StickyNote, link: "/notes" },
+          { label: "Continue reading", value: null, suffix: "", icon: Clock, link: "/reading-list" },
+        ].map((tile) => {
+          const Icon = tile.icon;
+          return (
+            <Link
+              key={tile.label}
+              to={tile.link}
+              className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 md:p-5 hover:border-sky-200 dark:hover:border-sky-800 transition-colors duration-200 cursor-pointer"
+            >
               <div className="flex items-center gap-2.5 mb-3">
-                <div className={`p-2 rounded-xl ${colorMap[stat.color]}`}>
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                   <Icon className="h-4 w-4 md:h-5 md:w-5" />
                 </div>
-                <span className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {stat.label}
-                </span>
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {statsLoading ? (
-                  <span className="inline-block w-10 h-7 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg" />
-                ) : (
-                  stat.value ?? 0
-                )}
-              </div>
-            </>
-          );
-          const cardClass = `rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-gradient-to-br ${stat.gradient} p-4 md:p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300`;
-          return stat.link ? (
-            <Link key={stat.label} to={stat.link} className={cardClass}>
-              {cardContent}
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {tile.label}
+              </p>
+              {tile.value != null && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {statsLoading ? (
+                    <span className="inline-block w-8 h-3 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+                  ) : (
+                    `${tile.value} ${tile.suffix}`
+                  )}
+                </p>
+              )}
             </Link>
-          ) : (
-            <div key={stat.label} className={cardClass}>
-              {cardContent}
-            </div>
           );
         })}
       </div>
@@ -117,12 +107,12 @@ export default function Dashboard() {
           </div>
         ) : recentItems.length === 0 ? (
           <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-            <BookOpen className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+            <BookOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
             <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
-              Nothing saved yet
+              No saved items
             </p>
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">
-              Toss something into your pocket to get started
+              Save a URL or create a note to get started.
             </p>
             <Link
               to="/add"

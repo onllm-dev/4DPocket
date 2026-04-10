@@ -125,9 +125,9 @@ function KnowledgeFeedTab() {
   if (!items?.length) {
     return (
       <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <Rss className="w-12 h-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
-        <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">No feed items yet</p>
-        <p className="text-sm text-gray-400 dark:text-gray-500">Follow other users to see their public knowledge here</p>
+        <Rss className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+        <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">No feed items</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Follow other users or add RSS feeds to populate this page.</p>
       </div>
     );
   }
@@ -199,8 +199,8 @@ function ManageFeedsTab({ onReview }: { onReview: (feedId: string) => void }) {
       ) : !feeds?.length ? (
         <div className="text-center py-12 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <Rss className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm">No feeds configured yet</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add an RSS, Atom, or JSON feed to get started</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">No feeds configured</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add an RSS, Atom, or JSON feed URL above.</p>
         </div>
       ) : (
         <div className="space-y-3">

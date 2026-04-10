@@ -48,13 +48,14 @@ export default function Tags() {
           </h1>
         </div>
         <div className="text-center py-16 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <TagsIcon className="h-12 w-12 text-[#0096C7]/20 dark:text-sky-900 mx-auto mb-4" />
+          <TagsIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-1">
-            No tags yet
+            No tags
           </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            Tags are created automatically as you save content
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
+            Tags are created automatically when you save items with AI tagging enabled.
           </p>
+          <Link to="/knowledge" className="text-sm text-sky-600 hover:text-sky-700 font-medium">Save your first item</Link>
         </div>
       </div>
     );
