@@ -36,10 +36,11 @@ async def lifespan(app: FastAPI):
                 reindex_all_items(db)
 
     # Start Huey worker automatically
-    import subprocess, sys
+    import subprocess
+    import sys
+
     huey_process = subprocess.Popen(
         [sys.executable, "-m", "fourdpocket.workers.huey_worker"],
-        cwd=str(Path(__file__).parent.parent.parent),
     )
     logger.info("Started Huey worker (PID %s)", huey_process.pid)
 
@@ -111,7 +112,9 @@ from fourdpocket.api.router import api_router  # noqa: E402
 app.include_router(api_router)
 
 # SPA catch-all: must be registered AFTER API routes
-frontend_dist = Path("frontend/dist")
+# Try package-bundled static files first (pip install), then dev path (app.sh / source)
+_pkg_static = Path(__file__).parent / "static"
+frontend_dist = _pkg_static if _pkg_static.is_dir() else Path("frontend/dist")
 if frontend_dist.exists():
     from fastapi.responses import FileResponse
 

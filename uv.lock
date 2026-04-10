@@ -14,7 +14,6 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "bcrypt" },
-    { name = "chromadb" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -22,17 +21,29 @@ dependencies = [
     { name = "lxml" },
     { name = "lxml-html-clean" },
     { name = "openai" },
-    { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-multipart" },
     { name = "readability-lxml" },
-    { name = "sentence-transformers" },
     { name = "sqlmodel" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "chromadb" },
+    { name = "gallery-dl" },
+    { name = "instaloader" },
+    { name = "meilisearch" },
+    { name = "pillow" },
+    { name = "playwright" },
+    { name = "psycopg2-binary" },
+    { name = "pymupdf" },
+    { name = "pytesseract" },
+    { name = "sentence-transformers" },
+    { name = "youtube-transcript-api" },
+    { name = "yt-dlp" },
+]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
@@ -44,6 +55,9 @@ dev = [
 meilisearch = [
     { name = "meilisearch" },
 ]
+postgres = [
+    { name = "psycopg2-binary" },
+]
 processors = [
     { name = "gallery-dl" },
     { name = "instaloader" },
@@ -54,12 +68,17 @@ processors = [
     { name = "youtube-transcript-api" },
     { name = "yt-dlp" },
 ]
+semantic = [
+    { name = "chromadb" },
+    { name = "sentence-transformers" },
+]
 
 [package.metadata]
 requires-dist = [
+    { name = "4dpocket", extras = ["postgres", "semantic", "processors", "meilisearch"], marker = "extra == 'all'" },
     { name = "alembic", specifier = ">=1.14.0" },
     { name = "bcrypt", specifier = ">=4.0.0" },
-    { name = "chromadb", specifier = ">=0.5.0" },
+    { name = "chromadb", marker = "extra == 'semantic'", specifier = ">=0.5.0" },
     { name = "email-validator", specifier = ">=2.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "gallery-dl", marker = "extra == 'processors'", specifier = ">=1.27.0" },
@@ -73,7 +92,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.50.0" },
     { name = "pillow", marker = "extra == 'processors'", specifier = ">=10.0.0" },
     { name = "playwright", marker = "extra == 'processors'", specifier = ">=1.40.0" },
-    { name = "psycopg2-binary", specifier = ">=2.9.0" },
+    { name = "psycopg2-binary", marker = "extra == 'postgres'", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
     { name = "pyjwt", specifier = ">=2.9.0" },
     { name = "pymupdf", marker = "extra == 'processors'", specifier = ">=1.24.0" },
@@ -85,13 +104,13 @@ requires-dist = [
     { name = "readability-lxml", specifier = ">=0.8.1" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.7.0" },
-    { name = "sentence-transformers", specifier = ">=3.0.0" },
+    { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=3.0.0" },
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
     { name = "youtube-transcript-api", marker = "extra == 'processors'", specifier = ">=0.6.0" },
     { name = "yt-dlp", marker = "extra == 'processors'", specifier = ">=2024.0.0" },
 ]
-provides-extras = ["processors", "meilisearch", "dev"]
+provides-extras = ["postgres", "semantic", "processors", "meilisearch", "all", "dev"]
 
 [[package]]
 name = "alembic"
