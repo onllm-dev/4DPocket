@@ -304,8 +304,21 @@ def _start_postgres():
     ], ready_check=ready)
 
 
+def _generate_meili_key():
+    """Get or generate a Meilisearch master key."""
+    import secrets
+    key_file = DEFAULT_DATA_DIR / "meili_master_key"
+    if key_file.exists():
+        return key_file.read_text().strip()
+    key = secrets.token_urlsafe(24)
+    DEFAULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    key_file.write_text(key)
+    key_file.chmod(0o600)
+    return key
+
+
 def _start_meilisearch():
-    meili_key = os.environ.get("FDP_SEARCH__MEILI_MASTER_KEY", "devkey123")
+    meili_key = os.environ.get("FDP_SEARCH__MEILI_MASTER_KEY") or _generate_meili_key()
 
     def ready():
         try:
@@ -508,7 +521,7 @@ def cmd_start(args):
         os.environ["FDP_DATABASE__URL"] = db_url
         os.environ.setdefault("FDP_SEARCH__BACKEND", "meilisearch")
         os.environ.setdefault("FDP_SEARCH__MEILI_URL", "http://localhost:7700")
-        os.environ.setdefault("FDP_SEARCH__MEILI_MASTER_KEY", "devkey123")
+        os.environ.setdefault("FDP_SEARCH__MEILI_MASTER_KEY", _generate_meili_key())
         _info("Profile: PostgreSQL + Meilisearch")
     elif profile == "full" or args.full:
         if _docker_available():
@@ -523,7 +536,7 @@ def cmd_start(args):
         os.environ["FDP_DATABASE__URL"] = db_url
         os.environ.setdefault("FDP_SEARCH__BACKEND", "meilisearch")
         os.environ.setdefault("FDP_SEARCH__MEILI_URL", "http://localhost:7700")
-        os.environ.setdefault("FDP_SEARCH__MEILI_MASTER_KEY", "devkey123")
+        os.environ.setdefault("FDP_SEARCH__MEILI_MASTER_KEY", _generate_meili_key())
         os.environ["FDP_AI__CHAT_PROVIDER"] = "ollama"
         os.environ["FDP_AI__OLLAMA_URL"] = "http://localhost:11434"
         _info("Profile: Full stack (PostgreSQL + Meilisearch + ChromaDB + Ollama)")
@@ -687,13 +700,19 @@ def cmd_db(args):
             _info("Resetting PostgreSQL database...")
             db_name = db_url.rsplit("/", 1)[-1]
             base_url = db_url.rsplit("/", 1)[0] + "/postgres"
-            subprocess.run(["psql", base_url, "-c",
-                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"],
+            # Use --set to pass db_name as a psql variable to avoid SQL injection
+            subprocess.run(["psql", base_url,
+                "--set", f"dbname={db_name}",
+                "-c", "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                      "WHERE datname = :'dbname' AND pid <> pg_backend_pid();"],
                 capture_output=True)
-            subprocess.run(["psql", base_url, "-c", f'DROP DATABASE IF EXISTS "{db_name}";'])
-            subprocess.run(["psql", base_url, "-c",
-                f'CREATE DATABASE "{db_name}" OWNER "{PG_USER}";'])
+            subprocess.run(["psql", base_url,
+                "--set", f"dbname={db_name}",
+                "-c", 'DROP DATABASE IF EXISTS :"dbname";'])
+            subprocess.run(["psql", base_url,
+                "--set", f"dbname={db_name}",
+                "--set", f"owner={PG_USER}",
+                "-c", 'CREATE DATABASE :"dbname" OWNER :"owner";'])
         else:
             db_path = db_url.replace("sqlite:///", "")
             _info(f"Resetting SQLite database: {db_path}...")
