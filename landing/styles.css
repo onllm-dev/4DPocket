@@ -295,8 +295,7 @@ p { color: var(--text-light, #4a5568); line-height: 1.7; margin: 0; }
    Hero
    ============================================ */
 .hero {
-    padding-top: 0;
-    padding-bottom: 80px;
+    padding: 120px 0 100px;
     position: relative;
 }
 .hero-inner {
