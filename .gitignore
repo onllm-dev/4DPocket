@@ -59,6 +59,7 @@ logs/
 
 # OMC / Claude / Playwright
 .omc/
+.omx/
 .playwright-mcp/
 design-system/
 
