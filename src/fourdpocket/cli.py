@@ -492,7 +492,9 @@ def cmd_start(args):
     # Apply profile overrides
     profile = getattr(args, "profile", None)
     if profile == "sqlite" or args.sqlite:
-        os.environ["FDP_DATABASE__URL"] = f"sqlite:///{DEFAULT_DATA_DIR}/data/4dpocket.db"
+        data_dir = DEFAULT_DATA_DIR / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        os.environ["FDP_DATABASE__URL"] = f"sqlite:///{data_dir}/4dpocket.db"
         os.environ["FDP_SEARCH__BACKEND"] = "sqlite"
         _info("Profile: SQLite (zero-config)")
     elif profile == "postgres" or args.postgres:
@@ -675,10 +677,11 @@ def cmd_db(args):
 
     elif args.db_command == "reset":
         _warn("This will DESTROY ALL DATA in the database.")
-        confirm = input("  Type 'yes' to confirm: ").strip()
-        if confirm != "yes":
-            print("  Cancelled.")
-            return
+        if not args.yes:
+            confirm = input("  Type 'yes' to confirm: ").strip()
+            if confirm != "yes":
+                print("  Cancelled.")
+                return
 
         if db_url.startswith("postgresql"):
             _info("Resetting PostgreSQL database...")
@@ -906,6 +909,7 @@ def main():
     p_restart = sub.add_parser("restart", help="Restart the server")
     p_restart.add_argument("--host", help="Bind host")
     p_restart.add_argument("--port", type=int, help="Bind port")
+    p_restart.add_argument("--background", "-d", action="store_true", help="Run in background")
     p_restart.add_argument("--reload", action="store_true")
     p_restart.add_argument("--sqlite", action="store_true")
     p_restart.add_argument("--postgres", action="store_true")
@@ -925,6 +929,8 @@ def main():
     p_db = sub.add_parser("db", help="Database management")
     p_db.add_argument("db_command", choices=["init", "reset", "migrate", "shell"],
                       help="Database operation")
+    p_db.add_argument("-y", "--yes", action="store_true",
+                      help="Skip confirmation prompts")
 
     # services
     p_svc = sub.add_parser("services", help="Docker service management")
