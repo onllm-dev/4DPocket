@@ -56,7 +56,7 @@ Pull the image from GitHub Container Registry:
 ```bash
 docker pull ghcr.io/onllm-dev/4dpocket:latest
 # or a specific version:
-docker pull ghcr.io/onllm-dev/4dpocket:0.1.4
+docker pull ghcr.io/onllm-dev/4dpocket:0.1.6
 ```
 
 **One-liner (SQLite, no external services):**
@@ -117,14 +117,24 @@ Available on [PyPI](https://pypi.org/project/4dpocket/):
 ```bash
 pip install 4dpocket
 
-# Run the server
-uvicorn fourdpocket.main:app --port 4040
+# First-time setup wizard (database, AI provider, auth mode)
+4dpocket setup
 
-# Run background worker (separate terminal, optional)
-python -m huey.bin.huey_consumer fourdpocket.workers.huey --workers 2
+# Start the server
+4dpocket start
+
+# Or start with a specific profile:
+4dpocket start --sqlite              # Zero-config, no Docker needed
+4dpocket start --postgres            # PostgreSQL + Meilisearch (auto-starts Docker)
+4dpocket start --full                # Full stack (+ ChromaDB + Ollama)
+
+# Background (daemon) mode
+4dpocket start --sqlite -d
 ```
 
-> **Note:** The PyPI package name is `4dpocket`, but the Python import remains `fourdpocket` (Python identifiers can't start with a digit).
+Open http://localhost:4040 — the setup wizard runs automatically on first start if no config exists.
+
+> **Note:** The PyPI package name is `4dpocket`, but the Python import is `fourdpocket` (Python identifiers can't start with a digit). Optional extras: `pip install 4dpocket[postgres]`, `4dpocket[semantic]`, `4dpocket[processors]`, `4dpocket[all]`.
 
 ### From Source (uv)
 
@@ -135,6 +145,9 @@ cd 4DPocket
 # Backend
 uv sync --all-extras
 make dev                    # → http://localhost:4040
+
+# Or via CLI
+4dpocket start --reload     # → http://localhost:4040
 
 # Frontend (separate terminal)
 cd frontend && pnpm install && pnpm dev   # → http://localhost:5173
@@ -166,6 +179,38 @@ FDP_AUTH__MODE=multi make dev
 ```
 
 First registered user automatically becomes admin.
+
+---
+
+## CLI Reference
+
+The `4dpocket` command provides full lifecycle management — setup, start/stop, database, Docker services, and maintenance.
+
+```
+4dpocket setup                       Interactive first-run wizard
+4dpocket start [--sqlite|--postgres|--full]  Start server with profile
+4dpocket start -d                    Start in background (daemon mode)
+4dpocket stop                        Stop background server
+4dpocket restart                     Restart server
+4dpocket status                      Show server + Docker service status
+4dpocket logs                        Tail server logs
+
+4dpocket db init                     Create database tables
+4dpocket db reset [-y]               Drop + recreate database (destructive)
+4dpocket db migrate                  Run Alembic migrations
+4dpocket db shell                    Open psql or sqlite3 CLI
+
+4dpocket services up [postgres meili chroma ollama all]
+4dpocket services down [names...]
+4dpocket services status
+
+4dpocket clean                       Remove logs, PID files, caches
+4dpocket version                     Show version
+```
+
+The setup wizard configures database (SQLite/PostgreSQL), AI provider (Ollama/Groq/NVIDIA/Custom/None), auth mode, and server port. Configuration is saved to `~/.4dpocket/.env`.
+
+Start profiles auto-manage Docker containers — `--postgres` starts PostgreSQL + Meilisearch, `--full` adds ChromaDB + Ollama. No manual `docker run` needed.
 
 ---
 
@@ -381,6 +426,7 @@ Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extension
 | **Vectors** | ChromaDB + sentence-transformers |
 | **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI/Anthropic-compatible) |
 | **Jobs** | Huey (SQLite backend) |
+| **CLI** | argparse, PID management, Docker service orchestration |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | **State** | TanStack Query (server) + Zustand (client) |
 | **Editor** | Tiptap (rich text) |
@@ -398,6 +444,8 @@ FDP_SEARCH__BACKEND=sqlite            # sqlite (zero-config) or meilisearch
 FDP_AUTH__MODE=single                 # single (no login) or multi (JWT)
 FDP_AUTH__SECRET_KEY=your-secret      # Set in production (auto-generated otherwise)
 ```
+
+Or run `4dpocket setup` for an interactive configuration wizard.
 
 ---
 
@@ -439,7 +487,9 @@ Interactive docs at http://localhost:4040/docs when running.
 
 ```
 4dpocket/
-├── src/fourdpocket/           # Python backend (110 files)
+├── src/fourdpocket/           # Python backend
+│   ├── cli.py                 # CLI entry point (4dpocket command)
+│   ├── __main__.py            # python -m fourdpocket support
 │   ├── api/                   # 25 FastAPI routers
 │   ├── models/                # 21 SQLModel tables
 │   ├── processors/            # 17 platform extractors
