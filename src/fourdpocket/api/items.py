@@ -93,10 +93,9 @@ def _try_sync_enrich(item: KnowledgeItem, db: Session, user_id: uuid.UUID) -> No
 
     # Re-index with enriched content
     try:
-        from fourdpocket.search.indexer import SearchIndexer
+        from fourdpocket.search import get_search_service
 
-        indexer = SearchIndexer(db)
-        indexer.index_item(item)
+        get_search_service().index_item(db, item)
     except Exception:
         pass
 
@@ -165,10 +164,9 @@ def create_item(
 
     # Index for search
     try:
-        from fourdpocket.search.indexer import SearchIndexer
+        from fourdpocket.search import get_search_service
 
-        indexer = SearchIndexer(db)
-        indexer.index_item(item)
+        get_search_service().index_item(db, item)
     except Exception:
         pass  # Search indexing is best-effort
 
@@ -188,8 +186,8 @@ def create_item(
             fetch_and_process_url(str(item.id), item.url, str(current_user.id))
             capture_screenshot(str(item.id), item.url, str(current_user.id))
         else:
-            from fourdpocket.workers.ai_enrichment import enrich_item
-            enrich_item(str(item.id), str(current_user.id))
+            from fourdpocket.workers.enrichment_pipeline import enrich_item_v2
+            enrich_item_v2(str(item.id), str(current_user.id))
     except Exception:
         pass  # Worker dispatch is best-effort
 
@@ -450,7 +448,11 @@ def delete_item(
     from fourdpocket.models.collection import CollectionItem
     from fourdpocket.models.comment import Comment
     from fourdpocket.models.embedding import Embedding
+    from fourdpocket.models.enrichment import EnrichmentStage
+    from fourdpocket.models.entity import ItemEntity
+    from fourdpocket.models.entity_relation import RelationEvidence
     from fourdpocket.models.highlight import Highlight
+    from fourdpocket.models.item_chunk import ItemChunk
     from fourdpocket.models.item_link import ItemLink
     from fourdpocket.models.share import Share
 
@@ -461,6 +463,26 @@ def delete_item(
             tag.usage_count = tag.usage_count - 1
             db.add(tag)
         db.delete(tag_link)
+
+    # Delete relation evidence referencing this item (before relations)
+    for ev in db.exec(
+        select(RelationEvidence).where(RelationEvidence.item_id == item_id)
+    ).all():
+        db.delete(ev)
+
+    # Delete item-entity links
+    for ie in db.exec(select(ItemEntity).where(ItemEntity.item_id == item_id)).all():
+        db.delete(ie)
+
+    # Delete enrichment stage records
+    for es in db.exec(
+        select(EnrichmentStage).where(EnrichmentStage.item_id == item_id)
+    ).all():
+        db.delete(es)
+
+    # Delete chunks (DB rows — FTS + vector cleanup handled by SearchService below)
+    for chunk in db.exec(select(ItemChunk).where(ItemChunk.item_id == item_id)).all():
+        db.delete(chunk)
 
     for model, fk in [
         (Highlight, Highlight.item_id),
@@ -479,13 +501,10 @@ def delete_item(
             db.delete(sr)
         db.delete(share)
 
-    # Remove from FTS index
+    # Remove from all search indexes (FTS, chunks_fts, vector embeddings)
     try:
-        from fourdpocket.config import get_settings
-        _settings = get_settings()
-        if _settings.search.backend == "sqlite" and _settings.database.url.startswith("sqlite"):
-            from fourdpocket.search.sqlite_fts import delete_item as fts_delete
-            fts_delete(db, item_id)
+        from fourdpocket.search import get_search_service
+        get_search_service().delete_item(db, item_id, current_user.id)
     except Exception:
         pass
 
@@ -626,6 +645,39 @@ def get_related_items(
         return []
 
 
+@router.get("/{item_id}/enrichment")
+def get_enrichment_status(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get per-stage enrichment status for an item."""
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    from sqlmodel import select
+
+    from fourdpocket.models.enrichment import EnrichmentStage
+
+    stages = db.exec(
+        select(EnrichmentStage).where(EnrichmentStage.item_id == item_id)
+    ).all()
+
+    return [
+        {
+            "stage": s.stage,
+            "status": s.status,
+            "attempts": s.attempts,
+            "error": s.last_error,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "finished_at": s.finished_at.isoformat() if s.finished_at else None,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        }
+        for s in stages
+    ]
+
+
 class ReadingProgressUpdate(BaseModel):
     progress: int = Field(ge=0, le=100)
 
@@ -690,7 +742,20 @@ def bulk_action(
             item.is_archived = True
             db.add(item)
         elif data.action == "delete":
+            from fourdpocket.models.enrichment import EnrichmentStage as _ES
+            from fourdpocket.models.entity import ItemEntity as _IE
+            from fourdpocket.models.entity_relation import RelationEvidence as _RE
+            from fourdpocket.models.item_chunk import ItemChunk as _IC
+            db.exec(sql_delete(_RE).where(_RE.item_id == item.id))
+            db.exec(sql_delete(_IE).where(_IE.item_id == item.id))
+            db.exec(sql_delete(_ES).where(_ES.item_id == item.id))
+            db.exec(sql_delete(_IC).where(_IC.item_id == item.id))
             db.exec(sql_delete(ItemTag).where(ItemTag.item_id == item.id))
+            try:
+                from fourdpocket.search import get_search_service
+                get_search_service().delete_item(db, item.id, current_user.id)
+            except Exception:
+                pass
             db.delete(item)
         elif data.action == "favorite":
             item.is_favorite = True

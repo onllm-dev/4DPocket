@@ -93,16 +93,21 @@ def execute_saved_filter(
     if not sf:
         raise HTTPException(status_code=404, detail="Filter not found")
 
-    from fourdpocket.search.indexer import SearchIndexer
+    from fourdpocket.search import get_search_service
+    from fourdpocket.search.base import SearchFilters
 
-    indexer = SearchIndexer(db)
+    service = get_search_service()
 
-    filters = sf.filters or {}
-    results = indexer.search(
+    sf_filters = sf.filters or {}
+    search_filters = SearchFilters(
+        item_type=sf_filters.get("item_type"),
+        source_platform=sf_filters.get("source_platform"),
+    )
+    results = service.search(
+        db,
         query=sf.query or "",
         user_id=current_user.id,
-        item_type=filters.get("item_type"),
-        source_platform=filters.get("source_platform"),
+        filters=search_filters,
         limit=limit,
         offset=offset,
     )

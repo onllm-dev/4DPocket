@@ -46,8 +46,14 @@ processors = [
 meilisearch = [
     "meilisearch>=0.31.0",
 ]
+pgvector = [
+    "pgvector>=0.3.0",
+]
+reranker = [
+    "sentence-transformers>=3.0.0",
+]
 all = [
-    "4dpocket[postgres,semantic,processors,meilisearch]",
+    "4dpocket[postgres,semantic,processors,meilisearch,pgvector,reranker]",
 ]
 dev = [
     "pytest>=8.0.0",

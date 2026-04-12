@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "4dpocket"
-version = "0.1.5"
+version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -35,6 +35,7 @@ all = [
     { name = "gallery-dl" },
     { name = "instaloader" },
     { name = "meilisearch" },
+    { name = "pgvector" },
     { name = "pillow" },
     { name = "playwright" },
     { name = "psycopg2-binary" },
@@ -55,6 +56,9 @@ dev = [
 meilisearch = [
     { name = "meilisearch" },
 ]
+pgvector = [
+    { name = "pgvector" },
+]
 postgres = [
     { name = "psycopg2-binary" },
 ]
@@ -68,6 +72,9 @@ processors = [
     { name = "youtube-transcript-api" },
     { name = "yt-dlp" },
 ]
+reranker = [
+    { name = "sentence-transformers" },
+]
 semantic = [
     { name = "chromadb" },
     { name = "sentence-transformers" },
@@ -75,7 +82,7 @@ semantic = [
 
 [package.metadata]
 requires-dist = [
-    { name = "4dpocket", extras = ["postgres", "semantic", "processors", "meilisearch"], marker = "extra == 'all'" },
+    { name = "4dpocket", extras = ["postgres", "semantic", "processors", "meilisearch", "pgvector", "reranker"], marker = "extra == 'all'" },
     { name = "alembic", specifier = ">=1.14.0" },
     { name = "bcrypt", specifier = ">=4.0.0" },
     { name = "chromadb", marker = "extra == 'semantic'", specifier = ">=0.5.0" },
@@ -90,6 +97,7 @@ requires-dist = [
     { name = "meilisearch", marker = "extra == 'meilisearch'", specifier = ">=0.31.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
     { name = "openai", specifier = ">=1.50.0" },
+    { name = "pgvector", marker = "extra == 'pgvector'", specifier = ">=0.3.0" },
     { name = "pillow", marker = "extra == 'processors'", specifier = ">=10.0.0" },
     { name = "playwright", marker = "extra == 'processors'", specifier = ">=1.40.0" },
     { name = "psycopg2-binary", marker = "extra == 'postgres'", specifier = ">=2.9.0" },
@@ -104,13 +112,14 @@ requires-dist = [
     { name = "readability-lxml", specifier = ">=0.8.1" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.7.0" },
+    { name = "sentence-transformers", marker = "extra == 'reranker'", specifier = ">=3.0.0" },
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=3.0.0" },
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
     { name = "youtube-transcript-api", marker = "extra == 'processors'", specifier = ">=0.6.0" },
     { name = "yt-dlp", marker = "extra == 'processors'", specifier = ">=2024.0.0" },
 ]
-provides-extras = ["postgres", "semantic", "processors", "meilisearch", "all", "dev"]
+provides-extras = ["postgres", "semantic", "processors", "meilisearch", "pgvector", "reranker", "all", "dev"]
 
 [[package]]
 name = "alembic"
@@ -1956,6 +1965,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fa/36/e27608899f9b8d4dff0617b2d9ab17ca5608956ca44461ac14ac48b44015/pathspec-1.0.4.tar.gz", hash = "sha256:0210e2ae8a21a9137c0d470578cb0e595af87edaa6ebf12ff176f14a02e0e645", size = 131200, upload-time = "2026-01-27T03:59:46.938Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ef/3c/2c197d226f9ea224a9ab8d197933f9da0ae0aac5b6e0f884e2b8d9c8e9f7/pathspec-1.0.4-py3-none-any.whl", hash = "sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723", size = 55206, upload-time = "2026-01-27T03:59:45.137Z" },
+]
+
+[[package]]
+name = "pgvector"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/25/6c/6d8b4b03b958c02fa8687ec6063c49d952a189f8c91ebbe51e877dfab8f7/pgvector-0.4.2.tar.gz", hash = "sha256:322cac0c1dc5d41c9ecf782bd9991b7966685dee3a00bc873631391ed949513a", size = 31354, upload-time = "2025-12-05T01:07:17.87Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5a/26/6cee8a1ce8c43625ec561aff19df07f9776b7525d9002c86bceb3e0ac970/pgvector-0.4.2-py3-none-any.whl", hash = "sha256:549d45f7a18593783d5eec609ea1684a724ba8405c4cb182a0b2b08aeff04e08", size = 27441, upload-time = "2025-12-05T01:07:16.536Z" },
 ]
 
 [[package]]

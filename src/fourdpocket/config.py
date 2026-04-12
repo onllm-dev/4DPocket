@@ -77,6 +77,10 @@ class SearchSettings(BaseSettings):
     backend: str = "sqlite"  # "sqlite" or "meilisearch"
     meili_url: str = "http://localhost:7700"
     meili_master_key: str = ""
+    vector_backend: str = "auto"  # "auto", "chroma", "pgvector"
+    chunk_size_tokens: int = 512
+    chunk_overlap_tokens: int = 64
+    max_chunks_per_item: int = 200
 
 
 class AISettings(BaseSettings):
@@ -101,6 +105,23 @@ class AISettings(BaseSettings):
     sync_enrichment: bool = False  # Set True in .env to run AI inline if Huey not running
 
 
+class RerankSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FDP_RERANK__")
+
+    enabled: bool = False
+    model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    candidate_pool: int = 50
+    top_k: int = 20
+
+
+class EnrichmentSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FDP_ENRICHMENT__")
+
+    extract_entities: bool = False
+    max_entities_per_chunk: int = 20
+    max_relations_per_chunk: int = 15
+
+
 class ServerSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_SERVER__")
 
@@ -119,6 +140,8 @@ class Settings(BaseSettings):
     storage: StorageSettings = Field(default_factory=StorageSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
     ai: AISettings = Field(default_factory=AISettings)
+    rerank: RerankSettings = Field(default_factory=RerankSettings)
+    enrichment: EnrichmentSettings = Field(default_factory=EnrichmentSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
 
     @model_validator(mode="after")

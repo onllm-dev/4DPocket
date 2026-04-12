@@ -61,8 +61,8 @@ def enrich_item(
 
     # Also dispatch to Huey for embedding (best-effort, runs if consumer is up)
     try:
-        from fourdpocket.workers.ai_enrichment import enrich_item as enrich_task
-        enrich_task(str(item_id), str(current_user.id))
+        from fourdpocket.workers.enrichment_pipeline import enrich_item_v2
+        enrich_item_v2(str(item_id), str(current_user.id))
     except Exception:
         pass
 

@@ -160,10 +160,10 @@ No login needed in single-user mode.
 Run the app from source while using Docker for PostgreSQL, Meilisearch, or Ollama:
 
 ```bash
-# Start PostgreSQL
+# Start PostgreSQL with pgvector (enables vector search without ChromaDB)
 docker run -d --name 4dp-postgres -p 5432:5432 \
   -e POSTGRES_USER=4dp -e POSTGRES_PASSWORD=4dp -e POSTGRES_DB=4dpocket \
-  postgres:16-alpine
+  pgvector/pgvector:pg16
 
 # Run backend against PostgreSQL with multi-user auth
 FDP_DATABASE__URL=postgresql://4dp:4dp@localhost:5432/4dpocket \
@@ -246,6 +246,9 @@ Paste a URL and 4DPocket detects the platform, deeply extracts content, and enri
 |---------|-------------|
 | **Auto-Tagging** | AI reads content and assigns tags with confidence scores. High-confidence tags applied automatically |
 | **Auto-Summarization** | Every item gets a 2-3 sentence AI summary |
+| **Entity Extraction** | AI extracts people, organizations, tools, concepts, and locations from content with a gleaning pass to catch missed entities |
+| **Concept Graph** | Extracted entities are linked by relationships — browse connections between ideas across your knowledge base |
+| **Entity Canonicalization** | Deduplicates entities across documents (e.g., "JS" and "JavaScript" → same entity). Merges descriptions from multiple sources |
 | **AI Title Generation** | Generate better titles for notes and items |
 | **Content Refresh** | Re-fetch and reprocess any item from its source URL. Manual tags, notes, and collections stay intact |
 | **Related Items** | Semantic similarity (0.5) + shared tags (0.3) + same-source (0.2) |
@@ -254,20 +257,56 @@ Paste a URL and 4DPocket detects the platform, deeply extracts content, and enri
 | **Smart Collection Suggestions** | AI suggests which collection an item belongs in |
 | **Stale Content Detection** | Surface items that may need revisiting or updating |
 | **Voice Transcription** | Transcribe audio recordings to text |
+| **LLM Response Caching** | Extraction and enrichment results cached by content hash — avoids redundant LLM calls on retries |
 | **Prompt Injection Protection** | Content sanitized before AI — homoglyph normalization, URL-decode, zero-width stripping |
 
 **Multi-Provider AI** — Ollama (local), Groq, NVIDIA, or any OpenAI/Anthropic-compatible API. No vendor lock-in.
 
-### Search — Four Modes
+### Enrichment Pipeline
 
-| Mode | How It Works |
-|------|-------------|
-| **Full-Text** | SQLite FTS5 with BM25 ranking, porter stemming, prefix matching |
-| **Fuzzy** | Automatic fallback when FTS5 returns nothing — catches typos and partial matches |
-| **Semantic** | Vector similarity via sentence-transformers + ChromaDB |
-| **Hybrid** | FTS5 + semantic combined via Reciprocal Rank Fusion (RRF, k=60) |
+Every saved item goes through a stage-based enrichment pipeline with dependency tracking, retry support, and per-stage status monitoring:
 
-**Unified search** returns items AND notes together. URL-aware query parsing tokenizes domains and paths. Inline filter syntax: `docker tag:devops is:favorite after:2024-01`. Filter chips for tags, favorites, archived. Results cached with per-user TTL invalidation.
+```
+Item Created
+  ├─ chunked     → Split content into overlapping chunks
+  ├─ tagged      → AI auto-tagging with confidence scores
+  └─ summarized  → AI summary generation
+       │
+       ├─ embedded           → Generate embeddings (depends on: chunked)
+       └─ entities_extracted → Extract entities + relations (depends on: chunked)
+```
+
+Independent stages run in parallel. Dependent stages auto-enqueue when prerequisites complete. Failed stages can be retried (up to 3 attempts). Monitor progress via `GET /items/{id}/enrichment`.
+
+### Search & Retrieval — Chunk-Level Hybrid Pipeline
+
+4DPocket uses a multi-stage retrieval architecture inspired by [LightRAG](https://github.com/HKUDS/LightRAG), combining keyword search, vector similarity, and optional cross-encoder reranking for production-grade search quality.
+
+**Architecture:**
+
+```
+Query → Keyword Backend → ┐
+                          ├→ RRF Fusion → Reranker (optional) → Results
+Query → Vector Backend  → ┘
+```
+
+| Stage | How It Works |
+|-------|-------------|
+| **Chunking** | Content split into overlapping chunks (512 tokens, 64 overlap) at paragraph/sentence boundaries. Each chunk indexed independently for paragraph-level precision |
+| **Keyword Search** | SQLite FTS5 (BM25, porter stemming) or Meilisearch — searches both item-level and chunk-level indexes |
+| **Vector Search** | Sentence-transformers embeddings stored in ChromaDB (SQLite) or pgvector (Postgres). Chunk-level + item-level embeddings |
+| **RRF Fusion** | Reciprocal Rank Fusion (k=60) merges keyword + vector results, deduplicates by item |
+| **Reranking** | Optional cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-scores top candidates for precision |
+| **Unified Search** | Returns items AND notes together with inline filter syntax |
+
+**Backend abstraction** — pluggable `KeywordBackend` and `VectorBackend` protocols:
+
+| Deployment | Keyword Backend | Vector Backend |
+|-----------|----------------|---------------|
+| **SQLite** (default) | SQLite FTS5 | ChromaDB |
+| **PostgreSQL** | Meilisearch | pgvector (HNSW index, auto-detected dimensions) |
+
+**Search modes:** Full-text, fuzzy fallback, semantic, hybrid (RRF), unified (items + notes). Inline filter syntax: `docker tag:devops is:favorite after:2024-01`. All 7 filter types supported across all backends.
 
 ### Notes
 
@@ -421,11 +460,14 @@ Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extension
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | FastAPI, SQLModel, Python 3.12+ |
-| **Database** | SQLite (default) / PostgreSQL |
-| **Search** | SQLite FTS5 (default) / Meilisearch |
-| **Vectors** | ChromaDB + sentence-transformers |
+| **Database** | SQLite (default) / PostgreSQL (with pgvector) |
+| **Keyword Search** | SQLite FTS5 (default) / Meilisearch — item + chunk-level indexes |
+| **Vector Search** | ChromaDB (SQLite) / pgvector with HNSW (Postgres) — auto-detected |
+| **Search Fusion** | Reciprocal Rank Fusion (k=60) + optional cross-encoder reranking |
 | **AI** | Ollama / Groq / NVIDIA / Custom (OpenAI/Anthropic-compatible) |
-| **Jobs** | Huey (SQLite backend) |
+| **Embeddings** | sentence-transformers (local) / NVIDIA (cloud) — auto-dimension detection |
+| **Knowledge Graph** | Entity extraction + canonicalization + relation mapping (SQL-based) |
+| **Jobs** | Huey (SQLite backend) — stage-based enrichment pipeline |
 | **CLI** | argparse, PID management, Docker service orchestration |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | **State** | TanStack Query (server) + Zustand (client) |
@@ -439,10 +481,26 @@ Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extension
 All config via environment variables with `FDP_` prefix. See [`.env.example`](.env.example).
 
 ```bash
+# Core
 FDP_AI__CHAT_PROVIDER=ollama          # ollama, groq, nvidia, or custom
 FDP_SEARCH__BACKEND=sqlite            # sqlite (zero-config) or meilisearch
 FDP_AUTH__MODE=single                 # single (no login) or multi (JWT)
-FDP_AUTH__SECRET_KEY=your-secret      # Set in production (auto-generated otherwise)
+
+# Search & Retrieval
+FDP_SEARCH__VECTOR_BACKEND=auto       # auto (pgvector for Postgres, chroma for SQLite), chroma, pgvector
+FDP_SEARCH__CHUNK_SIZE_TOKENS=512     # Target chunk size for content splitting
+FDP_SEARCH__CHUNK_OVERLAP_TOKENS=64   # Overlap between adjacent chunks
+
+# Reranker (optional, improves search precision)
+FDP_RERANK__ENABLED=false             # Enable cross-encoder reranking
+FDP_RERANK__MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+
+# Enrichment
+FDP_ENRICHMENT__EXTRACT_ENTITIES=false  # Enable entity extraction for concept graph
+
+# Embeddings
+FDP_AI__EMBEDDING_PROVIDER=local      # local (sentence-transformers) or nvidia
+FDP_AI__EMBEDDING_MODEL=all-MiniLM-L6-v2  # pgvector dimension auto-detected from model
 ```
 
 Or run `4dpocket setup` for an interactive configuration wizard.
@@ -453,7 +511,7 @@ Or run `4dpocket setup` for an interactive configuration wizard.
 
 Interactive docs at http://localhost:4040/docs when running.
 
-**Items** — `POST /items`, `GET /items`, `GET /items/{id}`, `PATCH /items/{id}`, `DELETE /items/{id}`, `POST /items/bulk`, `POST /items/{id}/archive`, `POST /items/{id}/reprocess`, `GET /items/{id}/related`, `PATCH /items/{id}/reading-progress`, `POST /items/{id}/download-video`, `GET /items/{id}/media-proxy`
+**Items** — `POST /items`, `GET /items`, `GET /items/{id}`, `PATCH /items/{id}`, `DELETE /items/{id}`, `POST /items/bulk`, `POST /items/{id}/archive`, `POST /items/{id}/reprocess`, `GET /items/{id}/related`, `GET /items/{id}/enrichment`, `PATCH /items/{id}/reading-progress`, `POST /items/{id}/download-video`, `GET /items/{id}/media-proxy`
 
 **Notes** — `POST /notes`, `GET /notes`, `GET /notes/{id}`, `PATCH /notes/{id}`, `DELETE /notes/{id}`, `POST /notes/{id}/summarize`, `POST /notes/{id}/generate-title`
 
@@ -475,6 +533,8 @@ Interactive docs at http://localhost:4040/docs when running.
 
 **Comments** — `POST /items/{id}/comments`, `GET /items/{id}/comments`, `DELETE /items/{id}/comments/{id}`
 
+**Entities** — `GET /entities`, `GET /entities/{id}`, `GET /entities/{id}/items`, `GET /entities/{id}/related`
+
 **Admin** — User management, AI config, instance settings, saved filters
 
 **Auth** — Register, login, logout, profile update, password change
@@ -490,24 +550,37 @@ Interactive docs at http://localhost:4040/docs when running.
 ├── src/fourdpocket/           # Python backend
 │   ├── cli.py                 # CLI entry point (4dpocket command)
 │   ├── __main__.py            # python -m fourdpocket support
-│   ├── api/                   # 25 FastAPI routers
-│   ├── models/                # 21 SQLModel tables
+│   ├── api/                   # 26 FastAPI routers (items, search, entities, AI, ...)
+│   ├── models/                # 26 SQLModel tables (items, chunks, entities, relations, ...)
 │   ├── processors/            # 17 platform extractors
-│   ├── ai/                    # Providers, tagger, summarizer, sanitizer
-│   ├── search/                # FTS5, Meilisearch, ChromaDB, hybrid RRF
+│   ├── ai/                    # Providers, tagger, summarizer, extractor, canonicalizer, LLM cache
+│   ├── search/                # Search service + pluggable backends
+│   │   ├── service.py         # SearchService orchestrator (keyword + vector + RRF + rerank)
+│   │   ├── base.py            # Protocol definitions (KeywordBackend, VectorBackend, Reranker)
+│   │   ├── backends/          # Backend implementations
+│   │   │   ├── sqlite_fts_backend.py   # SQLite FTS5 (item + chunk search)
+│   │   │   ├── chroma_backend.py       # ChromaDB vector store
+│   │   │   ├── pgvector_backend.py     # pgvector with HNSW (auto-dimension)
+│   │   │   └── meilisearch_backend.py  # Meilisearch keyword + chunk indexing
+│   │   ├── chunking.py        # Content chunking (paragraph/sentence/word split)
+│   │   ├── reranker.py        # NullReranker + LocalReranker (cross-encoder)
+│   │   └── filters.py         # Inline filter syntax parser
 │   ├── sharing/               # Share manager, permissions, feed manager
-│   ├── workers/               # Background tasks (fetcher, media, AI, RSS, rules)
+│   ├── workers/               # Background tasks
+│   │   ├── enrichment_pipeline.py  # Stage-based enrichment (chunk→embed→tag→summarize→entities)
+│   │   ├── fetcher.py         # URL content extraction
+│   │   └── ...                # Media, archiver, RSS, rules, scheduler
 │   └── storage/               # User-scoped file storage
-├── frontend/                  # React 19 PWA (56 files)
+├── frontend/                  # React 19 PWA
 │   └── src/
 │       ├── pages/             # 22 page components
 │       ├── components/        # UI components (editor, cards, dialogs, layout)
 │       ├── hooks/             # TanStack Query hooks + keyboard shortcuts
 │       └── stores/            # Zustand UI state
 ├── extension/                 # Chrome browser extension
-├── tests/                     # 73+ pytest tests
+├── tests/                     # 128 pytest tests
 ├── Dockerfile                 # Multi-stage build
-├── docker-compose.yml         # Full stack orchestration
+├── docker-compose.yml         # Full stack (pgvector/pgvector:pg16 for vector support)
 └── .env.example               # Configuration reference
 ```
 
@@ -519,7 +592,7 @@ See the full [Development Guide](DEVELOPMENT.md) for detailed setup instructions
 
 ```bash
 make dev        # Start dev server (hot reload)
-make test       # Run test suite (73+ tests)
+make test       # Run test suite (128 tests)
 make lint       # ruff check
 make format     # ruff format
 make test-cov   # Tests with coverage report

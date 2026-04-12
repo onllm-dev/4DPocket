@@ -37,6 +37,14 @@ def init_meilisearch() -> None:
     except Exception:
         pass  # Index may already exist
 
+    # Ensure primaryKey is set (may be missing if index was created without it)
+    try:
+        idx_info = client.get_index("knowledge_items")
+        if idx_info.primary_key is None:
+            client.index("knowledge_items").update(primary_key="id")
+    except Exception:
+        pass
+
     index = _get_index()
     index.update_filterable_attributes([
         "user_id", "item_type", "source_platform", "is_favorite", "is_archived",

@@ -29,6 +29,18 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
 );
 """
 
+CHUNKS_FTS_CREATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+    chunk_id UNINDEXED,
+    item_id UNINDEXED,
+    user_id UNINDEXED,
+    title,
+    url,
+    text,
+    tokenize='porter unicode61'
+);
+"""
+
 NOTES_FTS_CREATE = """
 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
     note_id UNINDEXED,
@@ -494,3 +506,195 @@ def search_notes(
     except Exception as e:
         logger.warning("Notes FTS5 search failed: %s", e)
         return []
+
+
+# ─── Chunk-Level FTS ─────────────────────────────────────────
+
+def init_chunks_fts(db: Session) -> None:
+    """Create chunks_fts virtual table if it doesn't exist."""
+    db.exec(text(CHUNKS_FTS_CREATE))
+    db.commit()
+
+
+def index_chunks(
+    db: Session,
+    item_id: uuid.UUID,
+    user_id: uuid.UUID,
+    chunks: list,
+    title: str | None = None,
+    url: str | None = None,
+) -> None:
+    """Index item chunks into chunks_fts. Replaces any existing entries for the item."""
+    # Remove existing chunk entries for this item
+    delete_chunks(db, item_id)
+
+    for chunk in chunks:
+        # chunk can be an ItemChunk model or a Chunk dataclass
+        chunk_id = str(getattr(chunk, "id", "") or getattr(chunk, "content_hash", ""))
+        chunk_text_val = getattr(chunk, "text", "")
+        chunk_order = getattr(chunk, "chunk_order", 0)
+
+        db.exec(
+            text(
+                "INSERT INTO chunks_fts (chunk_id, item_id, user_id, title, url, text) "
+                "VALUES (:chunk_id, :item_id, :user_id, :title, :url, :text)"
+            ),
+            params={
+                "chunk_id": chunk_id,
+                "item_id": str(item_id),
+                "user_id": str(user_id),
+                "title": (title or "") if chunk_order == 0 else "",
+                "url": (url or "") if chunk_order == 0 else "",
+                "text": chunk_text_val[:50000],
+            },
+        )
+    db.commit()
+    _search_cache.invalidate_user(str(user_id))
+
+
+def delete_chunks(db: Session, item_id: uuid.UUID) -> None:
+    """Remove all chunk FTS entries for an item."""
+    # Look up user_id for cache invalidation before deleting
+    result = db.exec(
+        text("SELECT DISTINCT user_id FROM chunks_fts WHERE item_id = :item_id"),
+        params={"item_id": str(item_id)},
+    )
+    user_ids = [row[0] for row in result.all()]
+
+    db.exec(
+        text("DELETE FROM chunks_fts WHERE item_id = :item_id"),
+        params={"item_id": str(item_id)},
+    )
+    db.commit()
+
+    for uid in user_ids:
+        _search_cache.invalidate_user(uid)
+
+
+def search_chunks(
+    db: Session,
+    query: str,
+    user_id: uuid.UUID,
+    item_type: str | None = None,
+    source_platform: str | None = None,
+    is_favorite: bool | None = None,
+    is_archived: bool | None = None,
+    tags: list[str] | None = None,
+    after: str | None = None,
+    before: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    """Search chunks via FTS5, roll up to items (best chunk per item).
+
+    Returns the same dict shape as search(): {item_id, rank, title_snippet, content_snippet}
+    """
+    if not query.strip():
+        return []
+
+    # Check cache
+    cache_k = _cache_key(
+        str(user_id), f"chunk:{query}",
+        item_type=item_type, source_platform=source_platform,
+        is_favorite=is_favorite, is_archived=is_archived,
+        tags=tags, after=after, before=before,
+        limit=limit, offset=offset,
+    )
+    cached = _search_cache.get(cache_k)
+    if cached is not None:
+        return cached
+
+    if _is_url_query(query):
+        fts_query = _build_url_fts_query(query)
+    else:
+        fts_query = _build_fts_query(query)
+
+    if not fts_query:
+        return []
+
+    # Build filter JOINs
+    where_fts = ["cfts.user_id = :user_id"]
+    where_items: list[str] = []
+    params: dict = {"user_id": str(user_id), "query": fts_query}
+    joins: list[str] = []
+
+    # Filters that require JOIN to knowledge_items
+    needs_join = bool(
+        item_type or source_platform or is_favorite is not None
+        or is_archived is not None or after or before or tags
+    )
+
+    if needs_join:
+        joins.append("JOIN knowledge_items ki ON ki.id = CAST(cfts.item_id AS TEXT)")
+
+    if item_type:
+        where_items.append("ki.item_type = :item_type")
+        params["item_type"] = item_type
+    if source_platform:
+        where_items.append("ki.source_platform = :source_platform")
+        params["source_platform"] = source_platform
+    if is_favorite is not None:
+        where_items.append("ki.is_favorite = :is_favorite")
+        params["is_favorite"] = is_favorite
+    if is_archived is not None:
+        where_items.append("ki.is_archived = :is_archived")
+        params["is_archived"] = is_archived
+    if after:
+        where_items.append("ki.created_at >= :after_date")
+        params["after_date"] = after
+    if before:
+        where_items.append("ki.created_at <= :before_date")
+        params["before_date"] = before
+
+    if tags:
+        joins.append(
+            "JOIN item_tags it ON it.item_id = CAST(cfts.item_id AS TEXT)"
+            " JOIN tags t ON t.id = it.tag_id"
+        )
+        tag_placeholders = ", ".join(f":tag_{i}" for i in range(len(tags)))
+        where_items.append(f"LOWER(t.slug) IN ({tag_placeholders})")
+        for i, tag_slug in enumerate(tags):
+            params[f"tag_{i}"] = tag_slug.lower().strip()
+
+    fts_where = " AND ".join(where_fts)
+    item_where = (" AND " + " AND ".join(where_items)) if where_items else ""
+    join_sql = " ".join(joins)
+
+    # Two-step approach: snippet() can't be used with GROUP BY, so we first
+    # find matching chunks, then pick the best per item in Python.
+    sql = f"""
+        SELECT cfts.item_id, cfts.rank, cfts.chunk_id,
+               snippet(chunks_fts, 3, '<mark>', '</mark>', '...', 32) as title_snippet,
+               snippet(chunks_fts, 5, '<mark>', '</mark>', '...', 64) as content_snippet
+        FROM chunks_fts cfts
+        {join_sql}
+        WHERE chunks_fts MATCH :query AND {fts_where}{item_where}
+        ORDER BY cfts.rank
+        LIMIT :raw_limit
+    """
+    # Fetch more than needed to allow rollup
+    params["raw_limit"] = limit * 5
+
+    try:
+        result = db.exec(text(sql), params=params)
+        rows = result.all()
+    except Exception as e:
+        logger.warning("Chunk FTS5 search failed: %s", e)
+        return []
+
+    # Roll up: keep the best-scoring chunk per item
+    seen_items: dict[str, dict] = {}
+    for row in rows:
+        iid = row[0]
+        if iid not in seen_items:
+            seen_items[iid] = {
+                "item_id": iid,
+                "rank": row[1],
+                "title_snippet": row[3],
+                "content_snippet": row[4],
+            }
+
+    results = list(seen_items.values())[offset:offset + limit]
+
+    _search_cache.set(cache_k, results)
+    return results

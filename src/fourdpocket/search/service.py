@@ -1,0 +1,230 @@
+"""SearchService — unified search orchestrator using pluggable backends."""
+
+import logging
+import uuid
+from collections import defaultdict
+
+from sqlmodel import Session
+
+from fourdpocket.search.base import (
+    KeywordBackend,
+    KeywordHit,
+    SearchFilters,
+    SearchResult,
+    VectorBackend,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class SearchService:
+    """Orchestrates keyword + vector search with optional reranking."""
+
+    def __init__(
+        self,
+        keyword: KeywordBackend,
+        vector: VectorBackend,
+        reranker=None,
+    ):
+        self._keyword = keyword
+        self._vector = vector
+        self._reranker = reranker
+
+    def index_item(self, db: Session, item: object) -> None:
+        """Index an item in the keyword backend."""
+        try:
+            self._keyword.index_item(db, item)
+        except Exception as e:
+            logger.warning("Keyword indexing failed: %s", e)
+
+    def index_chunks(
+        self,
+        db: Session,
+        item_id: uuid.UUID,
+        user_id: uuid.UUID,
+        chunks: list,
+        title: str | None = None,
+        url: str | None = None,
+    ) -> None:
+        """Index chunks in the keyword backend."""
+        try:
+            self._keyword.index_chunks(db, item_id, user_id, chunks, title, url)
+        except Exception as e:
+            logger.warning("Chunk keyword indexing failed: %s", e)
+
+    def upsert_item_embedding(
+        self,
+        item_id: uuid.UUID,
+        user_id: uuid.UUID,
+        embedding: list[float],
+        metadata: dict | None = None,
+    ) -> None:
+        """Store an item-level embedding in the vector backend."""
+        try:
+            self._vector.upsert_item(item_id, user_id, embedding, metadata)
+        except Exception as e:
+            logger.warning("Item embedding upsert failed: %s", e)
+
+    def upsert_chunk_embedding(
+        self,
+        chunk_id: uuid.UUID,
+        item_id: uuid.UUID,
+        user_id: uuid.UUID,
+        embedding: list[float],
+        metadata: dict | None = None,
+    ) -> None:
+        """Store a chunk-level embedding in the vector backend."""
+        try:
+            self._vector.upsert_chunk(chunk_id, item_id, user_id, embedding, metadata)
+        except Exception as e:
+            logger.warning("Chunk embedding upsert failed: %s", e)
+
+    def delete_item(self, db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """Remove an item from all backends."""
+        try:
+            self._keyword.delete_item(db, item_id)
+        except Exception as e:
+            logger.warning("Keyword delete failed: %s", e)
+        try:
+            self._vector.delete_item(item_id, user_id)
+        except Exception as e:
+            logger.warning("Vector delete failed: %s", e)
+
+    def search(
+        self,
+        db: Session,
+        query: str,
+        user_id: uuid.UUID,
+        filters: SearchFilters | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[SearchResult]:
+        """Run hybrid search: keyword + vector + RRF fusion + optional rerank."""
+        if filters is None:
+            filters = SearchFilters()
+
+        # Fetch enough candidates to cover offset + limit after fusion
+        fetch_size = max((offset + limit) * 2, limit * 3)
+
+        # 1. Keyword search
+        keyword_hits = self._keyword.search(
+            db, query, user_id, filters, limit=fetch_size, offset=0,
+        )
+
+        # 2. Vector search (embed query, then search)
+        vector_hits = []
+        if query.strip():
+            try:
+                from fourdpocket.ai.factory import get_embedding_provider
+
+                provider = get_embedding_provider()
+                query_embedding = provider.embed_single(query)
+                if query_embedding:
+                    vector_hits = self._vector.search(
+                        user_id, query_embedding, k=fetch_size
+                    )
+            except Exception as e:
+                logger.debug("Vector search unavailable: %s", e)
+
+        # 3. RRF fusion
+        merged = self._rrf_fusion(keyword_hits, vector_hits)
+
+        if not merged:
+            return []
+
+        # 4. Optional reranking
+        if self._reranker is not None and hasattr(self._reranker, "rerank"):
+            from fourdpocket.config import get_settings
+
+            settings = get_settings()
+            rerank_cfg = getattr(settings, "rerank", None)
+            if rerank_cfg and getattr(rerank_cfg, "enabled", False):
+                candidate_pool = getattr(rerank_cfg, "candidate_pool", 50)
+                rerank_top_k = getattr(rerank_cfg, "top_k", 20)
+                candidates = merged[:candidate_pool]
+
+                # Fetch texts for reranking
+                texts = self._fetch_texts(db, [r.item_id for r in candidates])
+                if texts:
+                    reranked = self._reranker.rerank(query, texts, rerank_top_k)
+                    # None means model failed to load — skip reranking, keep RRF order
+                    if reranked is not None:
+                        reranked_results = []
+                        for idx, score in reranked:
+                            if idx < len(candidates):
+                                r = candidates[idx]
+                                r.score = score
+                                reranked_results.append(r)
+                        merged = reranked_results
+
+        # 5. Apply offset and limit
+        return merged[offset:offset + limit]
+
+    def _rrf_fusion(
+        self,
+        keyword_hits: list[KeywordHit],
+        vector_hits: list,
+        k: int = 60,
+    ) -> list[SearchResult]:
+        """Reciprocal Rank Fusion of keyword and vector results."""
+        scores: dict[str, float] = defaultdict(float)
+        sources: dict[str, set] = defaultdict(set)
+        snippets: dict[str, tuple] = {}
+
+        for rank, hit in enumerate(keyword_hits):
+            scores[hit.item_id] += 1.0 / (k + rank)
+            sources[hit.item_id].add("fts")
+            if hit.item_id not in snippets:
+                snippets[hit.item_id] = (hit.title_snippet, hit.content_snippet)
+
+        for rank, hit in enumerate(vector_hits):
+            scores[hit.item_id] += 1.0 / (k + rank)
+            sources[hit.item_id].add("semantic")
+
+        results = []
+        for item_id, score in sorted(scores.items(), key=lambda x: -x[1]):
+            title_snip, content_snip = snippets.get(item_id, (None, None))
+            results.append(SearchResult(
+                item_id=item_id,
+                score=round(score, 6),
+                title_snippet=title_snip,
+                content_snippet=content_snip,
+                sources=list(sources[item_id]),
+            ))
+
+        return results
+
+    def _fetch_texts(self, db: Session, item_ids: list[str]) -> list[str]:
+        """Fetch item content for reranking."""
+        if not item_ids:
+            return []
+        try:
+            from sqlmodel import select
+
+            from fourdpocket.models.item import KnowledgeItem
+
+            items = db.exec(
+                select(KnowledgeItem).where(
+                    KnowledgeItem.id.in_([uuid.UUID(iid) for iid in item_ids])
+                )
+            ).all()
+            item_map = {str(item.id): item for item in items}
+
+            texts = []
+            for iid in item_ids:
+                item = item_map.get(iid)
+                if item:
+                    parts = []
+                    if item.title:
+                        parts.append(item.title)
+                    if item.description:
+                        parts.append(item.description)
+                    if item.content:
+                        parts.append(item.content[:2000])
+                    texts.append(" ".join(parts) if parts else "")
+                else:
+                    texts.append("")
+            return texts
+        except Exception as e:
+            logger.warning("Failed to fetch texts for reranking: %s", e)
+            return []

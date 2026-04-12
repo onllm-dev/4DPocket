@@ -8,12 +8,12 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 
 - **Backend**: FastAPI + SQLModel + Python 3.12+ (sync `def` handlers, NOT `async def`)
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide React icons
-- **Database**: SQLite (default) / PostgreSQL
-- **Search**: SQLite FTS5 (default) / Meilisearch + ChromaDB (semantic)
+- **Database**: SQLite (default) / PostgreSQL (with pgvector)
+- **Search**: SearchService with pluggable backends — SQLite FTS5 / Meilisearch (keyword) + ChromaDB / pgvector (vector) + RRF fusion + optional cross-encoder reranking
 - **AI**: Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) (NO litellm, NO langchain)
 - **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose)
 - **HTTP**: httpx (backend), native fetch (frontend) (NO axios)
-- **Background Jobs**: Huey (SQLite backend)
+- **Background Jobs**: Huey (SQLite backend) — stage-based enrichment pipeline
 - **State**: TanStack Query (server) + Zustand (client)
 
 ## Commands
@@ -22,7 +22,7 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 # Backend
 uv sync --all-extras          # Install deps
 uv run uvicorn fourdpocket.main:app --port 4040  # Run server
-uv run pytest tests/ -x -q    # Run tests
+uv run pytest tests/ -x -q    # Run tests (128 tests)
 make test                      # Run tests (alias)
 make lint                      # ruff check
 
@@ -46,21 +46,59 @@ All three version files must stay in sync when bumping:
 
 ```
 src/fourdpocket/
-  api/          # FastAPI routers (19 files)
-  models/       # SQLModel tables
+  api/          # FastAPI routers (26 files, including entities)
+  models/       # SQLModel tables (26 tables: items, chunks, entities, relations, enrichment, LLM cache, ...)
   processors/   # 17 platform extractors (BaseProcessor + @register_processor)
-  ai/           # Providers, tagger, summarizer, sanitizer
-  search/       # FTS5, Meilisearch, ChromaDB semantic
+  ai/           # Providers, tagger, summarizer, extractor, canonicalizer, LLM cache, sanitizer
+  search/       # SearchService + pluggable backends
+    service.py          # Orchestrator: keyword + vector + RRF + optional rerank
+    base.py             # Protocols: KeywordBackend, VectorBackend, Reranker
+    backends/           # sqlite_fts, chroma, pgvector, meilisearch
+    chunking.py         # Content chunking (paragraph/sentence/word, 512 tokens, 64 overlap)
+    reranker.py         # NullReranker + LocalReranker (cross-encoder)
+    filters.py          # Inline filter syntax parser
   sharing/      # Share manager, permissions, feed manager
-  workers/      # Huey tasks (fetcher, archiver, enrichment, rules engine)
+  workers/      # Huey tasks
+    enrichment_pipeline.py  # Stage-based: chunked→embedded→tagged→summarized→entities_extracted
+    fetcher.py              # URL content extraction
+    ai_enrichment.py        # Legacy enrichment (deprecated, kept for backward compat)
   storage/      # Local file storage (user-scoped)
 
 frontend/src/
-  pages/        # 18 page components
+  pages/        # 22 page components
   components/   # Layout, BookmarkCard, ShareDialog, CommandPalette
   hooks/        # TanStack Query hooks + keyboard shortcuts
   api/client.ts # fetch wrapper with auth + 401 redirect
 ```
+
+## Search Architecture
+
+```
+Query → KeywordBackend.search() → ┐
+                                   ├→ RRF Fusion (k=60) → Reranker (optional) → Results
+Query → embed → VectorBackend.search() → ┘
+```
+
+- **Auto-detection**: `vector_backend=auto` picks pgvector for Postgres, ChromaDB for SQLite
+- **Chunk-level**: Content split into overlapping chunks, indexed in both keyword + vector backends
+- **Fallback**: Chunk search → item-level search if no chunks exist
+- **pgvector dimensions**: Auto-detected from embedding provider (not hardcoded)
+
+## Enrichment Pipeline
+
+```
+Item Created → enrich_item_v2()
+  ├─ chunked (independent)     → chunk content → index in FTS + vector
+  ├─ tagged (independent)      → AI auto-tagging
+  └─ summarized (independent)  → AI summary
+       ├─ embedded (depends: chunked)           → per-chunk embeddings
+       └─ entities_extracted (depends: chunked)  → entity + relation extraction
+```
+
+- Each stage tracked in `enrichment_stages` table with status, attempts, errors
+- LLM responses cached in `llm_cache` table by content hash
+- Entity extraction uses gleaning (multi-pass) to catch missed entities
+- Entities canonicalized via 3-tier matching (exact alias → normalized name → create new)
 
 ## Key Patterns
 
@@ -72,6 +110,8 @@ frontend/src/
 - **Processors**: `@register_processor` decorator, URL pattern matching, returns `ProcessorResult`
 - **AI safety**: All user content sanitized via `ai/sanitizer.py` before LLM prompts
 - **SSRF protection**: `_fetch_url()` blocks internal networks (127.x, 10.x, 172.16.x, 169.254.x)
+- **Search backends**: Protocol-based (`KeywordBackend`, `VectorBackend`), lazy singleton via `get_search_service()`
+- **Entity canonicalization**: 3-tier matching with description merging across documents
 - **Dark mode**: Tailwind v4 `@custom-variant dark` in globals.css
 - **Theme**: Doraemon Blue `#0096C7`, bell yellow `#FCD34D`, dark bg `#0C1222`
 
@@ -81,4 +121,5 @@ frontend/src/
 - Don't use passlib, python-jose, axios, or litellm
 - Don't pass user content unsanitized to LLM prompts
 - Don't hardcode secrets - use `FDP_` env vars
+- Don't hardcode embedding dimensions - use auto-detection
 - First registered user auto-becomes admin

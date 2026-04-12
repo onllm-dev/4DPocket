@@ -22,6 +22,9 @@ services:
       - FDP_STORAGE__BASE_PATH=/data
       - FDP_SERVER__SECURE_COOKIES=${SECURE_COOKIES:-false}
       - FDP_SERVER__CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:4040"]}
+      - FDP_SEARCH__VECTOR_BACKEND=${VECTOR_BACKEND:-pgvector}
+      - FDP_RERANK__ENABLED=${RERANK_ENABLED:-false}
+      - FDP_ENRICHMENT__EXTRACT_ENTITIES=${EXTRACT_ENTITIES:-false}
     volumes:
       - 4dp-data:/data
     depends_on:
@@ -48,6 +51,9 @@ services:
       - FDP_AI__CUSTOM_MODEL=${AI_CUSTOM_MODEL:-}
       - FDP_STORAGE__BASE_PATH=/data
       - HUEY_WORKERS=${HUEY_WORKERS:-2}
+      - FDP_SEARCH__VECTOR_BACKEND=${VECTOR_BACKEND:-pgvector}
+      - FDP_RERANK__ENABLED=${RERANK_ENABLED:-false}
+      - FDP_ENRICHMENT__EXTRACT_ENTITIES=${EXTRACT_ENTITIES:-false}
     volumes:
       - 4dp-data:/data
     depends_on:
@@ -55,9 +61,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ─── PostgreSQL ───────────────────────────────────────────────
+  # ─── PostgreSQL (with pgvector extension) ────────────────────
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       - POSTGRES_USER=4dp
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-4dp}

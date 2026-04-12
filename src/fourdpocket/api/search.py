@@ -10,9 +10,49 @@ from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.note import Note, NoteRead
 from fourdpocket.models.user import User
 from fourdpocket.search.filters import parse_filters
-from fourdpocket.search.indexer import SearchIndexer
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+
+def _search_to_items(
+    db: Session,
+    results: list,
+    current_user: User,
+) -> list[dict]:
+    """Fetch full items by IDs from search results, attach snippets, preserve order."""
+    if not results:
+        return []
+
+    # Support both dict results and SearchResult dataclasses
+    def _get(r, key, default=None):
+        if isinstance(r, dict):
+            return r.get(key, default)
+        return getattr(r, key, default)
+
+    def _item_id(r):
+        v = _get(r, "item_id")
+        return uuid.UUID(v) if isinstance(v, str) else v
+
+    item_ids = [_item_id(r) for r in results]
+    items = db.exec(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id.in_(item_ids),
+            KnowledgeItem.user_id == current_user.id,
+        )
+    ).all()
+
+    item_map = {item.id: item for item in items}
+    response = []
+    for r, iid in zip(results, item_ids):
+        if iid in item_map:
+            item_dict = ItemRead.model_validate(item_map[iid]).model_dump()
+            item_dict["title_snippet"] = _get(r, "title_snippet")
+            item_dict["content_snippet"] = _get(r, "content_snippet")
+            sources = _get(r, "sources")
+            if sources:
+                item_dict["sources"] = sources
+            response.append(item_dict)
+    return response
 
 
 @router.get("")
@@ -34,11 +74,12 @@ def search_items(
 
     Supports inline filter syntax: `docker tag:devops is:favorite after:2024-01`
     """
-    # Parse inline filters from query string (e.g., "docker tag:devops")
     parsed = parse_filters(q)
-    search_query = parsed.get("query", q)
+    search_query = parsed.get("query") or ""
+    # If only filters remain (no free text), use original q only if no filters were parsed
+    if not search_query and len(parsed) <= 1:
+        search_query = q
 
-    # Merge inline filters with query params (query params take precedence)
     effective_type = item_type or parsed.get("item_type")
     effective_platform = source_platform or parsed.get("source_platform")
     effective_favorite = is_favorite if is_favorite is not None else parsed.get("is_favorite")
@@ -49,58 +90,27 @@ def search_items(
     effective_after = after or parsed.get("after")
     effective_before = before or parsed.get("before")
 
-    from fourdpocket.config import get_settings
-    settings = get_settings()
+    from fourdpocket.search import get_search_service
+    from fourdpocket.search.base import SearchFilters
 
-    if settings.search.backend == "sqlite" and settings.database.url.startswith("sqlite"):
-        from fourdpocket.search import sqlite_fts
-        results = sqlite_fts.search(
-            db, search_query, current_user.id,
-            item_type=effective_type,
-            source_platform=effective_platform,
-            is_favorite=effective_favorite,
-            is_archived=effective_archived,
-            tags=effective_tags or None,
-            after=effective_after,
-            before=effective_before,
-            limit=limit,
-            offset=offset,
-        )
-    else:
-        indexer = SearchIndexer(db)
-        results = indexer.search(
-            query=search_query,
-            user_id=current_user.id,
-            item_type=effective_type,
-            source_platform=effective_platform,
-            limit=limit,
-            offset=offset,
-        )
+    service = get_search_service()
+    filters = SearchFilters(
+        item_type=effective_type,
+        source_platform=effective_platform,
+        is_favorite=effective_favorite,
+        is_archived=effective_archived,
+        tags=effective_tags or None,
+        after=effective_after,
+        before=effective_before,
+    )
+    results = service.search(
+        db, search_query, current_user.id,
+        filters=filters,
+        limit=limit,
+        offset=offset,
+    )
 
-    if not results:
-        return []
-
-    # Fetch full items by IDs in order
-    item_ids = [uuid.UUID(r["item_id"]) for r in results]
-    items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.id.in_(item_ids),
-            KnowledgeItem.user_id == current_user.id,
-        )
-    ).all()
-
-    # Preserve search result ordering and attach snippets
-    item_map = {item.id: item for item in items}
-    snippet_map = {r["item_id"]: r for r in results}
-    response = []
-    for iid in item_ids:
-        if iid in item_map:
-            item_dict = ItemRead.model_validate(item_map[iid]).model_dump()
-            fts_result = snippet_map.get(str(iid), {})
-            item_dict["title_snippet"] = fts_result.get("title_snippet")
-            item_dict["content_snippet"] = fts_result.get("content_snippet")
-            response.append(item_dict)
-    return response
+    return _search_to_items(db, results, current_user)
 
 
 @router.get("/unified")
@@ -174,38 +184,14 @@ def hybrid_search_endpoint(
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Hybrid search: combines FTS5 keyword + semantic vector results via Reciprocal Rank Fusion."""
-    from fourdpocket.search.hybrid import hybrid_search
+    from fourdpocket.search import get_search_service
+    from fourdpocket.search.base import SearchFilters
 
-    results = hybrid_search(
-        db, q, current_user.id,
-        item_type=item_type,
-        source_platform=source_platform,
-        limit=limit,
-    )
+    service = get_search_service()
+    filters = SearchFilters(item_type=item_type, source_platform=source_platform)
+    results = service.search(db, q, current_user.id, filters=filters, limit=limit)
 
-    if not results:
-        return []
-
-    item_ids = [uuid.UUID(r["item_id"]) for r in results]
-    items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.id.in_(item_ids),
-            KnowledgeItem.user_id == current_user.id,
-        )
-    ).all()
-
-    item_map = {item.id: item for item in items}
-    snippet_map = {r["item_id"]: r for r in results}
-    response = []
-    for iid in item_ids:
-        if iid in item_map:
-            item_dict = ItemRead.model_validate(item_map[iid]).model_dump()
-            fts_result = snippet_map.get(str(iid), {})
-            item_dict["title_snippet"] = fts_result.get("title_snippet")
-            item_dict["content_snippet"] = fts_result.get("content_snippet")
-            item_dict["sources"] = fts_result.get("sources", [])
-            response.append(item_dict)
-    return response
+    return _search_to_items(db, results, current_user)
 
 
 @router.get("/semantic", response_model=list[ItemRead])
@@ -218,6 +204,7 @@ def semantic_search(
     """Semantic vector search using embeddings."""
     try:
         from fourdpocket.search.semantic import search_by_text
+
         results = search_by_text(q, current_user.id, limit=limit)
         if not results:
             return []

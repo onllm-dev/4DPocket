@@ -18,6 +18,10 @@ if (_project_root / "pyproject.toml").exists():
 from fourdpocket.workers import huey  # noqa: F401
 from fourdpocket.workers.ai_enrichment import enrich_item  # noqa: F401
 from fourdpocket.workers.archiver import archive_page  # noqa: F401
+from fourdpocket.workers.enrichment_pipeline import (  # noqa: F401
+    enrich_item_v2,
+    run_enrichment_stage,
+)
 from fourdpocket.workers.fetcher import fetch_and_process_url  # noqa: F401
 from fourdpocket.workers.media_downloader import download_media  # noqa: F401
 from fourdpocket.workers.rss_worker import poll_all_feeds  # noqa: F401

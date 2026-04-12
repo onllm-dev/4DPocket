@@ -56,7 +56,7 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
 
     from fourdpocket.db.session import get_engine
     from fourdpocket.models.item import KnowledgeItem
-    from fourdpocket.search.indexer import SearchIndexer
+    from fourdpocket.search import get_search_service
 
     logger.info("Processing URL %s for item %s", url, item_id)
 
@@ -67,7 +67,7 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
             logger.error("Item %s not found", item_id)
             return {"status": "error", "error": "Item not found"}
 
-        indexer = SearchIndexer(db)
+        search_service = get_search_service()
 
         try:
             import asyncio
@@ -96,7 +96,7 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
             db.refresh(item)
 
             # Index for search
-            indexer.index_item(item)
+            search_service.index_item(db, item)
 
             # Set favicon URL for generic URLs (brand platforms already have custom icons)
             if item.source_platform.value == "generic":
@@ -106,8 +106,8 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
 
             # Chain: AI enrichment (content now available)
             try:
-                from fourdpocket.workers.ai_enrichment import enrich_item
-                enrich_item(item_id, user_id)
+                from fourdpocket.workers.enrichment_pipeline import enrich_item_v2
+                enrich_item_v2(item_id, user_id)
             except Exception as chain_err:
                 logger.warning("Failed to chain enrich_item for %s: %s", item_id, chain_err)
 

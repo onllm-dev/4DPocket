@@ -23,8 +23,7 @@ def parse_filters(filter_string: str) -> dict:
 
     # Remaining text after removing filters is the search query
     query = re.sub(pattern, '', filter_string).strip()
-    if query:
-        filters['query'] = query
+    filters['query'] = query  # Always set — empty string means filter-only search
 
     for key, value in matches:
         key = key.lower()

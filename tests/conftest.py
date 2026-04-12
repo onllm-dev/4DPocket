@@ -20,10 +20,11 @@ def test_engine():
     SQLModel.metadata.create_all(engine)
 
     # Initialize FTS5 table for search tests
-    from fourdpocket.search.sqlite_fts import init_fts
+    from fourdpocket.search.sqlite_fts import init_chunks_fts, init_fts
 
     with Session(engine) as session:
         init_fts(session)
+        init_chunks_fts(session)
 
     yield engine
     engine.dispose()
@@ -52,7 +53,6 @@ def test_client(engine):
 
     # Disable rate limiting for tests by removing middleware state
     # We rebuild the middleware stack by removing RateLimitMiddleware
-    from starlette.middleware import Middleware
     app.user_middleware = [
         m for m in app.user_middleware
         if not (hasattr(m, "cls") and m.cls.__name__ == "RateLimitMiddleware")

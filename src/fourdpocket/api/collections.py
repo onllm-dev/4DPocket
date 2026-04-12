@@ -262,13 +262,13 @@ def get_smart_collection_items(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart collection"
         )
 
-    from fourdpocket.search.indexer import SearchIndexer
+    from fourdpocket.search import get_search_service
 
-    indexer = SearchIndexer(db)
-    results = indexer.search(
-        collection.smart_query, user_id=current_user.id, limit=limit, offset=offset
+    service = get_search_service()
+    results = service.search(
+        db, collection.smart_query, current_user.id, limit=limit, offset=offset,
     )
-    return results
+    return [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
 
 
 @router.get("/{collection_id}/items", response_model=list[ItemRead])
