@@ -248,10 +248,38 @@ jobs:
           name: chrome-extension
           path: 4dpocket-chrome-extension-${{ needs.meta.outputs.version }}.zip
 
+  # ─── Publish MCP npm package ──────────────────────────────────
+  npm:
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify mcp-npm version matches tag
+        working-directory: mcp-npm
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ needs.meta.outputs.version }}" ]; then
+            echo "ERROR: mcp-npm/package.json version ($PKG_VERSION) != tag (${{ needs.meta.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Publish to npm
+        working-directory: mcp-npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   # ─── Create GitHub Release ─────────────────────────────────────
   release:
     runs-on: ubuntu-latest
-    needs: [meta, docker, python, extension, smoke-test]
+    needs: [meta, docker, python, extension, smoke-test, npm]
     steps:
       - uses: actions/checkout@v4
 
@@ -296,6 +324,16 @@ jobs:
             ```bash
             pip install 4dpocket==${{ needs.meta.outputs.version }}
             ```
+
+            ## MCP Client
+
+            Connect stdio-based MCP clients (Claude Desktop, Cursor, etc.) to your instance:
+
+            ```bash
+            npx -y @onllm-dev/4dpocket-mcp --url https://your.pocket.tld --token fdp_pat_xxx
+            ```
+
+            See [`mcp-npm/README.md`](https://github.com/onllm-dev/4DPocket/blob/${{ needs.meta.outputs.tag }}/mcp-npm/README.md) for full client config snippets.
 
             ## Chrome Extension
 

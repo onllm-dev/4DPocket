@@ -263,6 +263,21 @@ The plaintext token is shown **once**. Copy it immediately — it's stored only 
 
 **Claude Code / Codex / other** — use the Raw JSON template from the Settings page.
 
+**Stdio-only clients** — if your client can't speak streamable HTTP directly, use the published npm launcher [`@onllm-dev/4dpocket-mcp`](https://www.npmjs.com/package/@onllm-dev/4dpocket-mcp):
+
+```json
+{
+  "mcpServers": {
+    "4dpocket": {
+      "command": "npx",
+      "args": ["-y", "@onllm-dev/4dpocket-mcp",
+               "--url", "https://your.pocket.tld",
+               "--token", "fdp_pat_..."]
+    }
+  }
+}
+```
+
 ### 3. Use it
 
 Ask your agent things like:

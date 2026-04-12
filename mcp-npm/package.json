@@ -1,0 +1,41 @@
+{
+  "name": "@onllm-dev/4dpocket-mcp",
+  "version": "0.2.0",
+  "description": "MCP client for 4DPocket — connect Claude Desktop, Cursor, and other MCP clients to your self-hosted 4DPocket instance.",
+  "type": "module",
+  "bin": {
+    "4dpocket-mcp": "./bin.mjs"
+  },
+  "files": [
+    "bin.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "4dpocket",
+    "knowledge-base",
+    "claude",
+    "cursor"
+  ],
+  "author": "onllm-dev",
+  "license": "MIT",
+  "homepage": "https://github.com/onllm-dev/4DPocket#mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onllm-dev/4DPocket.git",
+    "directory": "mcp-npm"
+  },
+  "bugs": {
+    "url": "https://github.com/onllm-dev/4DPocket/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mcp-remote": "^0.1.38"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
