@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-type ClientKey = "claude-desktop" | "cursor" | "raw";
+type ClientKey = "claude-desktop" | "cursor" | "claude-code" | "raw";
 
 function getMcpUrl(): string {
   if (typeof window === "undefined") return "http://localhost:4040/mcp";
@@ -26,6 +26,8 @@ function mcpConfig(client: ClientKey, token: string | null): string {
         null,
         2,
       );
+    case "claude-code":
+      return `claude mcp add --transport http 4dpocket ${url} \\\n  --header "Authorization: Bearer ${tokenValue}"`;
     case "raw":
       return JSON.stringify(
         {
@@ -42,12 +44,14 @@ function mcpConfig(client: ClientKey, token: string | null): string {
 const CLIENT_LABELS: { key: ClientKey; label: string }[] = [
   { key: "claude-desktop", label: "Claude Desktop" },
   { key: "cursor", label: "Cursor" },
+  { key: "claude-code", label: "Claude Code" },
   { key: "raw", label: "Raw JSON" },
 ];
 
 const PATH_HINTS: Record<ClientKey, string> = {
   "claude-desktop": "Add to ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%\\Claude\\claude_desktop_config.json (Windows).",
   "cursor": "Add to ~/.cursor/mcp.json or through Cursor → Settings → MCP.",
+  "claude-code": "Run this in your terminal. Registers the 4dpocket MCP server for the Claude Code CLI.",
   "raw": "Generic streamable-HTTP MCP server entry. Adapt to any MCP-compatible client.",
 };
 
