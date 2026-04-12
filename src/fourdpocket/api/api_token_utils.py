@@ -28,7 +28,7 @@ from fourdpocket.models.user import User
 logger = logging.getLogger(__name__)
 
 TOKEN_PREFIX = "fdp_pat_"
-_ID_LENGTH = 6
+_ID_LENGTH = 8  # hex chars; ``_`` is our separator so prefix must avoid it
 _SECRET_BYTES = 32  # 32 bytes → 43 urlsafe base64 chars
 
 # Dummy hash used for constant-time padding when prefix lookup misses.
@@ -51,8 +51,13 @@ def _utcnow() -> datetime:
 
 
 def generate_token() -> GeneratedToken:
-    """Generate a new token plaintext and its storable hash."""
-    prefix = secrets.token_urlsafe(_ID_LENGTH)[:_ID_LENGTH]
+    """Generate a new token plaintext and its storable hash.
+
+    The prefix is hex (0-9a-f) so it cannot contain the ``_`` separator —
+    previous urlsafe-base64 prefixes occasionally included ``_`` or ``-``,
+    which broke ``_parse_prefix`` when splitting on the first underscore.
+    """
+    prefix = secrets.token_hex(_ID_LENGTH // 2)
     secret = secrets.token_urlsafe(_SECRET_BYTES)
     plaintext = f"{TOKEN_PREFIX}{prefix}_{secret}"
     token_hash = _hash(plaintext)

@@ -41,35 +41,33 @@ async def lifespan(app: FastAPI):
             if recreated:
                 reindex_all_items(db)
 
-    # Start Huey worker automatically
+    import sys as _sys
+
+    # Under pytest, skip both the Huey worker subprocess and the MCP session
+    # manager: the subprocess would connect to the real configured database
+    # (bypassing the per-test in-memory engine the fixtures install), and the
+    # session manager only supports one run() per instance.
+    if "pytest" in _sys.modules:
+        yield
+        return
+
+    # Start Huey worker subprocess
     import subprocess
-    import sys
 
     huey_process = subprocess.Popen(
-        [sys.executable, "-m", "fourdpocket.workers.huey_worker"],
+        [_sys.executable, "-m", "fourdpocket.workers.huey_worker"],
     )
     logger.info("Started Huey worker (PID %s)", huey_process.pid)
 
     # Start the MCP session manager (streamable-HTTP transport at /mcp).
-    # The manager is stateful and only supports a single run() per instance,
-    # so we skip it under pytest (which re-enters the lifespan per test).
-    import sys as _sys
+    from fourdpocket.mcp import mcp
 
-    if "pytest" in _sys.modules:
+    async with mcp.session_manager.run():
         try:
             yield
         finally:
             huey_process.terminate()
             huey_process.wait()
-    else:
-        from fourdpocket.mcp import mcp
-
-        async with mcp.session_manager.run():
-            try:
-                yield
-            finally:
-                huey_process.terminate()
-                huey_process.wait()
 
 
 app = FastAPI(

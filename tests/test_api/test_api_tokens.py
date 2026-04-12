@@ -144,3 +144,24 @@ def test_allow_deletion_flag_stored(client, auth_headers):
     )
     assert res.status_code == 201
     assert res.json()["allow_deletion"] is True
+
+
+def test_generated_tokens_always_parse():
+    """Regression: prior urlsafe-base64 prefixes could contain ``_``, which
+    collided with the ``fdp_pat_<prefix>_<secret>`` separator and made
+    ~17% of tokens fail to resolve. Hex prefix must round-trip every time.
+    """
+    from fourdpocket.api.api_token_utils import (
+        TOKEN_PREFIX,
+        _parse_prefix,
+        generate_token,
+    )
+
+    for _ in range(500):
+        gen = generate_token()
+        assert gen.plaintext.startswith(TOKEN_PREFIX)
+        assert "_" not in gen.prefix, f"prefix must not contain separator: {gen.prefix!r}"
+        parsed = _parse_prefix(gen.plaintext)
+        assert parsed == gen.prefix, (
+            f"round-trip failed: generated prefix={gen.prefix!r} parsed={parsed!r}"
+        )
