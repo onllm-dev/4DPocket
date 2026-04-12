@@ -282,7 +282,13 @@ jobs:
 
       - name: Publish to npm (trusted publishing + provenance)
         working-directory: mcp-npm
-        run: npm publish --access public --provenance
+        run: |
+          VERSION="${{ needs.meta.outputs.version }}"
+          if npm view "@onllm-dev/4dpocket-mcp@$VERSION" version > /dev/null 2>&1; then
+            echo "@onllm-dev/4dpocket-mcp@$VERSION is already on npm — skipping publish."
+            exit 0
+          fi
+          npm publish --access public --provenance
 
   # ─── Create GitHub Release ─────────────────────────────────────
   # Intentionally does NOT depend on `npm` — the npm job requires the trusted
