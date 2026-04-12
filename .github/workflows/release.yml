@@ -248,10 +248,16 @@ jobs:
           name: chrome-extension
           path: 4dpocket-chrome-extension-${{ needs.meta.outputs.version }}.zip
 
-  # ─── Publish MCP npm package ──────────────────────────────────
+  # ─── Publish MCP npm package (Trusted Publishing via OIDC) ────
+  # Setup: npmjs.com → org "onllm-dev" → package/org Trusted Publishers →
+  # Add GitHub Actions with repo=onllm-dev/4DPocket, workflow=release.yml.
+  # No long-lived NPM_TOKEN needed — CI authenticates via GitHub OIDC.
   npm:
     runs-on: ubuntu-latest
     needs: meta
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -260,6 +266,10 @@ jobs:
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm to version supporting trusted publishing
+        # npm >= 11.5.1 is required for OIDC trusted publishing.
+        run: npm install -g npm@latest
 
       - name: Verify mcp-npm version matches tag
         working-directory: mcp-npm
@@ -270,16 +280,17 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm
+      - name: Publish to npm (trusted publishing + provenance)
         working-directory: mcp-npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
 
   # ─── Create GitHub Release ─────────────────────────────────────
+  # Intentionally does NOT depend on `npm` — the npm job requires the trusted
+  # publisher to be configured on npmjs.com, which is a one-time manual step.
+  # Keep the release notes / docker / pypi flow resilient if npm fails.
   release:
     runs-on: ubuntu-latest
-    needs: [meta, docker, python, extension, smoke-test, npm]
+    needs: [meta, docker, python, extension, smoke-test]
     steps:
       - uses: actions/checkout@v4
 
