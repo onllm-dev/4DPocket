@@ -154,7 +154,7 @@ def logout(response: Response):
     return None
 
 
-ALLOWED_PROFILE_FIELDS = {"display_name", "avatar_url", "bio"}
+ALLOWED_PROFILE_FIELDS = {"display_name", "avatar_url", "bio", "username", "email"}
 
 
 @router.patch("/me", response_model=UserRead)
@@ -168,12 +168,47 @@ def update_me(
         for k, v in data.model_dump(exclude_unset=True).items()
         if k in ALLOWED_PROFILE_FIELDS
     }
+    # Enforce uniqueness for identity-critical fields.
+    new_username = update_data.get("username")
+    if new_username and new_username != current_user.username:
+        clash = db.exec(
+            select(User).where(User.username == new_username, User.id != current_user.id)
+        ).first()
+        if clash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already taken",
+            )
+    new_email = update_data.get("email")
+    if new_email and new_email != current_user.email:
+        clash = db.exec(
+            select(User).where(User.email == new_email, User.id != current_user.id)
+        ).first()
+        if clash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already taken",
+            )
     for field, value in update_data.items():
         setattr(current_user, field, value)
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Self-service account deletion. Cascades through owned items, tokens, etc.
+    Clears the auth cookie so the client lands on /login."""
+    db.delete(current_user)
+    db.commit()
+    response.delete_cookie(key="4dp_token")
+    return None
 
 
 class PasswordChange(BaseModel):

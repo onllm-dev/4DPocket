@@ -239,7 +239,7 @@ function FeedCard({ feed, onReview }: { feed: FeedType; onReview: (feedId: strin
           <p className="text-xs text-gray-400 dark:text-gray-500 truncate mb-2">{feed.url}</p>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${formatBadgeClass}`}>
-              {feed.format.toUpperCase()}
+              {(feed.format ?? "rss").toUpperCase()}
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
               feed.mode === "auto"

@@ -97,7 +97,7 @@ export function McpSetupPanel({ token }: { token: string | null }) {
       </p>
 
       <div className="relative">
-        <pre className="rounded-lg bg-gray-900 dark:bg-black text-gray-100 text-xs p-3 overflow-x-auto font-mono">
+        <pre className="rounded-lg bg-gray-900 dark:bg-black text-gray-100 text-xs p-3 pr-20 overflow-x-auto font-mono whitespace-pre-wrap break-all">
 {config}
         </pre>
         <button

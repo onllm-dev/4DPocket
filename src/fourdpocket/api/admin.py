@@ -1,16 +1,90 @@
 """Admin management endpoints."""
 
+import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_db, get_or_create_settings, require_admin
 from fourdpocket.models.base import UserRole
+from fourdpocket.models.collection import Collection
+from fourdpocket.models.entity import Entity
+from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.tag import Tag
 from fourdpocket.models.user import User, UserRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/stats")
+def instance_stats(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """System-wide analytics: counts of key entities, storage on disk, worker queue status."""
+    def _count(model) -> int:
+        return db.exec(select(func.count()).select_from(model)).one()
+
+    user_total = _count(User)
+    active_users = db.exec(
+        select(func.count()).select_from(User).where(User.is_active.is_(True))
+    ).one()
+
+    # Huey queue depth (SQLite backend). Failure = 0, not fatal.
+    queue_depth = 0
+    worker_alive = False
+    try:
+        import sqlite3
+
+        db_path = os.path.join(os.getcwd(), "data", "huey_tasks.db")
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            try:
+                cur = conn.execute("SELECT COUNT(*) FROM task")
+                queue_depth = cur.fetchone()[0] or 0
+            finally:
+                conn.close()
+    except Exception:
+        pass
+
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["pgrep", "-f", "fourdpocket.workers.huey_worker"],
+            capture_output=True, text=True, timeout=2,
+        )
+        worker_alive = bool(out.stdout.strip())
+    except Exception:
+        pass
+
+    # Best-effort storage usage (data directory).
+    storage_bytes = 0
+    try:
+        data_dir = os.path.join(os.getcwd(), "data")
+        for root, _dirs, files in os.walk(data_dir):
+            for fname in files:
+                try:
+                    storage_bytes += os.path.getsize(os.path.join(root, fname))
+                except OSError:
+                    pass
+    except Exception:
+        pass
+
+    return {
+        "users_total": user_total,
+        "users_active": active_users,
+        "items_total": _count(KnowledgeItem),
+        "collections_total": _count(Collection),
+        "tags_total": _count(Tag),
+        "entities_total": _count(Entity),
+        "storage_bytes": storage_bytes,
+        "queue_depth": queue_depth,
+        "worker_alive": worker_alive,
+    }
 
 
 @router.get("/users", response_model=list[UserRead])

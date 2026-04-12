@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format migrate test-cov
+.PHONY: install dev test lint format migrate test-cov uat build
 
 install:
 	uv sync --all-extras
@@ -23,3 +23,11 @@ migrate:
 
 migrate-gen:
 	uv run alembic revision --autogenerate -m "$(msg)"
+
+build:
+	cd frontend && pnpm build
+
+uat:
+	@test -d frontend/node_modules/playwright || \
+		(echo "Installing playwright..." && cd frontend && pnpm add -D playwright && pnpm exec playwright install chromium)
+	node tests/uat/routes.mjs

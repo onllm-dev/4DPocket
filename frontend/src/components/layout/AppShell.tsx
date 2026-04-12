@@ -5,6 +5,7 @@ import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { CommandPalette } from "@/components/common/CommandPalette";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { ShortcutsHelpDialog } from "@/components/ShortcutsHelpDialog";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard";
 
 export function AppShell() {
@@ -30,6 +31,7 @@ export function AppShell() {
       </div>
       <BottomNav />
       <CommandPalette />
+      <ShortcutsHelpDialog />
     </div>
   );
 }

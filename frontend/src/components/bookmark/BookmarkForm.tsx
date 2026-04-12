@@ -13,6 +13,7 @@ interface Item {
 
 interface BookmarkFormProps {
   onClose?: () => void;
+  onCreated?: (created: { id: string }) => void;
 }
 
 interface EditBookmarkFormProps {
@@ -21,7 +22,7 @@ interface EditBookmarkFormProps {
   onUpdated?: () => void;
 }
 
-export function BookmarkForm({ onClose }: BookmarkFormProps) {
+export function BookmarkForm({ onClose, onCreated }: BookmarkFormProps) {
   const [url, setUrl] = useState("");
   const [extraUrls, setExtraUrls] = useState<string[]>([]);
   const [title, setTitle] = useState("");
@@ -96,19 +97,23 @@ export function BookmarkForm({ onClose }: BookmarkFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let created: { id: string };
       if (mode === "url") {
-        const created = await createItem.mutateAsync({ url: url.trim() });
+        if (!url.trim()) return;
+        created = await createItem.mutateAsync({ url: url.trim() });
         const validExtras = extraUrls.map((u) => u.trim()).filter(Boolean);
         for (const extraUrl of validExtras) {
           await api.post(`/api/v1/items/${created.id}/links`, { url: extraUrl });
         }
       } else {
-        await createItem.mutateAsync({ title: title.trim(), content: content.trim() });
+        if (!content.trim()) return;
+        created = await createItem.mutateAsync({ title: title.trim(), content: content.trim() });
       }
       setUrl("");
       setExtraUrls([]);
       setTitle("");
       setContent("");
+      onCreated?.(created);
       onClose?.();
     } catch {
       // Error handled by mutation state

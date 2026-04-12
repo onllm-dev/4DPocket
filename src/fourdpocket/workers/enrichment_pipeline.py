@@ -160,12 +160,20 @@ def handle_chunking(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None
         chunk_models.append(cm)
     db.commit()
 
-    # Index in FTS5
+    # Index in the configured keyword backend (sqlite_fts or meilisearch).
+    # Route through SearchService so we honor FDP_SEARCH__BACKEND instead of
+    # unconditionally running SQLite FTS SQL against Postgres.
     try:
-        from fourdpocket.search.sqlite_fts import index_chunks
-        index_chunks(db, item_id, user_id, chunk_models, item.title, item.url)
+        from fourdpocket.search import get_search_service
+        get_search_service().index_chunks(
+            db, item_id, user_id, chunk_models, item.title, item.url
+        )
     except Exception as e:
-        logger.debug("Chunk FTS indexing skipped: %s", e)
+        logger.warning("Chunk keyword indexing failed: %s", e)
+        # Reset the SQLAlchemy session — a failed SQL in the backend (e.g.
+        # a wrong-dialect query) aborts the transaction, and the next query
+        # would fail with InFailedSqlTransaction. Rolling back restores it.
+        db.rollback()
 
 
 def handle_embedding(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -514,6 +522,12 @@ def run_enrichment_stage(item_id: str, user_id: str, stage: str) -> dict:
 
             return {"status": "done", "stage": stage}
         except Exception as e:
+            # If the handler poisoned the transaction, _mark_failed's SELECT
+            # would fail with InFailedSqlTransaction. Rollback first.
+            try:
+                db.rollback()
+            except Exception:
+                pass
             _mark_failed(db, iid, stage, str(e))
             raise
 

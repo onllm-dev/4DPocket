@@ -54,8 +54,13 @@ export function useLogout() {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { display_name?: string; bio?: string; avatar_url?: string }) =>
-      api.patch("/api/v1/auth/me", data),
+    mutationFn: (data: {
+      display_name?: string;
+      bio?: string;
+      avatar_url?: string;
+      username?: string;
+      email?: string;
+    }) => api.patch("/api/v1/auth/me", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["currentUser"] }),
   });
 }
@@ -63,6 +68,12 @@ export function useUpdateProfile() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: (data: { current_password: string; new_password: string }) =>
-      api.post("/api/v1/auth/password", data),
+      api.patch("/api/v1/auth/password", data),
+  });
+}
+
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: () => api.del("/api/v1/auth/me"),
   });
 }

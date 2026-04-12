@@ -365,11 +365,35 @@ start_frontend() {
     fi
 }
 
+kill_stale_workers() {
+    # Kill Huey worker processes NOT tracked by our PID file.
+    # Prevents zombies (started outside app.sh or from prior crashes) from
+    # stealing tasks and poisoning the SQLite task queue with stale registries.
+    local tracked_pid=""
+    if [ -f "$WORKER_PID_FILE" ]; then
+        tracked_pid=$(cat "$WORKER_PID_FILE" 2>/dev/null || echo "")
+    fi
+    local stale
+    stale=$(pgrep -f "fourdpocket.workers.huey_worker" 2>/dev/null | grep -v "^${tracked_pid:-__none__}$" || true)
+    if [ -n "$stale" ]; then
+        warn "Found stale Huey worker process(es): $(echo "$stale" | tr '\n' ' ')"
+        echo "$stale" | xargs kill 2>/dev/null || true
+        sleep 1
+        local survivors
+        survivors=$(pgrep -f "fourdpocket.workers.huey_worker" 2>/dev/null | grep -v "^${tracked_pid:-__none__}$" || true)
+        [ -n "$survivors" ] && echo "$survivors" | xargs kill -9 2>/dev/null || true
+        step "Cleaned up stale workers"
+    fi
+}
+
 start_worker() {
     if is_running "$WORKER_PID_FILE"; then
         warn "Worker already running (PID: $(cat "$WORKER_PID_FILE"))"
+        kill_stale_workers
         return 0
     fi
+
+    kill_stale_workers
 
     mkdir -p "$PID_DIR" "$LOG_DIR"
 

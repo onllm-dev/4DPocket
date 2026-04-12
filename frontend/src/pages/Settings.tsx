@@ -13,11 +13,20 @@ import {
   Share2,
   User,
   Lock,
+  AlertTriangle,
+  Trash2,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
-import { useCurrentUser, useUpdateProfile, useChangePassword } from "@/hooks/use-auth";
+import {
+  useCurrentUser,
+  useUpdateProfile,
+  useChangePassword,
+  useDeleteAccount,
+  useLogout,
+} from "@/hooks/use-auth";
 import { ApiTokensSection } from "@/components/settings/ApiTokensSection";
 import { McpSetupPanel } from "@/components/settings/McpSetupPanel";
 
@@ -50,21 +59,67 @@ const SHARE_MODES = ["private", "public"];
 
 export default function Settings() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { theme, viewMode, setTheme, setViewMode } = useUIStore();
   const { data: currentUser } = useCurrentUser();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const deleteAccount = useDeleteAccount();
+  const logout = useLogout();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
 
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.display_name || "");
       setBio(currentUser.bio || "");
+      setUsername(currentUser.username || "");
+      setEmail(currentUser.email || "");
     }
   }, [currentUser]);
+
+  function handlePasswordChange() {
+    setPasswordError("");
+    if (newPwd !== confirmPwd) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+    if (newPwd.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    changePassword.mutate(
+      { current_password: currentPwd, new_password: newPwd },
+      {
+        onSuccess: () => {
+          setCurrentPwd("");
+          setNewPwd("");
+          setConfirmPwd("");
+        },
+        onError: (err) => {
+          setPasswordError(err instanceof Error ? err.message : "Failed to change password");
+        },
+      }
+    );
+  }
+
+  function handleDeleteAccount() {
+    if (deleteConfirm !== "DELETE") return;
+    deleteAccount.mutate(undefined, {
+      onSuccess: () => {
+        logout();
+        navigate("/login");
+      },
+    });
+  }
 
   const { data: settings } = useQuery<ApiSettings>({
     queryKey: ["settings"],
@@ -105,6 +160,28 @@ export default function Settings() {
           </div>
           <div className="space-y-3">
             <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onBlur={() => { if (username && username !== (currentUser?.username || "")) updateProfile.mutate({ username }); }}
+                placeholder="username"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => { if (email && email !== (currentUser?.email || "")) updateProfile.mutate({ email }); }}
+                placeholder="you@example.com"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
               <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Display Name</label>
               <input
                 type="text"
@@ -126,6 +203,11 @@ export default function Settings() {
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"
               />
             </div>
+            {updateProfile.isError && (
+              <p className="text-xs text-red-500">
+                {updateProfile.error instanceof Error ? updateProfile.error.message : "Failed to save profile"}
+              </p>
+            )}
           </div>
         </div>
 
@@ -143,16 +225,30 @@ export default function Settings() {
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">New Password</label>
               <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                At least 8 characters with an uppercase letter, a digit, and a special character.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
             </div>
             <button
-              onClick={() => { changePassword.mutate({ current_password: currentPwd, new_password: newPwd }); setCurrentPwd(""); setNewPwd(""); }}
-              disabled={!currentPwd || !newPwd || changePassword.isPending}
+              onClick={handlePasswordChange}
+              disabled={!currentPwd || !newPwd || !confirmPwd || changePassword.isPending}
               className="px-4 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
               {changePassword.isPending ? "Changing..." : "Change Password"}
             </button>
-            {changePassword.isError && <p className="text-xs text-red-500">Failed to change password</p>}
-            {changePassword.isSuccess && <p className="text-xs text-green-500">Password changed successfully</p>}
+            {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+            {!passwordError && changePassword.isSuccess && (
+              <p className="text-xs text-green-500">Password changed successfully</p>
+            )}
           </div>
         </div>
 
@@ -413,6 +509,61 @@ export default function Settings() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <h2 className="text-sm font-bold text-red-700 dark:text-red-300">
+              Danger Zone
+            </h2>
+          </div>
+          <p className="text-xs text-red-600/80 dark:text-red-400/80 mb-4">
+            Permanently delete your account and all saved items, collections, tokens, and data. This cannot be undone.
+          </p>
+          {!showDeleteForm ? (
+            <button
+              onClick={() => setShowDeleteForm(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete my account
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-xs text-red-700 dark:text-red-300">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="DELETE"
+                className="w-full px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-red-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirm !== "DELETE" || deleteAccount.isPending}
+                  className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {deleteAccount.isPending ? "Deleting..." : "Permanently delete account"}
+                </button>
+                <button
+                  onClick={() => { setShowDeleteForm(false); setDeleteConfirm(""); }}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+              {deleteAccount.isError && (
+                <p className="text-xs text-red-500">
+                  {deleteAccount.error instanceof Error ? deleteAccount.error.message : "Failed to delete account"}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

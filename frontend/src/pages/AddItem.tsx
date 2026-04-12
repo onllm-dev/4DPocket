@@ -90,7 +90,10 @@ export default function AddItem() {
       </div>
 
       <div className="flex items-center justify-center min-h-[50vh]">
-        <BookmarkForm onClose={() => navigate(-1)} />
+        <BookmarkForm
+          onCreated={(item) => navigate(`/item/${item.id}`)}
+          onClose={() => navigate(-1)}
+        />
       </div>
     </div>
   );

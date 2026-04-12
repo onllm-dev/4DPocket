@@ -1,4 +1,4 @@
-import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX, Sparkles, Eye, EyeOff, Activity, Database, HardDrive, Tag as TagIcon, FolderOpen, FileText, Users as UsersIcon } from "lucide-react";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -77,6 +77,25 @@ export default function Admin() {
     enabled: !!currentUser && currentUser.role === "admin",
   });
 
+  interface InstanceStats {
+    users_total: number;
+    users_active: number;
+    items_total: number;
+    collections_total: number;
+    tags_total: number;
+    entities_total: number;
+    storage_bytes: number;
+    queue_depth: number;
+    worker_alive: boolean;
+  }
+
+  const { data: stats, isLoading: statsLoading } = useQuery<InstanceStats>({
+    queryKey: ["admin", "stats"],
+    queryFn: () => api.get("/api/v1/admin/stats"),
+    enabled: !!currentUser && currentUser.role === "admin",
+    refetchInterval: 30000,
+  });
+
   const updateAI = useMutation({
     mutationFn: (data: Partial<AIConfig>) =>
       api.patch("/api/v1/admin/ai-settings", data),
@@ -109,6 +128,36 @@ export default function Admin() {
       <div className="flex items-center gap-3 mb-6">
         <Shield className="w-6 h-6 text-sky-600" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Admin Panel</h1>
+      </div>
+
+      {/* Analytics */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-sky-600" />
+          <h2 className="font-bold text-gray-900 dark:text-gray-100">Analytics</h2>
+          {statsLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+        </div>
+        {stats ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard icon={<UsersIcon className="w-4 h-4" />} label="Users" value={`${stats.users_active}/${stats.users_total}`} hint="active / total" />
+            <StatCard icon={<Database className="w-4 h-4" />} label="Items" value={stats.items_total.toLocaleString()} />
+            <StatCard icon={<FolderOpen className="w-4 h-4" />} label="Collections" value={stats.collections_total.toLocaleString()} />
+            <StatCard icon={<TagIcon className="w-4 h-4" />} label="Tags" value={stats.tags_total.toLocaleString()} />
+            <StatCard icon={<FileText className="w-4 h-4" />} label="Entities" value={stats.entities_total.toLocaleString()} />
+            <StatCard icon={<HardDrive className="w-4 h-4" />} label="Storage" value={formatBytes(stats.storage_bytes)} hint="data/ on disk" />
+            <StatCard
+              icon={<Activity className={`w-4 h-4 ${stats.worker_alive ? "text-green-500" : "text-red-500"}`} />}
+              label="Worker"
+              value={stats.worker_alive ? "Running" : "Stopped"}
+              hint={stats.worker_alive ? undefined : "No Huey processes detected"}
+            />
+            <StatCard icon={<Database className="w-4 h-4" />} label="Queue" value={stats.queue_depth.toString()} hint="pending tasks" />
+          </div>
+        ) : statsLoading ? (
+          <div className="flex items-center gap-2 text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading stats...</div>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Stats unavailable.</p>
+        )}
       </div>
 
       {/* Instance Settings */}
@@ -227,6 +276,37 @@ export default function Admin() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 p-3">
+      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-1">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{value}</div>
+      {hint && <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{hint}</div>}
     </div>
   );
 }

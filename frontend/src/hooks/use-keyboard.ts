@@ -28,6 +28,12 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
           break;
+        case "?":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("4dp:open-shortcuts"));
+          }
+          break;
       }
     };
     window.addEventListener("keydown", handler);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, FolderOpen, Grid3x3, List, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, FolderOpen, Grid3x3, List, Plus, Search, X, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
@@ -27,10 +27,12 @@ export default function CollectionDetail() {
   const {
     data: collection,
     isLoading: collectionLoading,
+    isError: collectionError,
   } = useQuery<Collection>({
     queryKey: ["collection", id],
     queryFn: () => api.get(`/api/v1/collections/${id}`),
     enabled: !!id,
+    retry: false,
   });
 
   const {
@@ -54,6 +56,35 @@ export default function CollectionDetail() {
   });
 
   const isLoading = collectionLoading || itemsLoading;
+
+  if (collectionError) {
+    return (
+      <div className="animate-fade-in p-6 max-w-6xl mx-auto">
+        <Link
+          to="/collections"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 p-2 -ml-2 rounded-xl hover:bg-sky-50 dark:hover:bg-gray-800 transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to collections
+        </Link>
+        <div className="text-center py-20 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <AlertCircle className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-900 dark:text-gray-100 text-lg font-medium mb-1">
+            Collection not found
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            This collection doesn&apos;t exist or you don&apos;t have access to it.
+          </p>
+          <Link
+            to="/collections"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors cursor-pointer"
+          >
+            Go to collections
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in p-6 max-w-6xl mx-auto">

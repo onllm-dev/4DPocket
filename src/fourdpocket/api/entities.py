@@ -86,7 +86,7 @@ def list_entities(
     current_user: User = Depends(get_current_user),
     entity_type: str | None = None,
     q: str | None = None,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
     """List user's entities, optionally filtered by type or name search."""
