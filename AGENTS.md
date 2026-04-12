@@ -51,7 +51,7 @@ Login at http://localhost:5173/login with `admin@local` / `admin1234`
 ## Running Tests
 
 ```bash
-# Backend (55+ tests, in-memory SQLite)
+# Backend (183 tests, in-memory SQLite)
 uv run pytest tests/ -x -q
 
 # Frontend type check
@@ -83,12 +83,17 @@ docker compose up
 
 Includes: app, worker, PostgreSQL, Meilisearch, ChromaDB, Ollama.
 
+## MCP Server (Agent Integration)
+
+The server mounts a FastMCP streamable-HTTP endpoint at `/mcp`. Mint a PAT in **Settings → API Tokens & MCP**, point Claude Desktop / Cursor / Claude Code at `http://localhost:4040/mcp` with `Authorization: Bearer fdp_pat_...`, and you get 10 tools: `save_knowledge`, `search_knowledge`, `get_knowledge`, `update_knowledge`, `refresh_knowledge`, `delete_knowledge`, `list_collections`, `add_to_collection`, `get_entity`, `get_related_entities`. See README for client config snippets.
+
 ## Architecture Notes
 
 - 17 content processors auto-detect platform from URL
 - AI enrichment runs as Huey background task (sync fallback if worker unavailable)
-- Search: FTS5 default (zero-config), upgrade to Meilisearch for typo tolerance
-- Semantic search via ChromaDB + sentence-transformers embeddings
+- Search: chunk-level hybrid — FTS5/Meilisearch + ChromaDB/pgvector + RRF + optional cross-encoder reranking
+- PATs (`fdp_pat_*`) authenticate MCP clients with per-token collection ACL + role (viewer/editor) + optional `allow_deletion` / `admin_scope`
+- Entity synthesis: per-entity structured JSON wiki pages regenerated on threshold (default 3 new mentions, 24h throttle)
 - All user data is scoped per-user. Sharing creates references, not copies.
 - Rules engine executes on item creation (condition-action pattern)
 - PWA with share target: share URLs from phone directly to 4DPocket

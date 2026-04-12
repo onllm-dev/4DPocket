@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter, Star, Archive, BookMarked } from "lucide-react";
+import { Home, BookOpen, Search, FolderOpen, Tags, FileText, Settings, Menu, X, Share2, Shield, LogOut, User, Rss, Zap, Clock, Highlighter, Star, Archive, BookMarked, Network } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 import { version } from "../../../package.json";
@@ -37,6 +37,7 @@ const navSections = [
     items: [
       { path: "/timeline", label: "Timeline", icon: Clock },
       { path: "/highlights", label: "Highlights", icon: Highlighter },
+      { path: "/entities", label: "Knowledge Graph", icon: Network },
     ],
   },
   {

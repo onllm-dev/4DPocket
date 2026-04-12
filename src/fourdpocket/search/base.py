@@ -54,6 +54,10 @@ class SearchFilters:
     tags: list[str] | None = None
     after: str | None = None
     before: str | None = None
+    # Access-control-layer fields populated by PAT-aware callers. ``None`` means
+    # "no filtering" — the common case for JWT-authenticated requests.
+    allowed_item_ids: set[uuid.UUID] | None = None
+    collection_id: uuid.UUID | None = None
 
 
 class KeywordBackend(Protocol):

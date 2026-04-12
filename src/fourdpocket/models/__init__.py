@@ -1,6 +1,14 @@
 """Models package - import all models for Alembic discovery."""
 
-from fourdpocket.models.base import ItemType, ReadingStatus, ShareMode, SourcePlatform, UserRole
+from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
+from fourdpocket.models.base import (
+    ApiTokenRole,
+    ItemType,
+    ReadingStatus,
+    ShareMode,
+    SourcePlatform,
+    UserRole,
+)
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.collection_note import CollectionNote
 from fourdpocket.models.comment import Comment
@@ -27,6 +35,9 @@ from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
 
 __all__ = [
+    "ApiToken",
+    "ApiTokenCollection",
+    "ApiTokenRole",
     "Collection",
     "CollectionItem",
     "CollectionNote",

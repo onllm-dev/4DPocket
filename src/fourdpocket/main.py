@@ -50,11 +50,26 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Started Huey worker (PID %s)", huey_process.pid)
 
-    yield
+    # Start the MCP session manager (streamable-HTTP transport at /mcp).
+    # The manager is stateful and only supports a single run() per instance,
+    # so we skip it under pytest (which re-enters the lifespan per test).
+    import sys as _sys
 
-    # Shutdown Huey worker on app shutdown
-    huey_process.terminate()
-    huey_process.wait()
+    if "pytest" in _sys.modules:
+        try:
+            yield
+        finally:
+            huey_process.terminate()
+            huey_process.wait()
+    else:
+        from fourdpocket.mcp import mcp
+
+        async with mcp.session_manager.run():
+            try:
+                yield
+            finally:
+                huey_process.terminate()
+                huey_process.wait()
 
 
 app = FastAPI(
@@ -116,6 +131,23 @@ def health_check():
 from fourdpocket.api.router import api_router  # noqa: E402
 
 app.include_router(api_router)
+
+# Mount the MCP server at /mcp. Import-time attachment is safe because the
+# ``FastMCP`` session manager is activated inside the lifespan above.
+from fastapi.responses import RedirectResponse  # noqa: E402
+
+from fourdpocket.mcp import build_mcp_app  # noqa: E402
+
+
+# The mounted ASGI app only answers at ``/mcp/`` (trailing slash). Most
+# users configure clients with ``http://host/mcp`` — redirect so both work.
+@app.api_route("/mcp", methods=["GET", "POST", "DELETE"], include_in_schema=False)
+def _mcp_trailing_slash():
+    # 307 preserves the HTTP method + body, which is required for MCP POSTs.
+    return RedirectResponse(url="/mcp/", status_code=307)
+
+
+app.mount("/mcp", build_mcp_app())
 
 # SPA catch-all: must be registered AFTER API routes
 # Try package-bundled static files first (pip install), then dev path (app.sh / source)

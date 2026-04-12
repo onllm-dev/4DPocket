@@ -724,6 +724,19 @@ do_setup() {
     step "Frontend built (frontend/dist/)"
     cd "$SCRIPT_DIR"
 
+    # Chrome extension (optional, but part of a full setup)
+    if [ -d "$SCRIPT_DIR/extension" ]; then
+        info "Installing extension dependencies..."
+        cd "$SCRIPT_DIR/extension"
+        pnpm install --silent
+        step "Extension dependencies installed"
+
+        info "Building Chrome extension..."
+        pnpm build 2>&1 | tail -5
+        step "Extension built (extension/dist/chrome-mv3/)"
+        cd "$SCRIPT_DIR"
+    fi
+
     # Create .env if missing
     if [ ! -f "$SCRIPT_DIR/.env" ]; then
         cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
@@ -942,19 +955,42 @@ do_logs() {
 # ─── Build ───────────────────────────────────────────────────────
 
 do_build() {
-    info "Building frontend..."
-    cd "$SCRIPT_DIR/frontend"
+    # Parse options — by default build both frontend + extension.
+    local build_frontend=true
+    local build_extension=true
+    for arg in "$@"; do
+        case "$arg" in
+            --frontend|-f) build_extension=false ;;
+            --extension|-e) build_frontend=false ;;
+            --all|-a) build_frontend=true; build_extension=true ;;
+        esac
+    done
 
-    if [ ! -d "node_modules" ]; then
-        info "Installing frontend dependencies first..."
-        pnpm install --silent
+    if $build_frontend; then
+        info "Building frontend..."
+        cd "$SCRIPT_DIR/frontend"
+        if [ ! -d "node_modules" ]; then
+            info "Installing frontend dependencies first..."
+            pnpm install --silent
+        fi
+        pnpm build
+        cd "$SCRIPT_DIR"
+        success "Frontend built (frontend/dist/)"
+        echo -e "  ${DIM}Backend serves these files automatically at /.*${NC}"
     fi
 
-    pnpm build
-    cd "$SCRIPT_DIR"
-
-    success "Frontend built (frontend/dist/)"
-    echo -e "  ${DIM}Backend serves these files automatically at /.*${NC}"
+    if $build_extension && [ -d "$SCRIPT_DIR/extension" ]; then
+        info "Building Chrome extension..."
+        cd "$SCRIPT_DIR/extension"
+        if [ ! -d "node_modules" ]; then
+            info "Installing extension dependencies first..."
+            pnpm install --silent
+        fi
+        pnpm build
+        cd "$SCRIPT_DIR"
+        success "Chrome extension built (extension/dist/chrome-mv3/)"
+        echo -e "  ${DIM}Load unpacked in chrome://extensions from that directory.${NC}"
+    fi
 }
 
 # ─── Test & Lint ─────────────────────────────────────────────────
@@ -1128,6 +1164,9 @@ do_clean() {
     rm -rf "$LOG_DIR"
     rm -rf "$SCRIPT_DIR/frontend/dist"
     rm -rf "$SCRIPT_DIR/frontend/.vite"
+    rm -rf "$SCRIPT_DIR/extension/dist"
+    rm -rf "$SCRIPT_DIR/extension/.output"
+    rm -rf "$SCRIPT_DIR/extension/.wxt"
     rm -rf "$SCRIPT_DIR/.pytest_cache"
     rm -rf "$SCRIPT_DIR/.ruff_cache"
     rm -rf "$SCRIPT_DIR/.mypy_cache"
@@ -1176,9 +1215,9 @@ ${CYAN}START OPTIONS:${NC}
     --port=PORT            Override backend port (default: 4040)
 
 ${CYAN}BUILD & TEST:${NC}
-    ${BOLD}build${NC}                                 Build frontend for production
-    ${BOLD}test${NC}  [pytest args]                   Run backend tests
-    ${BOLD}lint${NC}                                  Run ruff linter
+    ${BOLD}build${NC}  [--frontend|--extension|--all]  Build frontend + Chrome extension (default: both)
+    ${BOLD}test${NC}   [pytest args]                   Run backend tests
+    ${BOLD}lint${NC}                                   Run ruff linter
 
 ${CYAN}DATABASE:${NC}
     ${BOLD}db init${NC}                               Create tables (safe to re-run)
@@ -1260,7 +1299,8 @@ case "${1:-start}" in
         do_logs "${1:-backend}"
         ;;
     build)
-        do_build
+        shift 2>/dev/null || true
+        do_build "$@"
         ;;
     test)
         shift 2>/dev/null || true

@@ -120,6 +120,12 @@ class EnrichmentSettings(BaseSettings):
     extract_entities: bool = False
     max_entities_per_chunk: int = 20
     max_relations_per_chunk: int = 15
+    # Entity synthesis — Karpathy-style LLM-maintained wiki pages per entity.
+    synthesis_enabled: bool = True
+    synthesis_min_item_count: int = 3  # Don't synthesize entities mentioned in < N items
+    synthesis_threshold: int = 3  # Regen when item_count - synthesis_item_count >= N
+    synthesis_min_interval_hours: int = 24  # No more than once per entity per interval
+    synthesis_max_context_items: int = 20  # Cap evidence fed to the LLM per regen
 
 
 class ServerSettings(BaseSettings):

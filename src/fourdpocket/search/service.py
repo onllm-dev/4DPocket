@@ -103,8 +103,28 @@ class SearchService:
         if filters is None:
             filters = SearchFilters()
 
-        # Fetch enough candidates to cover offset + limit after fusion
-        fetch_size = max((offset + limit) * 2, limit * 3)
+        # Resolve collection-level ACL into a concrete item_id allow-set that all
+        # backends can be post-filtered against.
+        if filters.collection_id is not None:
+            from sqlmodel import select as _select
+
+            from fourdpocket.models.collection import CollectionItem
+
+            col_items = db.exec(
+                _select(CollectionItem.item_id).where(
+                    CollectionItem.collection_id == filters.collection_id
+                )
+            ).all()
+            coll_set = set(col_items)
+            if filters.allowed_item_ids is None:
+                filters.allowed_item_ids = coll_set
+            else:
+                filters.allowed_item_ids = filters.allowed_item_ids & coll_set
+
+        # Fetch enough candidates to cover offset + limit after fusion. When an
+        # ACL filter is active we over-fetch further since we'll be dropping hits.
+        base_fetch = max((offset + limit) * 2, limit * 3)
+        fetch_size = base_fetch * 3 if filters.allowed_item_ids is not None else base_fetch
 
         # 1. Keyword search
         keyword_hits = self._keyword.search(
@@ -128,6 +148,11 @@ class SearchService:
 
         # 3. RRF fusion
         merged = self._rrf_fusion(keyword_hits, vector_hits)
+
+        # 3b. Apply collection-level ACL by intersecting with the allow-set.
+        if filters.allowed_item_ids is not None:
+            allowed_str = {str(i) for i in filters.allowed_item_ids}
+            merged = [r for r in merged if str(r.item_id) in allowed_str]
 
         if not merged:
             return []

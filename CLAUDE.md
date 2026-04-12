@@ -7,11 +7,12 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 ## Stack
 
 - **Backend**: FastAPI + SQLModel + Python 3.12+ (sync `def` handlers, NOT `async def`)
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide React icons
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide React icons + React Flow (graph)
 - **Database**: SQLite (default) / PostgreSQL (with pgvector)
 - **Search**: SearchService with pluggable backends — SQLite FTS5 / Meilisearch (keyword) + ChromaDB / pgvector (vector) + RRF fusion + optional cross-encoder reranking
 - **AI**: Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) (NO litellm, NO langchain)
-- **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose)
+- **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose); **PATs** (`fdp_pat_*`) alongside JWT
+- **MCP**: FastMCP streamable-HTTP server mounted at `/mcp` (inner `streamable_http_path="/"` + 307 redirect so both `/mcp` and `/mcp/` work); PAT-validated `TokenVerifier`; 10 tools (persist/recall/navigate/update/delete)
 - **HTTP**: httpx (backend), native fetch (frontend) (NO axios)
 - **Background Jobs**: Huey (SQLite backend) — stage-based enrichment pipeline
 - **State**: TanStack Query (server) + Zustand (client)
@@ -22,7 +23,7 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 # Backend
 uv sync --all-extras          # Install deps
 uv run uvicorn fourdpocket.main:app --port 4040  # Run server
-uv run pytest tests/ -x -q    # Run tests (128 tests)
+uv run pytest tests/ -x -q    # Run tests (183 tests)
 make test                      # Run tests (alias)
 make lint                      # ruff check
 
@@ -99,6 +100,15 @@ Item Created → enrich_item_v2()
 - LLM responses cached in `llm_cache` table by content hash
 - Entity extraction uses gleaning (multi-pass) to catch missed entities
 - Entities canonicalized via 3-tier matching (exact alias → normalized name → create new)
+
+## PATs + MCP
+
+- **Tokens**: `api_tokens` + `api_token_collections`. Format `fdp_pat_<6>_<43>`; sha256 stored, `hmac.compare_digest` on lookup
+- **ACL flags**: `role` (viewer|editor), `all_collections`, `collection_ids`, `include_uncollected`, `allow_deletion`, `admin_scope`, `expires_at`
+- **Resolver**: `api/deps.py:_resolve_identity` detects `Bearer fdp_pat_...` and routes through `api_token_utils.resolve_token`; falls back to JWT otherwise
+- **Admin guard**: `require_admin` rejects PATs without `admin_scope=True` even when owner is admin
+- **MCP tools** (`src/fourdpocket/mcp/tools.py`): `save_knowledge`, `search_knowledge`, `get_knowledge`, `update_knowledge`, `refresh_knowledge`, `delete_knowledge` (gated by `allow_deletion`), `list_collections`, `add_to_collection`, `get_entity`, `get_related_entities`. Tool param name is `knowledge_id` (not `item_id`). Delete uses shared `cascade_delete_item()` helper in `api/items.py`.
+- **Synthesis**: per-entity structured JSON (`summary`, `themes`, `key_contexts`, `relationships`, `confidence`) regenerated when `item_count - synthesis_item_count >= threshold` AND `min_interval_hours` elapsed. Config: `FDP_ENRICHMENT__SYNTHESIS_*`
 
 ## Key Patterns
 

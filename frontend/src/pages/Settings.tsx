@@ -18,6 +18,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useUIStore } from "@/stores/ui-store";
 import { useCurrentUser, useUpdateProfile, useChangePassword } from "@/hooks/use-auth";
+import { ApiTokensSection } from "@/components/settings/ApiTokensSection";
+import { McpSetupPanel } from "@/components/settings/McpSetupPanel";
 
 type Theme = "light" | "dark" | "system";
 type ViewMode = "grid" | "list";
@@ -379,6 +381,14 @@ export default function Settings() {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* API Tokens & MCP */}
+        <ApiTokensSection />
+
+        {/* MCP reference panel (no token embedded — user pastes theirs) */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
+          <McpSetupPanel token={null} />
         </div>
 
         {/* About */}

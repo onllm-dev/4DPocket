@@ -8,9 +8,9 @@ from sqlmodel import Column, Field, SQLModel, UniqueConstraint
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import DateTime
+    from sqlalchemy import JSON, DateTime, Text
 except ImportError:
-    from sqlmodel import DateTime
+    from sqlmodel import JSON, DateTime, Text
 
 
 class Entity(SQLModel, table=True):
@@ -25,6 +25,17 @@ class Entity(SQLModel, table=True):
     entity_type: str = Field(index=True)  # person|org|concept|tool|product|event|location|other
     description: str | None = Field(default=None)
     item_count: int = Field(default=0)
+    # LLM-authored structured synthesis of the entity across all mentions.
+    # Stored as JSON text (portable across SQLite + Postgres via JSON column).
+    synthesis: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    synthesis_generated_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    synthesis_item_count: int = Field(default=0)
+    synthesis_confidence: str | None = Field(
+        default=None, sa_column=Column(Text, nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

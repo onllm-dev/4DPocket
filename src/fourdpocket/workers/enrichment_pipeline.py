@@ -11,13 +11,21 @@ from fourdpocket.workers import huey
 
 logger = logging.getLogger(__name__)
 
-STAGES = ["chunked", "embedded", "tagged", "summarized", "entities_extracted"]
+STAGES = [
+    "chunked",
+    "embedded",
+    "tagged",
+    "summarized",
+    "entities_extracted",
+    "synthesized",
+]
 STAGE_DEPS = {
     "chunked": [],
     "embedded": ["chunked"],
     "tagged": [],
     "summarized": [],
     "entities_extracted": ["chunked"],
+    "synthesized": ["entities_extracted"],
 }
 
 
@@ -420,12 +428,50 @@ def _store_extraction(db, item_id, user_id, chunk_id, result):
     db.flush()
 
 
+def handle_synthesis(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """Refresh entity synthesis for entities touched by this item.
+
+    Regeneration is guarded by threshold + interval rules in
+    :func:`fourdpocket.ai.synthesizer.should_regenerate` so most item saves
+    trigger at most 0-1 actual LLM calls.
+    """
+    from fourdpocket.ai.synthesizer import should_regenerate, synthesize_entity
+    from fourdpocket.config import get_settings
+    from fourdpocket.models.entity import Entity, ItemEntity
+
+    if not get_settings().enrichment.synthesis_enabled:
+        return
+
+    entity_links = db.exec(
+        select(ItemEntity.entity_id).where(ItemEntity.item_id == item_id)
+    ).all()
+    if not entity_links:
+        return
+
+    seen: set[uuid.UUID] = set()
+    for entity_id in entity_links:
+        if entity_id in seen:
+            continue
+        seen.add(entity_id)
+
+        entity = db.get(Entity, entity_id)
+        if entity is None or entity.user_id != user_id:
+            continue
+        if not should_regenerate(entity):
+            continue
+        try:
+            synthesize_entity(entity.id, db)
+        except Exception as e:  # nosec — synthesis is best-effort
+            logger.debug("Synthesis failed for entity %s: %s", entity.id, e)
+
+
 STAGE_HANDLERS = {
     "chunked": handle_chunking,
     "embedded": handle_embedding,
     "tagged": handle_tagging,
     "summarized": handle_summarization,
     "entities_extracted": handle_entity_extraction,
+    "synthesized": handle_synthesis,
 }
 
 

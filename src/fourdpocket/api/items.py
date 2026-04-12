@@ -434,17 +434,13 @@ def update_item(
     return item
 
 
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(
-    item_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    item = db.get(KnowledgeItem, item_id)
-    if not item or item.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+def cascade_delete_item(db: Session, item: KnowledgeItem) -> None:
+    """Delete an item and every row that references it.
 
-    # Cascade delete all associated data
+    Shared between the REST ``DELETE /items/{id}`` handler and the MCP
+    ``delete_knowledge`` tool so both enforce identical cleanup (FK-safe,
+    search indexes purged). Caller commits.
+    """
     from fourdpocket.models.collection import CollectionItem
     from fourdpocket.models.comment import Comment
     from fourdpocket.models.embedding import Embedding
@@ -454,7 +450,10 @@ def delete_item(
     from fourdpocket.models.highlight import Highlight
     from fourdpocket.models.item_chunk import ItemChunk
     from fourdpocket.models.item_link import ItemLink
-    from fourdpocket.models.share import Share
+    from fourdpocket.models.share import Share, ShareRecipient
+
+    item_id = item.id
+    user_id = item.user_id
 
     # Decrement tag usage counts before removing links
     for tag_link in db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all():
@@ -496,19 +495,34 @@ def delete_item(
 
     # Delete shares referencing this item
     for share in db.exec(select(Share).where(Share.item_id == item_id)).all():
-        from fourdpocket.models.share import ShareRecipient
-        for sr in db.exec(select(ShareRecipient).where(ShareRecipient.share_id == share.id)).all():
+        for sr in db.exec(
+            select(ShareRecipient).where(ShareRecipient.share_id == share.id)
+        ).all():
             db.delete(sr)
         db.delete(share)
 
     # Remove from all search indexes (FTS, chunks_fts, vector embeddings)
     try:
         from fourdpocket.search import get_search_service
-        get_search_service().delete_item(db, item_id, current_user.id)
+        get_search_service().delete_item(db, item_id, user_id)
     except Exception:
         pass
 
+    # Flush so dependent rows are gone before the parent delete hits SQLite FK check
+    db.flush()
     db.delete(item)
+
+
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.get(KnowledgeItem, item_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    cascade_delete_item(db, item)
     db.commit()
 
 

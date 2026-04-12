@@ -26,6 +26,8 @@ const Highlights = lazy(() => import("./pages/Highlights"));
 const NoteDetail = lazy(() => import("./pages/NoteDetail"));
 const ReadingList = lazy(() => import("./pages/ReadingList"));
 const TagDetail = lazy(() => import("./pages/TagDetail"));
+const Entities = lazy(() => import("./pages/Entities"));
+const EntityDetail = lazy(() => import("./pages/EntityDetail"));
 
 function LoadingFallback() {
   return (
@@ -74,6 +76,8 @@ export default function App() {
           <Route path="/rules" element={<SuspenseWrap><Rules /></SuspenseWrap>} />
           <Route path="/timeline" element={<SuspenseWrap><Timeline /></SuspenseWrap>} />
           <Route path="/highlights" element={<SuspenseWrap><Highlights /></SuspenseWrap>} />
+          <Route path="/entities" element={<SuspenseWrap><Entities /></SuspenseWrap>} />
+          <Route path="/entities/:id" element={<SuspenseWrap><EntityDetail /></SuspenseWrap>} />
         </Route>
       </Route>
 

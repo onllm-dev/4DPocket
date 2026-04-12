@@ -48,5 +48,10 @@ class ReadingStatus(str, enum.Enum):
     read = "read"
 
 
+class ApiTokenRole(str, enum.Enum):
+    viewer = "viewer"
+    editor = "editor"
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)

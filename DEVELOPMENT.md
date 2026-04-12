@@ -206,6 +206,23 @@ All configuration is via environment variables with the `FDP_` prefix. See [`.en
 | `FDP_SERVER__PORT` | `4040` | Server port |
 | `FDP_SERVER__SECURE_COOKIES` | `false` | Set `true` behind HTTPS |
 
+## Personal Access Tokens & MCP
+
+4DPocket ships a built-in **Model Context Protocol** server at `/mcp` that MCP-capable agents (Claude Desktop, Cursor, Claude Code, Codex) can use as persistent memory. Agents authenticate with **Personal Access Tokens** (PATs) you mint from the UI.
+
+```bash
+# Start the server (PATs work in both single- and multi-user mode)
+make dev
+```
+
+In the app: **Settings → API Tokens & MCP → New token**. Choose role (`viewer`/`editor`), collection scope, optional `allow_deletion` / `admin_scope`, and expiry. The plaintext token is shown **once** — only the sha256 hash is stored.
+
+Point an MCP client at `http://localhost:4040/mcp` with `Authorization: Bearer fdp_pat_...` — the Settings page emits ready-made `claude_desktop_config.json` / Cursor `mcp.json` snippets.
+
+**Ten tools** cover the full persist / recall / navigate / update / delete cycle: `save_knowledge`, `search_knowledge`, `get_knowledge`, `update_knowledge`, `refresh_knowledge`, `delete_knowledge` (requires `allow_deletion`), `list_collections`, `add_to_collection`, `get_entity`, `get_related_entities`. See the [README MCP section](README.md#using-4dpocket-as-an-mcp-server) for client snippets.
+
+**Entity synthesis** — per-entity structured JSON wiki pages (summary / themes / key_contexts / relationships / confidence) regenerated automatically after the configured threshold + interval, or manually via `POST /api/v1/entities/{id}/synthesize?force=true`. Visualize the full concept graph at **Knowledge Graph** in the sidebar.
+
 ## Chrome Extension
 
 ```bash

@@ -56,7 +56,7 @@ Pull the image from GitHub Container Registry:
 ```bash
 docker pull ghcr.io/onllm-dev/4dpocket:latest
 # or a specific version:
-docker pull ghcr.io/onllm-dev/4dpocket:0.1.6
+docker pull ghcr.io/onllm-dev/4dpocket:0.2.0
 ```
 
 **One-liner (SQLite, no external services):**
@@ -211,6 +211,71 @@ The `4dpocket` command provides full lifecycle management — setup, start/stop,
 The setup wizard configures database (SQLite/PostgreSQL), AI provider (Ollama/Groq/NVIDIA/Custom/None), auth mode, and server port. Configuration is saved to `~/.4dpocket/.env`.
 
 Start profiles auto-manage Docker containers — `--postgres` starts PostgreSQL + Meilisearch, `--full` adds ChromaDB + Ollama. No manual `docker run` needed.
+
+---
+
+## Using 4DPocket as an MCP Server
+
+4DPocket ships a built-in **Model Context Protocol** server at `/mcp`, letting Claude Desktop, Cursor, Claude Code, Codex, and any other MCP-capable agent use your knowledge base as **persistent memory**.
+
+Ten tools are exposed, covering the full persist-recall-navigate-update-delete cycle:
+
+| Tool | Purpose |
+|---|---|
+| `save_knowledge` | Save a URL or paste raw content — triggers enrichment |
+| `search_knowledge` | Chunk-level hybrid search (keyword + semantic + RRF + rerank) |
+| `get_knowledge` | Full detail for a single item (content, tags, entities, collections) |
+| `update_knowledge` | Edit title/content/tags/favorite/archived |
+| `refresh_knowledge` | Re-run enrichment pipeline for an item |
+| `delete_knowledge` | Hard-delete (requires `allow_deletion` token flag) |
+| `list_collections` | Enumerate collections the token can access |
+| `add_to_collection` | Organize saved items |
+| `get_entity` | Fetch entity detail including LLM-authored synthesis |
+| `get_related_entities` | Follow associative trails in the concept graph |
+
+### 1. Create a Personal Access Token
+
+In the app: **Settings → API Tokens & MCP → New token**. Choose:
+- **Role:** `viewer` (read-only) or `editor` (read + write)
+- **Access:** All collections, or specific collections (plus optional "uncollected items" toggle)
+- **Allow deletion:** optional, editor-only
+- **Admin scope:** optional, admins only — gates `/api/v1/admin/*`
+- **Expiry:** Never / 30d / 90d / 1 year / 2 years
+
+The plaintext token is shown **once**. Copy it immediately — it's stored only as a sha256 hash.
+
+### 2. Wire an MCP client
+
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "4dpocket": {
+      "url": "http://localhost:4040/mcp",
+      "headers": { "Authorization": "Bearer fdp_pat_..." }
+    }
+  }
+}
+```
+
+**Cursor** — `~/.cursor/mcp.json` (same shape as above).
+
+**Claude Code / Codex / other** — use the Raw JSON template from the Settings page.
+
+### 3. Use it
+
+Ask your agent things like:
+- *"Save this article to my 'research' collection."*
+- *"What did I save last month about FastAPI?"*
+- *"Show me everything related to the 'async patterns' concept."*
+- *"Regenerate the synthesis for the Postgres entity."*
+
+Collection-scoped tokens only return items the user authorized. Viewer tokens cannot call write tools. Admin endpoints reject PATs without `admin_scope`.
+
+### Entity synthesis — the Karpathy wiki pattern
+
+Each entity accumulates an LLM-authored structured synthesis as more items mention it. Regeneration is automatic (after 3+ mentions, throttled to once per 24h) or manual via `POST /api/v1/entities/{id}/synthesize?force=true` / the Regenerate button in the UI. Visualize the full concept graph at **Knowledge Graph** in the sidebar.
 
 ---
 
@@ -436,9 +501,11 @@ Save pages with one click, highlight text on any page, view highlights in a side
 
 **Build from source:**
 ```bash
-cd extension && pnpm install && pnpm build
+./app.sh build                    # builds frontend + extension together
+./app.sh build --extension        # extension only
+# or manually: cd extension && pnpm install && pnpm build
 ```
-Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions`.
+Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions` (Developer mode → Load unpacked). `./app.sh setup` also installs extension dependencies and produces this build out of the box.
 
 - One-click save current page
 - Right-click context menu save
@@ -497,6 +564,9 @@ FDP_RERANK__MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
 
 # Enrichment
 FDP_ENRICHMENT__EXTRACT_ENTITIES=false  # Enable entity extraction for concept graph
+FDP_ENRICHMENT__SYNTHESIS_ENABLED=true   # LLM-authored entity wiki pages
+FDP_ENRICHMENT__SYNTHESIS_THRESHOLD=3    # Regen after N new item mentions
+FDP_ENRICHMENT__SYNTHESIS_MIN_INTERVAL_HOURS=24
 
 # Embeddings
 FDP_AI__EMBEDDING_PROVIDER=local      # local (sentence-transformers) or nvidia
@@ -533,7 +603,11 @@ Interactive docs at http://localhost:4040/docs when running.
 
 **Comments** — `POST /items/{id}/comments`, `GET /items/{id}/comments`, `DELETE /items/{id}/comments/{id}`
 
-**Entities** — `GET /entities`, `GET /entities/{id}`, `GET /entities/{id}/items`, `GET /entities/{id}/related`
+**Entities** — `GET /entities`, `GET /entities/{id}`, `GET /entities/{id}/items`, `GET /entities/{id}/related`, `GET /entities/graph`, `POST /entities/{id}/synthesize`
+
+**API Tokens (PATs)** — `POST /auth/tokens`, `GET /auth/tokens`, `DELETE /auth/tokens/{id}`, `POST /auth/tokens/revoke-all`
+
+**MCP** — Streamable-HTTP server at `/mcp`; see [Using 4DPocket as an MCP Server](#using-4dpocket-as-an-mcp-server)
 
 **Admin** — User management, AI config, instance settings, saved filters
 
@@ -578,7 +652,7 @@ Interactive docs at http://localhost:4040/docs when running.
 │       ├── hooks/             # TanStack Query hooks + keyboard shortcuts
 │       └── stores/            # Zustand UI state
 ├── extension/                 # Chrome browser extension
-├── tests/                     # 128 pytest tests
+├── tests/                     # 183 pytest tests (incl. PAT + MCP + synthesis)
 ├── Dockerfile                 # Multi-stage build
 ├── docker-compose.yml         # Full stack (pgvector/pgvector:pg16 for vector support)
 └── .env.example               # Configuration reference
@@ -592,7 +666,7 @@ See the full [Development Guide](DEVELOPMENT.md) for detailed setup instructions
 
 ```bash
 make dev        # Start dev server (hot reload)
-make test       # Run test suite (128 tests)
+make test       # Run test suite (183 tests)
 make lint       # ruff check
 make format     # ruff format
 make test-cov   # Tests with coverage report

@@ -14,6 +14,72 @@ from fourdpocket.models.user import User
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
+def _synthesis_payload(entity: Entity) -> dict | None:
+    """Normalise the JSON-typed synthesis column into a dict."""
+    raw = entity.synthesis
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw:
+        import json
+
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return {"summary": raw}
+    return None
+
+
+@router.get("/graph")
+def graph(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    entity_type: str | None = None,
+    limit: int = Query(default=200, ge=1, le=1000),
+):
+    """Return nodes + edges for the knowledge-graph visualisation."""
+    node_query = select(Entity).where(Entity.user_id == current_user.id)
+    if entity_type:
+        node_query = node_query.where(Entity.entity_type == entity_type)
+    nodes = db.exec(
+        node_query.order_by(col(Entity.item_count).desc()).limit(limit)
+    ).all()
+    node_ids = {n.id for n in nodes}
+
+    edges = []
+    if node_ids:
+        rel_rows = db.exec(
+            select(EntityRelation).where(
+                EntityRelation.user_id == current_user.id,
+                col(EntityRelation.source_id).in_(list(node_ids)),
+                col(EntityRelation.target_id).in_(list(node_ids)),
+            )
+        ).all()
+        for r in rel_rows:
+            edges.append(
+                {
+                    "id": str(r.id),
+                    "source": str(r.source_id),
+                    "target": str(r.target_id),
+                    "keywords": r.keywords,
+                    "weight": r.weight,
+                }
+            )
+
+    return {
+        "nodes": [
+            {
+                "id": str(n.id),
+                "name": n.canonical_name,
+                "entity_type": n.entity_type,
+                "item_count": n.item_count,
+                "has_synthesis": n.synthesis is not None,
+            }
+            for n in nodes
+        ],
+        "edges": edges,
+    }
+
+
 @router.get("")
 def list_entities(
     db: Session = Depends(get_db),
@@ -41,6 +107,8 @@ def list_entities(
             "entity_type": e.entity_type,
             "description": e.description,
             "item_count": e.item_count,
+            "has_synthesis": e.synthesis is not None,
+            "synthesis_confidence": e.synthesis_confidence,
             "created_at": e.created_at.isoformat() if e.created_at else None,
         }
         for e in entities
@@ -69,9 +137,63 @@ def get_entity(
         "description": entity.description,
         "item_count": entity.item_count,
         "aliases": [{"alias": a.alias, "source": a.source} for a in aliases],
+        "synthesis": _synthesis_payload(entity),
+        "synthesis_generated_at": (
+            entity.synthesis_generated_at.isoformat()
+            if entity.synthesis_generated_at
+            else None
+        ),
+        "synthesis_confidence": entity.synthesis_confidence,
+        "synthesis_item_count": entity.synthesis_item_count,
         "created_at": entity.created_at.isoformat() if entity.created_at else None,
         "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
     }
+
+
+@router.post("/{entity_id}/synthesize")
+def regenerate_synthesis(
+    entity_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    force: bool = False,
+):
+    """Regenerate the synthesis for a single entity.
+
+    By default respects ``min_interval_hours``; pass ``force=true`` to bypass
+    the cooldown (but not the ``min_item_count`` guard).
+    """
+    entity = db.get(Entity, entity_id)
+    if not entity or entity.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    from fourdpocket.ai.synthesizer import should_regenerate, synthesize_entity
+    from fourdpocket.config import get_settings
+
+    settings = get_settings().enrichment
+    if entity.item_count < settings.synthesis_min_item_count:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Entity has only {entity.item_count} mentions "
+                f"(minimum {settings.synthesis_min_item_count} required)."
+            ),
+        )
+
+    if not force and not should_regenerate(entity):
+        raise HTTPException(
+            status_code=429,
+            detail="Synthesis was regenerated recently. Pass force=true to override.",
+        )
+
+    payload = synthesize_entity(entity.id, db)
+    if payload is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Synthesis could not be generated (no evidence or LLM unavailable)."
+            ),
+        )
+    return {"status": "regenerated", "synthesis": payload}
 
 
 @router.get("/{entity_id}/items")
