@@ -132,6 +132,65 @@ def get_knowledge(
     return knowledge_detail(db, item)
 
 
+def _resolve_collection(
+    db: Session, user: User, token: ApiToken, ref: str
+) -> Collection:
+    """Resolve a collection reference (UUID or case-insensitive name) for this user + token.
+
+    LLMs usually know the collection *name*, not its id — so accept either.
+    Raises ``ToolError`` if the collection is missing or the PAT can't access it.
+    """
+    coll: Collection | None = None
+    try:
+        coll = db.get(Collection, uuid.UUID(ref))
+    except (ValueError, TypeError):
+        coll = None
+
+    if coll is None:
+        coll = db.exec(
+            select(Collection).where(
+                Collection.user_id == user.id,
+                col(Collection.name).ilike(ref),
+            )
+        ).first()
+
+    if coll is None or coll.user_id != user.id:
+        _raise(f"Collection not found: {ref!r}.")
+    if not token_can_access_collection(db, token, coll.id):
+        _raise("Token cannot access the requested collection.")
+    return coll
+
+
+def search_in_collection(
+    db: Session,
+    user: User,
+    token: ApiToken,
+    collection: str,
+    query: str,
+    limit: int = 20,
+    item_type: str | None = None,
+    tags: list[str] | None = None,
+    after: str | None = None,
+    before: str | None = None,
+) -> dict[str, Any]:
+    """Search scoped to a single collection, identified by UUID or name."""
+    coll = _resolve_collection(db, user, token, collection)
+    payload = search_knowledge(
+        db,
+        user,
+        token,
+        query=query,
+        limit=limit,
+        item_type=item_type,
+        tags=tags,
+        after=after,
+        before=before,
+        collection_id=str(coll.id),
+    )
+    payload["collection"] = {"id": str(coll.id), "name": coll.name}
+    return payload
+
+
 def list_collections(
     db: Session, user: User, token: ApiToken
 ) -> dict[str, Any]:

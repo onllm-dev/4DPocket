@@ -115,6 +115,38 @@ def search_knowledge(
 
 
 @mcp.tool()
+def search_in_collection(
+    collection: str,
+    query: str,
+    limit: int = 20,
+    item_type: str | None = None,
+    tags: list[str] | None = None,
+    after: str | None = None,
+    before: str | None = None,
+) -> dict[str, Any]:
+    """Search within a single collection.
+
+    ``collection`` accepts either the collection UUID or its name (case-insensitive).
+    All other filters behave the same as ``search_knowledge``. Returns the
+    same result shape plus a resolved ``collection`` pointer for the caller.
+    """
+    with _tool_ctx() as (user, pat, db):
+        return tools_mod.call(
+            tools_mod.search_in_collection,
+            db,
+            user,
+            pat,
+            collection=collection,
+            query=query,
+            limit=limit,
+            item_type=item_type,
+            tags=tags,
+            after=after,
+            before=before,
+        )
+
+
+@mcp.tool()
 def get_knowledge(knowledge_id: str) -> dict[str, Any]:
     """Fetch full detail for a single knowledge item (title, content, tags,
     entities, collections, chunks)."""

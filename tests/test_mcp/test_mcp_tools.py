@@ -301,3 +301,72 @@ def test_search_knowledge_scope(db):
     ids = {r["id"] for r in res["results"]}
     assert str(keep.id) in ids
     assert str(drop.id) not in ids
+
+
+# ─── search_in_collection ─────────────────────────────────────────────────
+
+
+def test_search_in_collection_by_name(db):
+    from fourdpocket.search.sqlite_fts import index_item
+
+    user = _user(db, "sic-n@x.com")
+    pat = _pat(db, user.id, all_collections=True, include_uncollected=True)
+    target = _collection(db, user.id, "Research")
+    other = _collection(db, user.id, "Fun")
+
+    inside = _item(db, user.id, "overlapping topic A")
+    outside_same_text = _item(db, user.id, "overlapping topic B")
+    _link(db, target.id, inside.id)
+    _link(db, other.id, outside_same_text.id)
+
+    for it in (inside, outside_same_text):
+        index_item(db, it)
+
+    # Case-insensitive name resolution
+    res = tools.search_in_collection(
+        db, user, pat, collection="research", query="overlapping", limit=10
+    )
+    ids = {r["id"] for r in res["results"]}
+    assert str(inside.id) in ids
+    assert str(outside_same_text.id) not in ids
+    assert res["collection"]["name"] == "Research"
+    assert res["collection"]["id"] == str(target.id)
+
+
+def test_search_in_collection_by_id(db):
+    from fourdpocket.search.sqlite_fts import index_item
+
+    user = _user(db, "sic-id@x.com")
+    pat = _pat(db, user.id, all_collections=True, include_uncollected=True)
+    coll = _collection(db, user.id, "Archive")
+
+    inside = _item(db, user.id, "targeted snippet")
+    _link(db, coll.id, inside.id)
+    index_item(db, inside)
+
+    res = tools.search_in_collection(
+        db, user, pat, collection=str(coll.id), query="targeted", limit=5
+    )
+    assert {r["id"] for r in res["results"]} == {str(inside.id)}
+
+
+def test_search_in_collection_unknown_name_raises(db):
+    user = _user(db, "sic-u@x.com")
+    pat = _pat(db, user.id, all_collections=True)
+    with pytest.raises(tools.ToolError):
+        tools.search_in_collection(
+            db, user, pat, collection="nonexistent-collection", query="anything"
+        )
+
+
+def test_search_in_collection_forbidden_by_token(db):
+    user = _user(db, "sic-f@x.com")
+    pat = _pat(db, user.id, all_collections=False)
+    allowed = _collection(db, user.id, "Allowed")
+    forbidden = _collection(db, user.id, "Forbidden")
+    _grant(db, pat.id, allowed.id)
+
+    with pytest.raises(tools.ToolError):
+        tools.search_in_collection(
+            db, user, pat, collection=str(forbidden.id), query="anything"
+        )

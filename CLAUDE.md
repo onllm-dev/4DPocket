@@ -12,7 +12,7 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 - **Search**: SearchService with pluggable backends — SQLite FTS5 / Meilisearch (keyword) + ChromaDB / pgvector (vector) + RRF fusion + optional cross-encoder reranking
 - **AI**: Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) (NO litellm, NO langchain)
 - **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose); **PATs** (`fdp_pat_*`) alongside JWT
-- **MCP**: FastMCP streamable-HTTP server mounted at `/mcp` (inner `streamable_http_path="/"` + 307 redirect so both `/mcp` and `/mcp/` work); PAT-validated `TokenVerifier`; 10 tools (persist/recall/navigate/update/delete)
+- **MCP**: FastMCP streamable-HTTP server mounted at `/mcp` (inner `streamable_http_path="/"` + 307 redirect so both `/mcp` and `/mcp/` work); PAT-validated `TokenVerifier`; 11 tools (persist/recall/navigate/update/delete, incl. `search_in_collection`)
 - **HTTP**: httpx (backend), native fetch (frontend) (NO axios)
 - **Background Jobs**: Huey (SQLite backend) — stage-based enrichment pipeline
 - **State**: TanStack Query (server) + Zustand (client)
