@@ -10,7 +10,6 @@ import asyncio
 import httpx
 import respx
 
-
 STATUS_PAYLOAD = {
     "id": "1001",
     "url": "https://mastodon.social/@alice/1001",

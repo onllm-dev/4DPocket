@@ -66,7 +66,7 @@ class StackOverflowProcessor(BaseProcessor):
         r"serverfault\.com/questions/\d+",
         r"superuser\.com/questions/\d+",
         r"askubuntu\.com/questions/\d+",
-        r"\w+\.stackexchange\.com/questions/\d+",
+        r"[\w-]+\.stackexchange\.com/questions/\d+",
     ]
     priority = 10
 

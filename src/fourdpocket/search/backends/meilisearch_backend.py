@@ -53,7 +53,7 @@ class MeilisearchKeywordBackend:
             index = client.index("knowledge_chunks")
             docs = []
             for chunk in chunks:
-                docs.append({
+                doc = {
                     "id": str(chunk.id),
                     "item_id": str(item_id),
                     "user_id": str(user_id),
@@ -61,8 +61,26 @@ class MeilisearchKeywordBackend:
                     "url": url or "",
                     "text": chunk.text,
                     "chunk_order": chunk.chunk_order,
-                })
+                }
+                # Section provenance — nullable for legacy chunks
+                if hasattr(chunk, "section_kind") and chunk.section_kind:
+                    doc["section_kind"] = chunk.section_kind
+                if hasattr(chunk, "section_role") and chunk.section_role:
+                    doc["section_role"] = chunk.section_role
+                if hasattr(chunk, "author") and chunk.author:
+                    doc["author"] = chunk.author
+                if hasattr(chunk, "is_accepted_answer") and chunk.is_accepted_answer:
+                    doc["is_accepted_answer"] = True
+                docs.append(doc)
             if docs:
+                # Ensure section fields are filterable
+                try:
+                    index.update_filterable_attributes([
+                        "user_id", "item_id", "section_kind",
+                        "section_role", "author",
+                    ])
+                except Exception:
+                    pass
                 index.add_documents(docs)
         except Exception as e:
             logger.debug("Meilisearch chunk indexing failed: %s", e)

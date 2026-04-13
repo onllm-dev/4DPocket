@@ -84,8 +84,8 @@ class RedditProcessor(BaseProcessor):
     """Extract a Reddit submission with threaded comments as sections."""
 
     url_patterns = [
-        r"reddit\.com/r/\w+/comments/",
-        r"old\.reddit\.com/r/\w+/comments/",
+        r"reddit\.com/r/[\w-]+/comments/",
+        r"old\.reddit\.com/r/[\w-]+/comments/",
         r"redd\.it/\w+",
     ]
     priority = 10

@@ -264,7 +264,7 @@ class YouTubeProcessor(BaseProcessor):
             media=media,
             metadata=metadata,
             source_platform="youtube",
-            item_type="video" if media else "url",
+            item_type="video",
             status=status,
             error=error,
             sections=sections,

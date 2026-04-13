@@ -86,7 +86,7 @@ class TikTokProcessor(BaseProcessor):
             media=media,
             metadata={"url": url, "fallback": "og_metadata", "limited_extraction": True},
             source_platform="tiktok",
-            item_type="url",
+            item_type="video",
             status=ProcessorStatus.partial,
             error=reason,
             sections=sections,

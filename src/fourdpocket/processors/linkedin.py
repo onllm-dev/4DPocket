@@ -38,7 +38,7 @@ _CHROME_UA = (
     "Chrome/124.0.0.0 Safari/537.36"
 )
 
-_MIN_BODY_CHARS = 250  # below this we still ship but flag as limited
+_MIN_BODY_CHARS = 150  # below this we still ship but flag as limited
 
 
 @register_processor

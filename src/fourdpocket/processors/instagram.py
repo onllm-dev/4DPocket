@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_shortcode(url: str) -> str | None:
-    m = re.search(r"instagram\.com/(?:p|reel|reels)/([A-Za-z0-9_-]+)", url)
+    m = re.search(r"instagram\.com/(?:[^/]+/)?(?:p|reel|reels)/([A-Za-z0-9_-]+)", url)
     return m.group(1) if m else None
 
 
@@ -38,6 +38,8 @@ class InstagramProcessor(BaseProcessor):
         r"instagram\.com/p/[A-Za-z0-9_-]+",
         r"instagram\.com/reel/[A-Za-z0-9_-]+",
         r"instagram\.com/reels/[A-Za-z0-9_-]+",
+        r"instagram\.com/[^/]+/p/[A-Za-z0-9_-]+",
+        r"instagram\.com/[^/]+/reel/[A-Za-z0-9_-]+",
     ]
     priority = 10
 

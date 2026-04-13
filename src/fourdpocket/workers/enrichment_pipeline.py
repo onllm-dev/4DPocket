@@ -143,15 +143,27 @@ def handle_chunking(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None
         for sd in sections_payload:
             try:
                 section_objs.append(Section(**sd))
-            except TypeError:
-                # Forward-compat: unknown fields are ignored so old payloads
-                # don't crash a newer schema.
+            except Exception as sec_err:
+                # Forward-compat: preserve all available fields so
+                # provenance (author, depth, parent_id, etc.) survives
+                # even when the schema diverges.
+                logger.warning(
+                    "Section re-hydration fallback for %s: %s",
+                    sd.get("id", "?"), sec_err,
+                )
                 section_objs.append(Section(
                     id=sd.get("id", ""),
                     kind=sd.get("kind", "uncategorized"),
                     order=sd.get("order", 0),
                     text=sd.get("text", ""),
                     role=sd.get("role", "main"),
+                    parent_id=sd.get("parent_id"),
+                    depth=sd.get("depth", 0),
+                    author=sd.get("author"),
+                    score=sd.get("score"),
+                    created_at=sd.get("created_at"),
+                    source_url=sd.get("source_url"),
+                    extra=sd.get("extra"),
                 ))
         raw_chunks = chunk_sections(
             section_objs,

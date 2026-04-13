@@ -59,7 +59,7 @@ class MastodonProcessor(BaseProcessor):
     """Mastodon status + reply tree as sections."""
 
     url_patterns = [
-        r"https?://[^/]+/@[^/]+/\d+",
+        r"/@[^/]+/\d+",
     ]
     priority = 8
 

@@ -1,15 +1,15 @@
-"""Generic URL processor - fallback for any URL."""
+"""Generic URL processor - fallback for any URL with section support."""
 
 import httpx
-from readability import Document
 
 from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
+from fourdpocket.processors.medium import _trafilatura_or_readability_sections
 from fourdpocket.processors.registry import register_processor
 
 
 @register_processor
 class GenericURLProcessor(BaseProcessor):
-    """Extract content from any URL using readability and metadata parsing."""
+    """Extract content from any URL using trafilatura/readability as sections."""
 
     url_patterns = []  # matches nothing - used as fallback
     priority = -1  # lowest priority
@@ -47,23 +47,15 @@ class GenericURLProcessor(BaseProcessor):
                 status=ProcessorStatus.partial,
             )
 
-        # Extract readable content via readability
-        try:
-            doc = Document(raw_html)
-            readable_title = doc.title()
-            readable_content = doc.summary()
-            doc.short_title()
-        except Exception:
-            readable_title = None
-            readable_content = None
-
         # Extract OG metadata
         og_meta = self._extract_og_metadata(raw_html)
+
+        # Emit structured sections via trafilatura/readability
+        sections = _trafilatura_or_readability_sections(raw_html, url, og_meta)
 
         # Determine best title
         title = (
             og_meta.get("og_title")
-            or readable_title
             or og_meta.get("html_title")
             or url
         )
@@ -99,11 +91,12 @@ class GenericURLProcessor(BaseProcessor):
         return ProcessorResult(
             title=title,
             description=description,
-            content=readable_content,
-            raw_content=raw_html[:100000],  # cap raw HTML at 100KB
+            content=None,
+            raw_content=raw_html[:100000],
             media=media,
             metadata=metadata,
             source_platform="generic",
             item_type="url",
             status=ProcessorStatus.success,
+            sections=sections,
         )

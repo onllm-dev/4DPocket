@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_pub_and_slug(url: str) -> tuple[str | None, str | None]:
+    # Standard: https://{pub}.substack.com/p/{slug}
     m = re.match(r"https?://([^.]+)\.substack\.com/p/([\w\-]+)", url)
-    if not m:
-        return None, None
-    return m.group(1), m.group(2)
+    if m:
+        return m.group(1), m.group(2)
+    # Aggregator: https://substack.com/home/post/p-{id}
+    m2 = re.match(r"https?://substack\.com/home/post/([\w\-]+)", url)
+    if m2:
+        return None, m2.group(1)
+    return None, None
 
 
 def _try_substack_api(pub: str, slug: str) -> dict | None:
@@ -99,7 +104,10 @@ def _html_to_sections(html: str, url: str, start_order: int) -> tuple[list[Secti
 class SubstackProcessor(BaseProcessor):
     """Substack post → typed sections via API; trafilatura fallback."""
 
-    url_patterns = [r"[a-z0-9-]+\.substack\.com/p/"]
+    url_patterns = [
+        r"[a-z0-9-]+\.substack\.com/p/",
+        r"substack\.com/home/post/",
+    ]
     priority = 10
 
     async def process(self, url: str, **kwargs) -> ProcessorResult:

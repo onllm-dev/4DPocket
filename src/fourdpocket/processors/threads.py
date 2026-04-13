@@ -96,7 +96,7 @@ class ThreadsProcessor(BaseProcessor):
             body_text = og_desc
 
         body_text = body_text.strip()
-        limited = len(body_text) < 50
+        limited = len(body_text) < 30
 
         # ─── Sections ───
         sections: list[Section] = []
