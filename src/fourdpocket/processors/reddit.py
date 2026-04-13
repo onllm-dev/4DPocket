@@ -107,7 +107,8 @@ class RedditProcessor(BaseProcessor):
 
         headers = {
             "User-Agent": _REDDIT_USER_AGENT,
-            "Accept": "application/json",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
         }
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             r = await client.get(json_url, headers=headers)

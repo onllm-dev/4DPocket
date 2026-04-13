@@ -229,7 +229,18 @@ class MediumProcessor(BaseProcessor):
             )
 
         raw_html = response.text
+        # When using Google cache, the wrapper page has Google's own
+        # OG/title tags. Extract from original content within the cache.
         og_meta = self._extract_og_metadata(raw_html)
+        if og_meta.get("og_title", "").startswith("Google"):
+            # Cache wrapper — try harder to find the real title
+            import re as _re
+            real_title = _re.search(
+                r'<title[^>]*>([^<]+)</title>', raw_html[raw_html.find('<!DOCTYPE'):] if '<!DOCTYPE' in raw_html else raw_html,
+            )
+            if real_title and not real_title.group(1).startswith("Google"):
+                og_meta["og_title"] = real_title.group(1).strip()
+                og_meta["html_title"] = real_title.group(1).strip()
         sections = _trafilatura_or_readability_sections(raw_html, url, og_meta)
 
         title = (
