@@ -1,4 +1,18 @@
-"""Medium processor - extract articles via JSON API + readability fallback."""
+"""Medium processor — JSON endpoint with trafilatura fallback.
+
+Per R&D memo: Medium's ``?format=json`` endpoint is the cleanest source
+when it works (it strips the ``])}while(1);</x>`` anti-JSONP prefix
+manually). Falls back to trafilatura (the empirical winner for HTML
+article extraction) when JSON is blocked, then OG metadata.
+
+Sections:
+  * ``title`` — article title
+  * ``subtitle`` — when present (Medium has dedicated field)
+  * ``heading`` / ``paragraph`` / ``quote`` / ``code`` — per-paragraph
+    structure derived from Medium's bodyModel paragraph types
+"""
+
+from __future__ import annotations
 
 import json
 import logging
@@ -9,25 +23,35 @@ from readability import Document
 
 from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
 from fourdpocket.processors.registry import register_processor
+from fourdpocket.processors.sections import Section, make_section_id
 
 logger = logging.getLogger(__name__)
 
+# Medium paragraph type codes (from the bodyModel.paragraphs[] schema)
+_PARA_TYPE = {
+    1: ("paragraph", 0),
+    2: ("paragraph", 0),  # P
+    3: ("heading", 2),    # H3
+    4: ("figure", 0),     # IMG
+    6: ("quote", 0),      # blockquote
+    7: ("quote", 0),      # pullquote
+    8: ("code", 0),       # code block
+    9: ("list_item", 0),  # ULI
+    10: ("list_item", 0), # OLI
+    11: ("figure", 0),    # IFRAME
+    13: ("heading", 3),   # H4
+    14: ("heading", 1),   # H2 (rare in Medium, but exists)
+}
+
 
 def _extract_publication(url: str, og_meta: dict) -> str | None:
-    """Try to get publication name from OG metadata or subdomain."""
     if og_meta.get("og_site_name"):
         return og_meta["og_site_name"]
-    match = re.match(r"https?://([^/]+)\.medium\.com", url)
-    if match:
-        return match.group(1)
-    return None
+    m = re.match(r"https?://([^/]+)\.medium\.com", url)
+    return m.group(1) if m else None
 
 
 def _try_json_endpoint(url: str) -> dict | None:
-    """Try Medium's hidden JSON endpoint for reliable content extraction.
-
-    Medium prefixes JSON responses with `])}while(1);</x>` to prevent JSONP abuse.
-    """
     from fourdpocket.processors.base import _is_safe_url
 
     json_url = url.rstrip("/") + "?format=json"
@@ -45,83 +69,84 @@ def _try_json_endpoint(url: str) -> dict | None:
         )
         if resp.status_code != 200:
             return None
-
         text = resp.text
-        # Strip Medium's anti-JSONP prefix
         if text.startswith("])}while(1);</x>"):
             text = text[len("])}while(1);</x>"):]
-
-        data = json.loads(text)
-        return data.get("payload", {})
+        return json.loads(text).get("payload", {})
     except Exception as e:
         logger.debug("Medium JSON endpoint failed for %s: %s", url, e)
         return None
 
 
-def _extract_from_json(payload: dict) -> dict:
-    """Extract article data from Medium's JSON payload."""
-    post = payload.get("value", {})
+def _sections_from_medium_payload(payload: dict, url: str) -> tuple[list[Section], dict]:
+    """Convert Medium's bodyModel into typed sections + metadata."""
+    sections: list[Section] = []
+    post = payload.get("value", {}) or {}
     if not post:
-        return {}
+        return sections, {}
 
     title = post.get("title", "")
-    subtitle = post.get("content", {}).get("subtitle", "")
+    subtitle = (post.get("content") or {}).get("subtitle", "")
 
-    # Extract paragraphs from the post content
-    paragraphs = post.get("content", {}).get("bodyModel", {}).get("paragraphs", [])
-    content_parts = []
+    order = 0
+    if title:
+        sections.append(Section(
+            id=make_section_id(url, order), kind="title", order=order,
+            role="main", text=title,
+        ))
+        order += 1
+    if subtitle:
+        sections.append(Section(
+            id=make_section_id(url, order), kind="subtitle", order=order,
+            role="main", text=subtitle,
+        ))
+        order += 1
+
+    paragraphs = (
+        ((post.get("content") or {}).get("bodyModel") or {}).get("paragraphs") or []
+    )
     for p in paragraphs:
-        text = p.get("text", "")
-        if text:
-            p_type = p.get("type")
-            if p_type == 3:  # H3 heading
-                content_parts.append(f"\n### {text}\n")
-            elif p_type == 6:  # blockquote
-                content_parts.append(f"> {text}")
-            elif p_type == 8:  # code block
-                content_parts.append(f"```\n{text}\n```")
-            elif p_type == 13:  # H4 heading
-                content_parts.append(f"\n#### {text}\n")
-            else:
-                content_parts.append(text)
+        text = (p.get("text") or "").strip()
+        if not text:
+            continue
+        ptype = p.get("type")
+        kind, depth = _PARA_TYPE.get(ptype, ("paragraph", 0))
+        sec = Section(
+            id=make_section_id(url, order), kind=kind, order=order,
+            depth=depth, role="main", text=text,
+            extra={"medium_p_type": ptype} if ptype is not None else {},
+        )
+        sections.append(sec)
+        order += 1
 
-    # Extract author
-    creator_id = post.get("creatorId", "")
-    references = payload.get("references", {})
-    user_data = references.get("User", {}).get(creator_id, {})
-    author = user_data.get("name", "")
+    creator_id = post.get("creatorId") or ""
+    user_data = (payload.get("references") or {}).get("User", {}).get(creator_id, {}) or {}
+    author = user_data.get("name") or ""
 
-    # Extract metadata
-    clap_count = post.get("virtuals", {}).get("totalClapCount", 0)
-    reading_time = post.get("virtuals", {}).get("readingTime", 0)
-    word_count = post.get("virtuals", {}).get("wordCount", 0)
-    published_at = post.get("firstPublishedAt")
+    virtuals = post.get("virtuals", {}) or {}
+    cover = virtuals.get("previewImage", {}) or {}
+    image_id = cover.get("imageId") or ""
+    cover_url = (
+        f"https://miro.medium.com/v2/resize:fit:1200/{image_id}" if image_id else None
+    )
 
-    # Extract tags
-    tags = [t.get("slug", "") for t in post.get("virtuals", {}).get("tags", [])]
-
-    # Cover image
-    preview_image = post.get("virtuals", {}).get("previewImage", {})
-    image_id = preview_image.get("imageId", "")
-    cover_url = f"https://miro.medium.com/v2/resize:fit:1200/{image_id}" if image_id else None
-
-    return {
-        "title": title,
-        "subtitle": subtitle,
-        "content": "\n\n".join(content_parts),
+    metadata = {
+        "url": url,
         "author": author,
-        "clap_count": clap_count,
-        "reading_time": round(reading_time, 1),
-        "word_count": word_count,
-        "published_at": published_at,
-        "tags": tags,
+        "clap_count": virtuals.get("totalClapCount", 0),
+        "reading_time_min": round(virtuals.get("readingTime", 0), 1),
+        "word_count": virtuals.get("wordCount", 0),
+        "tags": [t.get("slug", "") for t in virtuals.get("tags") or []],
+        "published_at": post.get("firstPublishedAt"),
+        "subtitle": subtitle,
         "cover_url": cover_url,
     }
+    return sections, metadata
 
 
 @register_processor
 class MediumProcessor(BaseProcessor):
-    """Extract Medium articles using JSON API with readability fallback."""
+    """Extract a Medium article as typed sections."""
 
     url_patterns = [
         r"medium\.com/",
@@ -130,53 +155,47 @@ class MediumProcessor(BaseProcessor):
     priority = 10
 
     async def process(self, url: str, **kwargs) -> ProcessorResult:
-        # Try JSON endpoint first (more reliable than HTML scraping)
+        # ─── Path 1: structured JSON ───
         payload = _try_json_endpoint(url)
         if payload:
-            extracted = _extract_from_json(payload)
-            if extracted.get("content"):
-                media = []
-                if extracted.get("cover_url"):
-                    media.append({"type": "image", "url": extracted["cover_url"], "role": "thumbnail"})
-
-                metadata = {
-                    "url": url,
-                    "author": extracted.get("author"),
-                    "clap_count": extracted.get("clap_count"),
-                    "reading_time_min": extracted.get("reading_time"),
-                    "word_count": extracted.get("word_count"),
-                    "tags": extracted.get("tags", []),
-                    "published_at": extracted.get("published_at"),
-                }
-
-                description = extracted.get("subtitle") or (extracted["content"][:300] if extracted.get("content") else None)
-
+            sections, metadata = _sections_from_medium_payload(payload, url)
+            if sections:
+                title_section = next((s for s in sections if s.kind == "title"), None)
+                title = title_section.text if title_section else url
+                media: list[dict] = []
+                if metadata.get("cover_url"):
+                    media.append({
+                        "type": "image", "url": metadata["cover_url"],
+                        "role": "thumbnail",
+                    })
+                description = metadata.get("subtitle") or (
+                    next((s.text for s in sections if s.kind == "paragraph"), "")[:300]
+                )
                 return ProcessorResult(
-                    title=extracted.get("title") or url,
+                    title=title,
                     description=description,
-                    content=extracted["content"],
+                    content=None,
                     media=media,
                     metadata=metadata,
                     source_platform="medium",
                     item_type="url",
                     status=ProcessorStatus.success,
+                    sections=sections,
                 )
 
-        # Fallback to HTML + readability
+        # ─── Path 2: HTML + trafilatura/readability fallback ───
         try:
             response = await self._fetch_url(url, timeout=15)
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
-                title=url,
-                source_platform="medium",
+                title=url, source_platform="medium",
                 status=ProcessorStatus.partial,
                 error=f"HTTP {e.response.status_code}",
                 metadata={"url": url},
             )
         except Exception as e:
             return ProcessorResult(
-                title=url,
-                source_platform="medium",
+                title=url, source_platform="medium",
                 status=ProcessorStatus.failed,
                 error=str(e)[:200],
                 metadata={"url": url},
@@ -184,34 +203,21 @@ class MediumProcessor(BaseProcessor):
 
         raw_html = response.text
         og_meta = self._extract_og_metadata(raw_html)
-
-        try:
-            doc = Document(raw_html)
-            readable_title = doc.title()
-            readable_content = doc.summary()
-        except Exception:
-            readable_title = None
-            readable_content = None
+        sections = _trafilatura_or_readability_sections(raw_html, url, og_meta)
 
         title = (
             og_meta.get("og_title")
-            or readable_title
             or og_meta.get("html_title")
             or url
         )
         description = og_meta.get("og_description") or og_meta.get("description")
-        author = og_meta.get("author")
-        publication = _extract_publication(url, og_meta)
-
-        media = []
-        og_image = og_meta.get("og_image")
-        if og_image:
-            media.append({"type": "image", "url": og_image, "role": "thumbnail"})
-
+        media: list[dict] = []
+        if og_meta.get("og_image"):
+            media.append({"type": "image", "url": og_meta["og_image"], "role": "thumbnail"})
         metadata = {
             "url": url,
-            "author": author,
-            "publication": publication,
+            "author": og_meta.get("author"),
+            "publication": _extract_publication(url, og_meta),
         }
         if og_meta.get("keywords"):
             metadata["keywords"] = og_meta["keywords"]
@@ -219,11 +225,67 @@ class MediumProcessor(BaseProcessor):
         return ProcessorResult(
             title=title,
             description=description,
-            content=readable_content,
+            content=None,
             raw_content=raw_html[:100000],
             media=media,
             metadata=metadata,
             source_platform="medium",
             item_type="url",
             status=ProcessorStatus.success,
+            sections=sections,
         )
+
+
+def _trafilatura_or_readability_sections(
+    raw_html: str, url: str, og_meta: dict,
+) -> list[Section]:
+    """Try trafilatura first, fall back to readability."""
+    sections: list[Section] = []
+    order = 0
+    title_text = og_meta.get("og_title") or og_meta.get("html_title")
+    if title_text:
+        sections.append(Section(
+            id=make_section_id(url, order), kind="title", order=order,
+            role="main", text=title_text,
+        ))
+        order += 1
+
+    extracted_text: str | None = None
+    try:
+        import trafilatura  # type: ignore
+
+        extracted_text = trafilatura.extract(
+            raw_html,
+            output_format="markdown",
+            include_tables=True,
+            include_comments=False,
+            favor_recall=True,
+            url=url,
+        )
+    except Exception as e:
+        logger.debug("trafilatura failed for %s: %s", url, e)
+
+    if extracted_text and len(extracted_text.strip()) >= 200:
+        # Reuse the markdown→sections splitter from PDF (heading + paragraph)
+        from fourdpocket.processors.pdf import _split_markdown_into_sections
+
+        body_sections, _ = _split_markdown_into_sections(
+            extracted_text, page_no=None, parent_id=None, start_order=order,
+        )
+        sections.extend(body_sections)
+        return sections
+
+    # Readability fallback (lower fidelity)
+    try:
+        doc = Document(raw_html)
+        body = doc.summary() or ""
+        if body.strip():
+            sections.append(Section(
+                id=make_section_id(url, order), kind="paragraph", order=order,
+                role="main", text=re.sub(r"<[^>]+>", "", body).strip(),
+                raw_html=body,
+            ))
+    except Exception as e:
+        logger.debug("readability failed for %s: %s", url, e)
+
+    return sections

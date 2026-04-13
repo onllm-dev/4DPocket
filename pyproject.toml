@@ -22,6 +22,7 @@ dependencies = [
     "lxml-html-clean>=0.4.0",
     "mcp>=1.12",
     "tldextract>=5.1.0",
+    "trafilatura>=1.12.0",
 ]
 
 [project.scripts]
@@ -43,6 +44,7 @@ processors = [
     "playwright>=1.40.0",
     "pytesseract>=0.3.10",
     "PyMuPDF>=1.24.0",
+    "pymupdf4llm>=0.0.17",
     "Pillow>=10.0.0",
 ]
 meilisearch = [
