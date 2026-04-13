@@ -28,10 +28,13 @@ from fourdpocket.processors.sections import Section
 
 logger = logging.getLogger(__name__)
 
-# Reddit explicitly rejects generic library UAs. A descriptive UA is
-# also their stated etiquette in the API rules. Bumping the version is
-# fine — the string just has to be reasonable.
-_REDDIT_USER_AGENT = "4dpocket/0.2 (knowledge-base ingester; +https://github.com/4dpocket)"
+# Reddit blocks non-browser UAs on both www and old.reddit.com.
+# A realistic Chrome UA is the only way to get .json responses.
+_REDDIT_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
 
 # Cap how many comments we keep per post. Big threads (e.g. AskReddit
 # popular posts) can return thousands; keeping all of them blows up

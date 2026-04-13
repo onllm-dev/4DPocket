@@ -194,26 +194,37 @@ class MediumProcessor(BaseProcessor):
 
         # ─── Path 2: HTML + trafilatura/readability fallback ───
         # Use Chrome UA — Medium 403s bot-like User-Agents.
+        # If direct fetch fails, try Google webcache as Path 2b.
+        response = None
+        _headers = {
+            "User-Agent": _CHROME_UA,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(url, headers={
-                    "User-Agent": _CHROME_UA,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.5",
-                })
+                response = await client.get(url, headers=_headers)
                 response.raise_for_status()
-        except httpx.HTTPStatusError as e:
+        except (httpx.HTTPStatusError, httpx.RequestError):
+            # Path 2b: Google webcache — Medium often blocks direct
+            # requests but Google's cached copy is usually available.
+            cache_url = (
+                "https://webcache.googleusercontent.com/search"
+                f"?q=cache:{url}"
+            )
+            try:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    response = await client.get(cache_url, headers=_headers)
+                    response.raise_for_status()
+                logger.debug("Medium: using Google cache for %s", url)
+            except Exception:
+                response = None
+
+        if response is None:
             return ProcessorResult(
                 title=url, source_platform="medium",
                 status=ProcessorStatus.partial,
-                error=f"HTTP {e.response.status_code}",
-                metadata={"url": url},
-            )
-        except Exception as e:
-            return ProcessorResult(
-                title=url, source_platform="medium",
-                status=ProcessorStatus.failed,
-                error=str(e)[:200],
+                error="Medium blocked direct + cache fetch",
                 metadata={"url": url},
             )
 
