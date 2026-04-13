@@ -82,6 +82,10 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
                 item.title = result.title
             if result.description:
                 item.description = result.description
+            if result.source_platform:
+                item.source_platform = result.source_platform
+            if result.item_type:
+                item.item_type = result.item_type
 
             # Section-aware: stash structured sections + auto-derive
             # legacy content for processors that haven't migrated.
