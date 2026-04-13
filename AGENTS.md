@@ -51,7 +51,7 @@ Login at http://localhost:5173/login with `admin@local` / `admin1234`
 ## Running Tests
 
 ```bash
-# Backend (183 tests, in-memory SQLite)
+# Backend (304 tests, in-memory SQLite)
 uv run pytest tests/ -x -q
 
 # Frontend type check
@@ -91,7 +91,7 @@ The server mounts a FastMCP streamable-HTTP endpoint at `/mcp`. Mint a PAT in **
 
 - 17 content processors auto-detect platform from URL
 - AI enrichment runs as Huey background task (sync fallback if worker unavailable)
-- Search: chunk-level hybrid — FTS5/Meilisearch + ChromaDB/pgvector + RRF + optional cross-encoder reranking
+- Search: section-aware chunk-level hybrid — FTS5/Meilisearch (with section metadata) + ChromaDB/pgvector + RRF + optional cross-encoder reranking
 - PATs (`fdp_pat_*`) authenticate MCP clients with per-token collection ACL + role (viewer/editor) + optional `allow_deletion` / `admin_scope`
 - Entity synthesis: per-entity structured JSON wiki pages regenerated on threshold (default 3 new mentions, 24h throttle)
 - All user data is scoped per-user. Sharing creates references, not copies.

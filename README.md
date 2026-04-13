@@ -302,23 +302,23 @@ Paste a URL and 4DPocket detects the platform, deeply extracts content, and enri
 
 | Platform | What's Extracted |
 |----------|-----------------|
-| **Generic URL** | Title, description, full article (readability), OG metadata, favicon |
-| **YouTube** | Title, channel, duration, full transcript, chapters, thumbnails |
-| **Reddit** | Post, selftext, top 10 comments, subreddit, score, crosspost info |
-| **GitHub** | Repo metadata, README, stars, language, issues/PRs with comments, gists |
-| **Twitter/X** | Tweet text, author, media, engagement stats (via fxtwitter API) |
-| **Instagram** | Caption, images/carousel, hashtags, alt text |
-| **Hacker News** | Title, author, score, threaded comments (via Algolia API) |
-| **Stack Overflow** | Question, accepted answer, top answers, tags, code blocks |
-| **TikTok** | Description, author, thumbnail, hashtags, view count |
-| **Mastodon** | Toot content, media, boosts, favourites (auto-detects instance) |
-| **Threads** | Author, content, media |
-| **Substack** | Full article, author, newsletter name |
-| **Medium** | Full article via JSON API + readability fallback |
-| **LinkedIn** | Post text, author (public posts) |
+| **Generic URL** | Structured sections (title, headings, paragraphs) via trafilatura/readability, OG metadata, favicon |
+| **YouTube** | Title, channel, duration, chapters, transcript segments grouped by chapter, thumbnails (yt-dlp + youtube-transcript-api) |
+| **Reddit** | Post + threaded comments with authors/scores, score-weighted DFS (up to 80 comments, depth 5) via old.reddit.com JSON |
+| **GitHub** | Repo README split into heading/paragraph sections, issues/PRs with comments + reviews, gists with code sections |
+| **Twitter/X** | Tweet as post section, quoted tweets, self-threads (via fxtwitter API) |
+| **Instagram** | Caption as post section, visual captions (alt text), hashtags, OG fallback for login-walled posts |
+| **Hacker News** | Story + threaded comments as sections, score-weighted DFS (up to 80 comments, depth 6) via Algolia API |
+| **Stack Overflow** | Question + accepted answer (highlighted) + scored answers + comments, all as parented sections (SE 2.3 rich filter) |
+| **TikTok** | Description, author, transcript segments, hashtags, thumbnail (yt-dlp primary, OG fallback) |
+| **Mastodon** | Full thread context — ancestors + post + descendants as sections, media alt text as visual captions (ActivityPub API) |
+| **Threads** | Author, content, media (Chromium UA + trafilatura) |
+| **Substack** | Full article via API or trafilatura, supports both `{pub}.substack.com/p/` and `substack.com/home/post/` URLs |
+| **Medium** | Full article via internal API with TLS fingerprint impersonation (curl_cffi), falls back to trafilatura/readability |
+| **LinkedIn** | Post text, author (Chromium UA extraction, honest "limited" flag for short/blocked posts) |
 | **Spotify** | Track/album/playlist, artist, cover art (oEmbed) |
-| **Image** | EXIF data, OCR text extraction |
-| **PDF** | Full text, metadata, page count |
+| **Image** | EXIF metadata, OCR text extraction (pytesseract), structured sections |
+| **PDF** | Per-page sections with heading/paragraph structure (pymupdf4llm), scanned-page detection |
 
 ### AI-Powered Organization
 
@@ -348,7 +348,7 @@ Every saved item goes through a stage-based enrichment pipeline with dependency 
 
 ```
 Item Created
-  ├─ chunked     → Split content into overlapping chunks
+  ├─ chunked     → Section-aware chunking with provenance (kind, author, heading_path)
   ├─ tagged      → AI auto-tagging with confidence scores
   └─ summarized  → AI summary generation
        │
@@ -372,7 +372,7 @@ Query → Vector Backend  → ┘
 
 | Stage | How It Works |
 |-------|-------------|
-| **Chunking** | Content split into overlapping chunks (512 tokens, 64 overlap) at paragraph/sentence boundaries. Each chunk indexed independently for paragraph-level precision |
+| **Chunking** | Section-aware chunking — content split per-section with provenance (section_kind, author, heading_path). Overlapping chunks (512 tokens, 64 overlap) indexed with metadata for paragraph-level precision |
 | **Keyword Search** | SQLite FTS5 (BM25, porter stemming) or Meilisearch — searches both item-level and chunk-level indexes |
 | **Vector Search** | Sentence-transformers embeddings stored in ChromaDB (SQLite) or pgvector (Postgres). Chunk-level + item-level embeddings |
 | **RRF Fusion** | Reciprocal Rank Fusion (k=60) merges keyword + vector results, deduplicates by item |
@@ -667,7 +667,7 @@ Interactive docs at http://localhost:4040/docs when running.
 │       ├── hooks/             # TanStack Query hooks + keyboard shortcuts
 │       └── stores/            # Zustand UI state
 ├── extension/                 # Chrome browser extension
-├── tests/                     # 183 pytest tests (incl. PAT + MCP + synthesis)
+├── tests/                     # 304 pytest tests (incl. PAT + MCP + synthesis)
 ├── Dockerfile                 # Multi-stage build
 ├── docker-compose.yml         # Full stack (pgvector/pgvector:pg16 for vector support)
 └── .env.example               # Configuration reference
@@ -681,7 +681,7 @@ See the full [Development Guide](DEVELOPMENT.md) for detailed setup instructions
 
 ```bash
 make dev        # Start dev server (hot reload)
-make test       # Run test suite (183 tests)
+make test       # Run test suite (304 tests)
 make lint       # ruff check
 make format     # ruff format
 make test-cov   # Tests with coverage report

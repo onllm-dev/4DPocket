@@ -13,7 +13,7 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 - **AI**: Ollama / Groq / NVIDIA / Custom (OpenAI or Anthropic-compatible) (NO litellm, NO langchain)
 - **Auth**: PyJWT + bcrypt direct (NO passlib, NO python-jose); **PATs** (`fdp_pat_*`) alongside JWT
 - **MCP**: FastMCP streamable-HTTP server mounted at `/mcp` (inner `streamable_http_path="/"` + 307 redirect so both `/mcp` and `/mcp/` work); PAT-validated `TokenVerifier`; 11 tools (persist/recall/navigate/update/delete, incl. `search_in_collection`)
-- **HTTP**: httpx (backend), native fetch (frontend) (NO axios)
+- **HTTP**: httpx (backend) + curl_cffi for TLS impersonation (Medium), native fetch (frontend) (NO axios)
 - **Background Jobs**: Huey (SQLite backend) — stage-based enrichment pipeline
 - **State**: TanStack Query (server) + Zustand (client)
 
@@ -96,7 +96,7 @@ src/fourdpocket/
     service.py          # Orchestrator: keyword + vector + RRF + optional rerank
     base.py             # Protocols: KeywordBackend, VectorBackend, Reranker
     backends/           # sqlite_fts, chroma, pgvector, meilisearch
-    chunking.py         # Content chunking (paragraph/sentence/word, 512 tokens, 64 overlap)
+    chunking.py         # Section-aware chunking with provenance (kind, author, heading_path)
     reranker.py         # NullReranker + LocalReranker (cross-encoder)
     filters.py          # Inline filter syntax parser
   sharing/      # Share manager, permissions, feed manager
