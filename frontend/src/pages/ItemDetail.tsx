@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
 import ContentRenderer from "@/components/content/ContentRenderer";
+import { SectionRenderer, type Section } from "@/components/content/SectionRenderer";
 import TextHighlighter from "@/components/content/TextHighlighter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -900,15 +901,31 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {item.content && (
+      {/*
+        Section-aware rendering: when the processor emitted structured
+        sections (post + comments, transcript + chapters, Q&A, page-
+        paginated PDFs) we render them directly. Otherwise fall back to
+        the legacy flat content blob via ContentRenderer. Sections are
+        stashed in item_metadata._sections by workers/fetcher.py.
+      */}
+      {Array.isArray((metadata as Record<string, unknown>)._sections) &&
+      ((metadata as { _sections?: Section[] })._sections?.length ?? 0) > 0 ? (
         <TextHighlighter itemId={item.id} highlights={highlights}>
-          <ContentRenderer
-            content={item.content}
-            rawContent={item.raw_content}
-            sourceUrl={item.url}
-            sourcePlatform={item.source_platform}
+          <SectionRenderer
+            sections={(metadata as { _sections?: Section[] })._sections ?? []}
           />
         </TextHighlighter>
+      ) : (
+        item.content && (
+          <TextHighlighter itemId={item.id} highlights={highlights}>
+            <ContentRenderer
+              content={item.content}
+              rawContent={item.raw_content}
+              sourceUrl={item.url}
+              sourcePlatform={item.source_platform}
+            />
+          </TextHighlighter>
+        )
       )}
 
       {/* Reading list action */}
