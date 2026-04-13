@@ -81,6 +81,34 @@ packages = ["src/fourdpocket"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "slow: marks tests that take >5s (deselect with -m 'not slow')",
+    "integration: marks integration tests requiring full app stack",
+    "security: marks security-critical tests",
+    "ai: marks tests requiring AI provider mocks",
+]
+
+[tool.coverage.run]
+source = ["src/fourdpocket"]
+branch = true
+omit = [
+    "src/fourdpocket/__main__.py",
+    "src/fourdpocket/cli.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 85  # Target: 90%. Currently at 86%.
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__",
+    "@overload",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.ruff]
 line-length = 100

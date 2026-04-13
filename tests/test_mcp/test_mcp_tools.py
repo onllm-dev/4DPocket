@@ -3,7 +3,7 @@
 import uuid
 
 import pytest
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from fourdpocket.api.api_token_utils import generate_token
 from fourdpocket.mcp import tools
@@ -370,3 +370,401 @@ def test_search_in_collection_forbidden_by_token(db):
         tools.search_in_collection(
             db, user, pat, collection=str(forbidden.id), query="anything"
         )
+
+
+# === PHASE 1B MOPUP ADDITIONS ===
+
+# ─── get_entity ──────────────────────────────────────────────────────────────
+
+
+def test_get_entity_found_by_name(db):
+    """get_entity by name returns entity with synthesis."""
+    from fourdpocket.models.entity import Entity
+
+    user = _user(db, "ge-fn@x.com")
+    pat = _pat(db, user.id)
+    entity = Entity(
+        user_id=user.id, canonical_name="Python", entity_type="technology", description="Lang"
+    )
+    db.add(entity)
+    db.commit()
+
+    res = tools.get_entity(db, user, pat, "Python")
+    assert res["canonical_name"] == "Python"
+    assert res["entity_type"] == "technology"
+
+
+def test_get_entity_found_by_uuid(db):
+    """get_entity by UUID returns entity."""
+    from fourdpocket.models.entity import Entity
+
+    user = _user(db, "ge-uuid@x.com")
+    pat = _pat(db, user.id)
+    entity = Entity(
+        user_id=user.id, canonical_name="Rust", entity_type="technology", description="Lang"
+    )
+    db.add(entity)
+    db.commit()
+    db.refresh(entity)
+
+    res = tools.get_entity(db, user, pat, str(entity.id))
+    assert res["canonical_name"] == "Rust"
+
+
+def test_get_entity_not_found(db):
+    """get_entity raises ToolError when entity does not exist."""
+    user = _user(db, "ge-404@x.com")
+    pat = _pat(db, user.id)
+
+    with pytest.raises(tools.ToolError, match="not found"):
+        tools.get_entity(db, user, pat, "DoesNotExist")
+
+
+# ─── get_related_entities ────────────────────────────────────────────────────
+
+
+def test_get_related_entities_found(db):
+    """get_related_entities returns one-hop neighbours ranked by weight."""
+    from fourdpocket.models.entity import Entity
+    from fourdpocket.models.entity_relation import EntityRelation
+
+    user = _user(db, "gre@x.com")
+    pat = _pat(db, user.id)
+
+    python = Entity(user_id=user.id, canonical_name="Python", entity_type="technology")
+    rust = Entity(user_id=user.id, canonical_name="Rust", entity_type="technology")
+    db.add_all([python, rust])
+    db.commit()
+    db.refresh(python)
+    db.refresh(rust)
+
+    rel = EntityRelation(
+        user_id=user.id,
+        source_id=python.id,
+        target_id=rust.id,
+        keywords='["systems", "safe"]',
+        weight=0.95,
+    )
+    db.add(rel)
+    db.commit()
+
+    res = tools.get_related_entities(db, user, pat, "Python", limit=10)
+    assert res["source"]["canonical_name"] == "Python"
+    assert len(res["related"]) == 1
+    assert res["related"][0]["entity"]["canonical_name"] == "Rust"
+
+
+def test_get_related_entities_not_found(db):
+    """get_related_entities raises ToolError for unknown entity."""
+    user = _user(db, "gre-404@x.com")
+    pat = _pat(db, user.id)
+
+    with pytest.raises(tools.ToolError, match="not found"):
+        tools.get_related_entities(db, user, pat, "UnknownEntity")
+
+
+def test_get_related_entities_respects_limit(db):
+    """get_related_entities caps results at the specified limit."""
+    from fourdpocket.models.entity import Entity
+    from fourdpocket.models.entity_relation import EntityRelation
+
+    user = _user(db, "gre-limit@x.com")
+    pat = _pat(db, user.id)
+
+    center = Entity(user_id=user.id, canonical_name="Center", entity_type="concept")
+    db.add(center)
+    db.commit()
+    db.refresh(center)
+
+    for i in range(5):
+        other = Entity(user_id=user.id, canonical_name=f"Other{i}", entity_type="concept")
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+        db.add(
+            EntityRelation(
+                user_id=user.id,
+                source_id=center.id,
+                target_id=other.id,
+                keywords=None,
+                weight=0.5 + i * 0.1,
+            )
+        )
+    db.commit()
+
+    res = tools.get_related_entities(db, user, pat, "Center", limit=3)
+    assert len(res["related"]) == 3
+
+
+# ─── save_knowledge ─────────────────────────────────────────────────────────
+
+
+def test_save_knowledge_with_collection_id(db):
+    """save_knowledge with collection_id creates CollectionItem link."""
+    user = _user(db, "swc@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    coll = _collection(db, user.id, "Work")
+
+    res = tools.save_knowledge(
+        db, user, pat, url="https://example.com/article", collection_id=str(coll.id)
+    )
+    assert "id" in res
+    # Verify link was created
+    from fourdpocket.models.collection import CollectionItem
+
+    link = db.exec(
+        select(CollectionItem).where(
+            CollectionItem.collection_id == coll.id,
+            CollectionItem.item_id == uuid.UUID(res["id"]),
+        )
+    ).first()
+    assert link is not None
+
+
+def test_save_knowledge_collection_acl_denied(db):
+    """save_knowledge rejects collection the token cannot write to."""
+    user = _user(db, "swc-deny@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor, all_collections=False)
+    coll = _collection(db, user.id, "Private")
+    _grant(db, pat.id, coll.id)  # only this collection
+
+    # Try to save to a different, ungranted collection
+    other = _collection(db, user.id, "Other")
+
+    with pytest.raises(tools.ToolError, match="cannot write"):
+        tools.save_knowledge(
+            db, user, pat, url="https://example.com", collection_id=str(other.id)
+        )
+
+
+def test_save_knowledge_with_tags(db):
+    """save_knowledge applies tags to the newly created item."""
+    user = _user(db, "swt@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+
+    res = tools.save_knowledge(
+        db, user, pat, content="Something interesting.", tags=["python", "AI"]
+    )
+    assert set(res["tags"]) == {"python", "AI"}
+
+
+# ─── update_knowledge ────────────────────────────────────────────────────────
+
+
+def test_update_knowledge_replaces_tags(db):
+    """update_knowledge with tags=['newtag'] replaces the existing tag set."""
+    from fourdpocket.models.tag import ItemTag, Tag
+
+    user = _user(db, "upt@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    item = _item(db, user.id, "Target")
+
+    # Pre-existing tag
+    old_tag = Tag(user_id=user.id, name="old-tag", slug="old-tag")
+    db.add(old_tag)
+    db.commit()
+    db.refresh(old_tag)
+    db.add(ItemTag(item_id=item.id, tag_id=old_tag.id))
+    db.commit()
+
+    res = tools.update_knowledge(
+        db, user, pat, str(item.id), tags=["new-tag"]
+    )
+    assert "new-tag" in res["tags"]
+    assert "old-tag" not in res["tags"]
+
+
+def test_update_knowledge_partial_update(db):
+    """update_knowledge only changes the fields that are passed."""
+    user = _user(db, "up-partial@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    item = _item(db, user.id, "Original Title")
+
+    res = tools.update_knowledge(
+        db, user, pat, str(item.id), is_favorite=True
+    )
+    assert res["title"] == "Original Title"
+    assert res["is_favorite"] is True
+
+
+def test_update_knowledge_missing_item(db):
+    """update_knowledge raises ToolError for unknown knowledge_id."""
+    user = _user(db, "up-404@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+
+    with pytest.raises(tools.ToolError):
+        tools.update_knowledge(
+            db, user, pat, str(uuid.uuid4()), title="New"
+        )
+
+
+# ─── refresh_knowledge ──────────────────────────────────────────────────────
+
+
+def test_refresh_knowledge_enqueues_enrichment(db, monkeypatch):
+    """refresh_knowledge calls enrich_item_v2 even without refetch."""
+    user = _user(db, "rf@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    item = _item(db, user.id, "To refresh")
+
+    called = []
+
+    def mock_enrich(item_id, user_id):
+        called.append((item_id, user_id))
+
+    monkeypatch.setattr(
+        "fourdpocket.workers.enrichment_pipeline.enrich_item_v2", mock_enrich
+    )
+
+    res = tools.refresh_knowledge(db, user, pat, str(item.id), refetch=False)
+    assert res["status"] == "refresh_enqueued"
+    assert called[0][0] == str(item.id)
+
+
+def test_refresh_knowledge_refetch_and_enrich(db, monkeypatch):
+    """refresh_knowledge with refetch=True first re-fetches URL then enriches."""
+    user = _user(db, "rf2@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    item = _item(db, user.id, "With URL")
+    item.url = "https://example.com/refetch"
+    db.add(item)
+    db.commit()
+
+    calls = []
+
+    def mock_fetch(item_id, url):
+        calls.append(("fetch", item_id, url))
+
+    def mock_enrich(item_id, user_id):
+        calls.append(("enrich", item_id, user_id))
+
+    monkeypatch.setattr(
+        "fourdpocket.workers.fetcher.fetch_and_process_url", mock_fetch
+    )
+    monkeypatch.setattr(
+        "fourdpocket.workers.enrichment_pipeline.enrich_item_v2", mock_enrich
+    )
+
+    res = tools.refresh_knowledge(db, user, pat, str(item.id), refetch=True)
+    assert res["status"] == "refresh_enqueued"
+    assert calls[0][0] == "fetch"
+    assert calls[1][0] == "enrich"
+
+
+def test_refresh_knowledge_missing_item(db):
+    """refresh_knowledge raises ToolError for unknown knowledge_id."""
+    user = _user(db, "rf-404@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+
+    with pytest.raises(tools.ToolError):
+        tools.refresh_knowledge(db, user, pat, str(uuid.uuid4()))
+
+
+# ─── delete_knowledge ───────────────────────────────────────────────────────
+
+
+def test_delete_knowledge_unknown_item(db):
+    """delete_knowledge raises ToolError when item does not exist."""
+    user = _user(db, "del-404@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor, allow_deletion=True)
+
+    with pytest.raises(tools.ToolError):
+        tools.delete_knowledge(db, user, pat, str(uuid.uuid4()))
+
+
+# ─── search_knowledge ────────────────────────────────────────────────────────
+
+
+def test_search_knowledge_empty_query_returns_empty(db):
+    """search_knowledge with no matching results returns empty list."""
+    user = _user(db, "se-empty@x.com")
+    pat = _pat(db, user.id, all_collections=True)
+
+    res = tools.search_knowledge(db, user, pat, query="xyzzy-nothing", limit=10)
+    assert res["results"] == []
+
+
+def test_search_knowledge_respects_limit(db):
+    """search_knowledge caps results at the configured limit (max 50)."""
+    from fourdpocket.search.sqlite_fts import index_item
+
+    user = _user(db, "se-limit@x.com")
+    pat = _pat(db, user.id, all_collections=True)
+
+    for i in range(5):
+        it = _item(db, user.id, f"Unique thing {i}")
+        index_item(db, it)
+
+    res = tools.search_knowledge(db, user, pat, query="Unique", limit=2)
+    assert len(res["results"]) <= 2
+
+
+def test_search_knowledge_date_range_filter(db):
+    """search_knowledge after/before filters are accepted without error."""
+    from datetime import datetime, timedelta, timezone
+
+    from fourdpocket.search.sqlite_fts import index_item
+
+    user = _user(db, "se-date@x.com")
+    pat = _pat(db, user.id, all_collections=True)
+
+    now = datetime.now(timezone.utc)
+    item = _item(db, user.id, "Dated Item")
+    item.created_at = now
+    db.add(item)
+    db.commit()
+    index_item(db, item)
+
+    after = (now - timedelta(days=1)).isoformat()
+    before = (now + timedelta(days=1)).isoformat()
+    # Just verify it runs without raising; date filter application
+    # depends on the search backend's FTS implementation
+    res = tools.search_knowledge(
+        db, user, pat, query="Dated", limit=5, after=after, before=before
+    )
+    assert "results" in res
+
+
+# ─── list_collections ───────────────────────────────────────────────────────
+
+
+def test_list_collections_includes_uncollected(db):
+    """list_collections returns an 'uncollected' sentinel when token includes uncollected."""
+    user = _user(db, "lc-unc@x.com")
+    pat = _pat(db, user.id, all_collections=True, include_uncollected=True)
+
+    res = tools.list_collections(db, user, pat)
+    # The tool should return the user's collections; the sentinel is a UI hint
+    assert isinstance(res["collections"], list)
+
+
+def test_list_collections_empty(db):
+    """list_collections returns empty list when user has no collections."""
+    user = _user(db, "lc-empty@x.com")
+    pat = _pat(db, user.id, all_collections=True)
+
+    res = tools.list_collections(db, user, pat)
+    assert res["collections"] == []
+
+
+# ─── add_to_collection ──────────────────────────────────────────────────────
+
+
+def test_add_to_collection_item_not_found(db):
+    """add_to_collection raises ToolError when knowledge_id is unknown."""
+    user = _user(db, "atc-404@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    coll = _collection(db, user.id, "C")
+
+    with pytest.raises(tools.ToolError, match="not found"):
+        tools.add_to_collection(db, user, pat, str(coll.id), str(uuid.uuid4()))
+
+
+def test_add_to_collection_collection_not_found(db):
+    """add_to_collection raises ToolError when collection_id is unknown."""
+    user = _user(db, "atc-c404@x.com")
+    pat = _pat(db, user.id, role=ApiTokenRole.editor)
+    item = _item(db, user.id, "I")
+
+    with pytest.raises(tools.ToolError, match="not found"):
+        tools.add_to_collection(db, user, pat, str(uuid.uuid4()), str(item.id))

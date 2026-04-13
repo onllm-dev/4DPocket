@@ -36,6 +36,68 @@ def test_db(engine):
         yield session
 
 
+@pytest.fixture(autouse=True)
+def reset_search_singleton():
+    """Reset the search service singleton between tests."""
+    import fourdpocket.search as search_module
+    original = getattr(search_module, "_search_service", None)
+    yield
+    search_module._search_service = original
+
+
+@pytest.fixture(autouse=True)
+def reset_settings_singleton():
+    """Reset the settings singleton between tests.
+
+    The test_client fixture modifies settings.auth.mode = "multi" and restores
+    it afterward, but if a test fails before restore runs, state leaks. This
+    fixture ensures _settings is always reset to None after each test.
+    """
+    import fourdpocket.config as config_module
+    yield
+    config_module._settings = None
+
+
+@pytest.fixture(autouse=True)
+def clear_search_cache():
+    """Clear FTS search cache between tests."""
+    from fourdpocket.search.sqlite_fts import _search_cache
+    yield
+    _search_cache._cache.clear()
+
+
+@pytest.fixture(name="mock_chat_provider")
+def mock_chat_provider_fixture(monkeypatch):
+    """Inject a deterministic mock chat provider for AI tests."""
+    class MockChatProvider:
+        def generate(self, prompt, **kwargs):
+            return "mock response"
+        def generate_json(self, prompt, schema=None, **kwargs):
+            return {}
+
+    provider = MockChatProvider()
+    monkeypatch.setattr(
+        "fourdpocket.ai.factory.get_chat_provider", lambda: provider
+    )
+    return provider
+
+
+@pytest.fixture(name="mock_embedding_provider")
+def mock_embedding_provider_fixture(monkeypatch):
+    """Inject a mock embedding provider that returns fixed-dim vectors."""
+    class MockEmbeddingProvider:
+        dimensions = 384
+
+        def embed(self, texts):
+            return [[0.1] * 384 for _ in texts]
+
+    provider = MockEmbeddingProvider()
+    monkeypatch.setattr(
+        "fourdpocket.ai.factory.get_embedding_provider", lambda: provider
+    )
+    return provider
+
+
 @pytest.fixture(name="client")
 def test_client(engine):
     import fourdpocket.db.session as db_module
@@ -94,6 +156,24 @@ def auth_headers_fixture(client):
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+
+@pytest.fixture(name="enrich_user")
+def enrich_user_fixture(db):
+    """Create a user for enrichment tests."""
+    from fourdpocket.models.user import User
+
+    user = User(
+        email="enrichtest@example.com",
+        username="enrichuser",
+        password_hash="$2b$12$fakehash",
+        display_name="Enrich Test User",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @pytest.fixture(name="second_user_headers")

@@ -1,6 +1,7 @@
 """Tests for the enrichment pipeline stage management."""
 
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 from sqlmodel import Session, select
@@ -206,3 +207,184 @@ class TestEnrichmentEndpoint:
         # Other user should get 404
         resp = client.get(f"/api/v1/items/{item_id}/enrichment", headers=second_user_headers)
         assert resp.status_code == 404
+
+
+# === PHASE 2B MOPUP ADDITIONS ===
+
+class TestHandleEmbedding:
+    """Test the handle_embedding stage handler."""
+
+    def test_handle_embedding_with_metadata(self, db: Session, enrich_user, monkeypatch):
+        """Item with title+description+content → all in embed_parts."""
+        # Create item with description (enrich_item fixture doesn't set it)
+        item = KnowledgeItem(
+            user_id=enrich_user.id,
+            title="Test Article Title",
+            description="This is a test description.",
+            content="This is the main content of the article.",
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+
+        mock_provider = MagicMock()
+        mock_provider.embed_single.return_value = [0.1] * 384
+        mock_provider.__class__.__name__ = "MockEmbeddingProvider"
+        monkeypatch.setattr("fourdpocket.ai.factory.get_embedding_provider", lambda: mock_provider)
+        monkeypatch.setattr("fourdpocket.search.semantic.add_embedding", lambda *a, **kw: None)
+
+        from fourdpocket.workers.enrichment_pipeline import handle_embedding
+        handle_embedding(db, item.id, enrich_user.id)
+
+        # Verify embed_single was called with text combining title + description + content
+        mock_provider.embed_single.assert_called_once()
+        call_arg = mock_provider.embed_single.call_args[0][0]
+        assert item.title in call_arg
+        assert item.description in call_arg
+        assert item.content[:5000] in call_arg
+
+
+class TestHandleEntityExtraction:
+    """Test the handle_entity_extraction stage handler."""
+
+    def test_handle_entity_extraction_no_chunks(self, db: Session, enrich_item, enrich_user, monkeypatch):
+        """No chunks → fallback to item content for entity extraction."""
+        from fourdpocket.ai.extractor import ExtractionResult
+
+        mock_result = ExtractionResult(entities=[], relations=[])
+        mock_extractor = MagicMock(return_value=mock_result)
+        monkeypatch.setattr("fourdpocket.ai.extractor.extract_entities", mock_extractor)
+        monkeypatch.setattr("fourdpocket.ai.llm_cache.get_cached_response", lambda *a: None)
+        monkeypatch.setattr("fourdpocket.ai.llm_cache.store_cached_response", lambda *a: None)
+        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: MagicMock(enrichment=MagicMock(
+            extract_entities=True,
+            max_entities_per_chunk=10,
+            max_relations_per_chunk=10,
+        )))
+
+        # Ensure no chunks exist
+        from sqlmodel import select
+
+        from fourdpocket.models.item_chunk import ItemChunk
+        from fourdpocket.workers.enrichment_pipeline import handle_entity_extraction
+        existing = db.exec(select(ItemChunk).where(ItemChunk.item_id == enrich_item.id)).all()
+        for c in existing:
+            db.delete(c)
+        db.commit()
+
+        handle_entity_extraction(db, enrich_item.id, enrich_user.id)
+
+        # Should have called extract_entities with item content fallback
+        mock_extractor.assert_called_once()
+
+    def test_handle_entity_extraction_cache_hit(self, db: Session, enrich_item, enrich_user, monkeypatch):
+        """get_cached_response returns data → no extraction call."""
+        cached_data = {
+            "entities": [{"name": "Test Entity", "type": "person", "description": "A test"}],
+            "relations": [],
+        }
+        monkeypatch.setattr("fourdpocket.ai.llm_cache.get_cached_response", lambda *a: cached_data)
+        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: MagicMock(enrichment=MagicMock(
+            extract_entities=True,
+            max_entities_per_chunk=10,
+            max_relations_per_chunk=10,
+        )))
+
+        mock_extractor = MagicMock()
+        monkeypatch.setattr("fourdpocket.ai.extractor.extract_entities", mock_extractor)
+
+        from fourdpocket.workers.enrichment_pipeline import handle_entity_extraction
+        handle_entity_extraction(db, enrich_item.id, enrich_user.id)
+
+        # Should NOT call extract_entities due to cache hit
+        mock_extractor.assert_not_called()
+
+
+class TestHandleSynthesis:
+    """Test the handle_synthesis stage handler."""
+
+    def test_handle_synthesis_disabled(self, db: Session, enrich_item, enrich_user, monkeypatch):
+        """synthesis_enabled=False → early return."""
+        mock_settings = MagicMock()
+        mock_settings.enrichment.synthesis_enabled = False
+        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
+
+        from fourdpocket.workers.enrichment_pipeline import handle_synthesis
+        # Should return early without error
+        handle_synthesis(db, enrich_item.id, enrich_user.id)
+
+
+class TestRunStage:
+    """Test the run_enrichment_stage Huey task."""
+
+    def test_run_stage_already_done(self, db: Session, enrich_item, enrich_user, engine, monkeypatch):
+        """Stage status='done' → returns already_done."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        from fourdpocket.models.enrichment import EnrichmentStage
+        es = EnrichmentStage(item_id=enrich_item.id, stage="tagged", status="done")
+        db.add(es)
+        db.commit()
+
+        from fourdpocket.workers.enrichment_pipeline import run_enrichment_stage
+        result = run_enrichment_stage.call_local(str(enrich_item.id), str(enrich_user.id), "tagged")
+        assert result["status"] == "already_done"
+
+    def test_run_stage_deps_not_met(self, db: Session, enrich_item, enrich_user, engine, monkeypatch):
+        """Dependent stage still pending → deps_not_met."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        from fourdpocket.models.enrichment import EnrichmentStage
+        # chunked exists but is still pending, not done
+        es = EnrichmentStage(item_id=enrich_item.id, stage="chunked", status="pending")
+        db.add(es)
+        db.commit()
+
+        from fourdpocket.workers.enrichment_pipeline import run_enrichment_stage
+        # embedded depends on chunked, which is pending
+        result = run_enrichment_stage.call_local(str(enrich_item.id), str(enrich_user.id), "embedded")
+        assert result["status"] == "deps_not_met"
+
+    def test_run_stage_unknown(self, db: Session, enrich_item, enrich_user, engine, monkeypatch):
+        """Unknown stage name → skipped."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        from fourdpocket.workers.enrichment_pipeline import run_enrichment_stage
+        result = run_enrichment_stage.call_local(str(enrich_item.id), str(enrich_user.id), "nonexistent_stage")
+        assert result["status"] == "skipped"
+
+    def test_run_stage_handler_exception(self, db: Session, enrich_item, enrich_user, engine, monkeypatch):
+        """Handler raises → rollback + mark_failed."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        def bad_handler(*a, **kw):
+            raise RuntimeError("AI failed")
+
+        # Patch the dict entry directly since STAGE_HANDLERS is a module-level dict
+        import fourdpocket.workers.enrichment_pipeline as ep_module
+        original_handler = ep_module.STAGE_HANDLERS["tagged"]
+        ep_module.STAGE_HANDLERS["tagged"] = bad_handler
+        try:
+            from fourdpocket.workers.enrichment_pipeline import run_enrichment_stage
+            # The function raises after marking failed, so catch the exception
+            try:
+                run_enrichment_stage.call_local(str(enrich_item.id), str(enrich_user.id), "tagged")
+                assert False, "Expected RuntimeError to be raised"
+            except RuntimeError as exc:
+                assert str(exc) == "AI failed"
+            # Verify stage was marked failed in DB
+            from fourdpocket.models.enrichment import EnrichmentStage
+            stage = db.exec(
+                select(EnrichmentStage).where(
+                    EnrichmentStage.item_id == enrich_item.id,
+                    EnrichmentStage.stage == "tagged",
+                )
+            ).first()
+            assert stage is not None
+            assert stage.status == "failed"
+        finally:
+            ep_module.STAGE_HANDLERS["tagged"] = original_handler
