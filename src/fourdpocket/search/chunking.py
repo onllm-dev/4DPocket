@@ -2,22 +2,41 @@
 
 Splits text into overlapping chunks sized for embedding models.
 Uses word-count estimation for token counts (no external deps).
+
+Section-aware (Phase 1+): when called via ``chunk_sections()`` chunks
+carry the originating section's kind/role/author/heading-path so
+retrieval can filter ("only post bodies, not comments") and result
+snippets can render context ("found in top comment by @alice on r/python").
 """
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Chunk:
-    """A text chunk with character offsets into the original text."""
+    """A text chunk with character offsets into the original text.
+
+    Section-aware fields are nullable so the legacy ``chunk_text()`` path
+    keeps working unchanged. ``chunk_sections()`` populates them.
+    """
 
     text: str
     char_start: int
     char_end: int
     token_count: int
     content_hash: str
+    # ─── section provenance (Phase 1) ─────────────────────────────────
+    section_id: str | None = None
+    section_kind: str | None = None
+    section_role: str | None = None
+    heading_path: list[str] = field(default_factory=list)
+    parent_section_id: str | None = None
+    page_no: int | None = None
+    timestamp_start_s: float | None = None
+    author: str | None = None
+    is_accepted_answer: bool = False
 
 
 def _estimate_tokens(text: str) -> int:
@@ -217,3 +236,115 @@ def chunk_text(
 
     # Enforce max chunks limit
     return chunks[:max_chunks]
+
+
+# ─── Section-aware chunking (Phase 1) ─────────────────────────────────
+
+_HEADING_KINDS = frozenset({"title", "heading", "subtitle", "chapter"})
+
+
+def _heading_path_for(sections, target_index: int) -> list[str]:
+    """Walk backwards from ``target_index`` collecting ancestor heading text.
+
+    Headings are sections with kind in {"title", "heading", "subtitle",
+    "chapter"}; deeper-level headings replace shallower ones in the path
+    once we cross their boundary. We walk in reverse from the target so
+    the most recent heading at each depth wins.
+    """
+    path_by_depth: dict[int, str] = {}
+    for s in sections[:target_index][::-1]:
+        if s.kind in _HEADING_KINDS and s.text:
+            d = s.depth or 0
+            # First time we see a depth, take it; deeper depths first if
+            # we want full breadcrumb back to the title. Use min-depth-wins.
+            if d not in path_by_depth:
+                path_by_depth[d] = s.text.strip()
+        # Stop once we hit the page break before the section — keeps
+        # heading_path scoped to the current page when sections come from PDF.
+        if s.kind == "page_number":
+            break
+    return [path_by_depth[d] for d in sorted(path_by_depth)]
+
+
+def chunk_sections(
+    sections,
+    target_tokens: int = 512,
+    overlap_tokens: int = 64,
+    max_chunks: int = 200,
+) -> list[Chunk]:
+    """Chunk a section list while preserving per-section metadata.
+
+    Strategy:
+      * Each section is chunked independently — never merge text across
+        section boundaries (a comment and the next post should not share a
+        chunk; their semantics differ).
+      * Within a long section we still use the existing paragraph/sentence
+        splitter for sane sub-chunks.
+      * Skip ``boilerplate``/``promotional`` sections — they pollute search.
+      * Each emitted chunk inherits the section's id/kind/role/author plus
+        the heading_path computed from prior heading sections.
+    """
+    if not sections:
+        return []
+
+    chunks: list[Chunk] = []
+    chunk_order = 0
+
+    for idx, sec in enumerate(sections):
+        text = (sec.text or "").strip()
+        if not text:
+            continue
+        if sec.role in ("boilerplate", "promotional"):
+            # Allow callers to opt back in by setting role="supplemental"
+            # on, e.g., a video description they want indexed.
+            continue
+
+        # Use the section text directly for chunking. For very small
+        # sections (single comment, single transcript line) the existing
+        # ``chunk_text`` returns one chunk; for long ones it sub-splits.
+        sub_chunks = chunk_text(
+            text,
+            target_tokens=target_tokens,
+            overlap_tokens=overlap_tokens,
+            max_chunks=max_chunks,
+        )
+
+        heading_path = _heading_path_for(sections, idx)
+
+        for sub in sub_chunks:
+            chunks.append(Chunk(
+                text=sub.text,
+                char_start=sub.char_start,
+                char_end=sub.char_end,
+                token_count=sub.token_count,
+                content_hash=sub.content_hash,
+                section_id=sec.id,
+                section_kind=sec.kind,
+                section_role=sec.role,
+                heading_path=list(heading_path),
+                parent_section_id=sec.parent_id,
+                page_no=sec.page_no,
+                timestamp_start_s=sec.timestamp_start_s,
+                author=sec.author,
+                is_accepted_answer=sec.is_accepted or sec.kind == "accepted_answer",
+            ))
+            chunk_order += 1
+            if chunk_order >= max_chunks:
+                return chunks
+
+    return chunks
+
+
+def contextualize(chunk: Chunk) -> str:
+    """Prefix a chunk's text with its heading breadcrumb.
+
+    Used by the embedder so a chunk like "Activations are squashed via..."
+    becomes "Neural Networks > Layers > Activations are squashed via..."
+    before being embedded, which dramatically improves retrieval on
+    deeply-nested content. The stored chunk text stays unchanged — only
+    the *embedding input* is contextualized.
+    """
+    if not chunk.heading_path:
+        return chunk.text
+    breadcrumb = " > ".join(chunk.heading_path)
+    return f"{breadcrumb}\n\n{chunk.text}"

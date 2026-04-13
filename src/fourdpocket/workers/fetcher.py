@@ -82,14 +82,44 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
                 item.title = result.title
             if result.description:
                 item.description = result.description
-            if result.content:
+
+            # Section-aware: stash structured sections + auto-derive
+            # legacy content for processors that haven't migrated.
+            from dataclasses import asdict
+
+            from fourdpocket.processors.sections import (
+                section_summary_for_metadata,
+                sections_to_text,
+            )
+            sections = getattr(result, "sections", None) or []
+            if sections:
+                # Persist the section payload alongside other metadata so
+                # the chunker can re-hydrate it. Capped per item via
+                # max_chunks at chunking time.
+                serialized = [asdict(s) for s in sections]
+                item.item_metadata = {
+                    **item.item_metadata,
+                    **section_summary_for_metadata(sections),
+                    "_sections": serialized,
+                }
+                # Always overwrite content from sections — they're the
+                # authoritative source. Falls back to result.content for
+                # processors mid-migration.
+                item.content = sections_to_text(sections) or result.content
+            elif result.content:
                 item.content = result.content
+
             if result.raw_content:
                 item.raw_content = result.raw_content
             if result.media:
                 item.media = list(result.media)
             if result.metadata:
-                item.item_metadata = {**item.item_metadata, **result.metadata}
+                # Don't let processor metadata clobber the _sections we
+                # just stored above.
+                merged = {**item.item_metadata, **result.metadata}
+                if "_sections" in item.item_metadata and "_sections" not in result.metadata:
+                    merged["_sections"] = item.item_metadata["_sections"]
+                item.item_metadata = merged
 
             db.add(item)
             db.commit()

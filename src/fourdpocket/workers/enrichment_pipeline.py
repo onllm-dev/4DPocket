@@ -113,27 +113,63 @@ def _deps_satisfied(db: Session, item_id: uuid.UUID, stage: str) -> bool:
 # ─── Stage Handlers ──────────────────────────────────────────
 
 def handle_chunking(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """Chunk item content into ItemChunk rows and index in FTS5."""
+    """Chunk item content into ItemChunk rows and index in FTS5.
+
+    When ``item.item_metadata['_sections']`` is populated by a
+    section-aware processor, prefer ``chunk_sections`` so chunks carry
+    section provenance (kind/role/author/heading_path/page/timestamp).
+    Falls back to the legacy ``chunk_text`` path on the item's flat
+    content for processors not yet migrated.
+    """
     from fourdpocket.config import get_settings
     from fourdpocket.models.item import KnowledgeItem
     from fourdpocket.models.item_chunk import ItemChunk
-    from fourdpocket.search.chunking import chunk_text
+    from fourdpocket.search.chunking import Chunk, chunk_sections, chunk_text
 
     item = db.get(KnowledgeItem, item_id)
     if not item:
         return
 
     settings = get_settings()
-    content = item.content or item.description or ""
-    if not content.strip():
-        return
+    sections_payload = (item.item_metadata or {}).get("_sections") or []
+    raw_chunks: list[Chunk]
 
-    raw_chunks = chunk_text(
-        content,
-        target_tokens=settings.search.chunk_size_tokens,
-        overlap_tokens=settings.search.chunk_overlap_tokens,
-        max_chunks=settings.search.max_chunks_per_item,
-    )
+    if sections_payload:
+        # Re-hydrate the dataclass list from the JSON payload the
+        # processor stashed in metadata. Done here (not in the processor)
+        # so we keep one chunking pipeline.
+        from fourdpocket.processors.sections import Section
+        section_objs = []
+        for sd in sections_payload:
+            try:
+                section_objs.append(Section(**sd))
+            except TypeError:
+                # Forward-compat: unknown fields are ignored so old payloads
+                # don't crash a newer schema.
+                section_objs.append(Section(
+                    id=sd.get("id", ""),
+                    kind=sd.get("kind", "uncategorized"),
+                    order=sd.get("order", 0),
+                    text=sd.get("text", ""),
+                    role=sd.get("role", "main"),
+                ))
+        raw_chunks = chunk_sections(
+            section_objs,
+            target_tokens=settings.search.chunk_size_tokens,
+            overlap_tokens=settings.search.chunk_overlap_tokens,
+            max_chunks=settings.search.max_chunks_per_item,
+        )
+    else:
+        content = item.content or item.description or ""
+        if not content.strip():
+            return
+        raw_chunks = chunk_text(
+            content,
+            target_tokens=settings.search.chunk_size_tokens,
+            overlap_tokens=settings.search.chunk_overlap_tokens,
+            max_chunks=settings.search.max_chunks_per_item,
+        )
+
     if not raw_chunks:
         return
 
@@ -155,6 +191,15 @@ def handle_chunking(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None
             char_start=c.char_start,
             char_end=c.char_end,
             content_hash=c.content_hash,
+            section_id=c.section_id,
+            section_kind=c.section_kind,
+            section_role=c.section_role,
+            parent_section_id=c.parent_section_id,
+            heading_path=list(c.heading_path) if c.heading_path else None,
+            page_no=c.page_no,
+            timestamp_start_s=c.timestamp_start_s,
+            author=c.author,
+            is_accepted_answer=c.is_accepted_answer,
         )
         db.add(cm)
         chunk_models.append(cm)
@@ -205,20 +250,38 @@ def handle_embedding(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> Non
                 "source_platform": item.source_platform.value if item.source_platform else "",
             })
 
-    # Chunk-level embeddings
+    # Chunk-level embeddings — contextualize with heading_path so
+    # deeply-nested content embeds with breadcrumb context (Docling trick).
     chunks = db.exec(
         select(ItemChunk).where(ItemChunk.item_id == item_id)
         .order_by(ItemChunk.chunk_order)
     ).all()
     if chunks:
-        chunk_texts = [c.text for c in chunks]
+        chunk_texts = []
+        for c in chunks:
+            if c.heading_path:
+                breadcrumb = " > ".join(c.heading_path)
+                chunk_texts.append(f"{breadcrumb}\n\n{c.text}")
+            else:
+                chunk_texts.append(c.text)
         chunk_embeddings = provider.embed(chunk_texts)
         for cm, emb in zip(chunks, chunk_embeddings):
             if emb:
-                add_chunk_embedding(cm.id, user_id, item_id, emb, {
+                meta = {
                     "item_type": item.item_type.value if item.item_type else "",
                     "source_platform": item.source_platform.value if item.source_platform else "",
-                })
+                }
+                # Propagate section provenance into vector metadata so
+                # search filters like kind:comment work end-to-end.
+                if cm.section_kind:
+                    meta["section_kind"] = cm.section_kind
+                if cm.section_role:
+                    meta["section_role"] = cm.section_role
+                if cm.author:
+                    meta["author"] = cm.author
+                if cm.is_accepted_answer:
+                    meta["is_accepted_answer"] = True
+                add_chunk_embedding(cm.id, user_id, item_id, emb, meta)
                 cm.embedding_model = provider.__class__.__name__
                 db.add(cm)
         db.commit()

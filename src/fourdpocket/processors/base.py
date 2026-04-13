@@ -52,7 +52,15 @@ class ProcessorStatus(str, enum.Enum):
 
 @dataclass(frozen=True)
 class ProcessorResult:
-    """Immutable result from a content processor."""
+    """Immutable result from a content processor.
+
+    ``sections`` is the new structured output (Phase 1+). When populated,
+    downstream chunking respects section boundaries and propagates section
+    type/role/author into chunk metadata for search filtering and result
+    snippets. ``content`` remains for back-compat — processors that haven't
+    been migrated still set it directly; migrated processors derive it via
+    ``sections_to_text(sections)``.
+    """
 
     title: str | None = None
     description: str | None = None
@@ -64,6 +72,7 @@ class ProcessorResult:
     item_type: str = "url"
     status: ProcessorStatus = ProcessorStatus.success
     error: str | None = None
+    sections: list = field(default_factory=list)  # list[Section] — typed in sections.py
 
 
 class BaseProcessor(ABC):

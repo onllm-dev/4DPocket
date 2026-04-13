@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlmodel import Column, Field, SQLModel, UniqueConstraint
+from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
 
 from fourdpocket.models.base import utc_now
 
@@ -27,6 +27,19 @@ class ItemChunk(SQLModel, table=True):
     char_end: int = Field(default=0)
     content_hash: str = Field(default="")
     embedding_model: str | None = Field(default=None)
+
+    # ─── Section provenance (Phase 1) ──────────────────────────────
+    # All nullable so legacy chunks don't need backfill.
+    section_id: str | None = Field(default=None, index=True)
+    section_kind: str | None = Field(default=None, index=True)
+    section_role: str | None = Field(default=None, index=True)
+    parent_section_id: str | None = Field(default=None)
+    heading_path: list[str] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    page_no: int | None = Field(default=None)
+    timestamp_start_s: float | None = Field(default=None)
+    author: str | None = Field(default=None, index=True)
+    is_accepted_answer: bool = Field(default=False)
+
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),
