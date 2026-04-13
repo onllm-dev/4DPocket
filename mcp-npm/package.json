@@ -1,6 +1,6 @@
 {
   "name": "@onllm-dev/4dpocket-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP client for 4DPocket — connect Claude Desktop, Cursor, and other MCP clients to your self-hosted 4DPocket instance.",
   "type": "module",
   "bin": {
