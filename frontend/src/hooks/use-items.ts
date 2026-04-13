@@ -1,6 +1,13 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 
+export interface EnrichmentStatus {
+  overall: "none" | "pending" | "processing" | "done" | "failed";
+  stages: Record<string, string>;
+  failed_stages: string[];
+  last_error: string | null;
+}
+
 interface Item {
   id: string;
   user_id: string;
@@ -22,6 +29,23 @@ interface Item {
   read_at: string | null;
   created_at: string;
   updated_at: string;
+  enrichment_status?: EnrichmentStatus | null;
+}
+
+export interface QueueStats {
+  items_in_flight: number;
+  running_items: number;
+  pending_items: number;
+}
+
+export function useQueueStats() {
+  return useQuery<QueueStats>({
+    queryKey: ["queue-stats"],
+    queryFn: () => api.get("/api/v1/items/queue-stats"),
+    // Poll every 10s while any UI is mounted — cheap query, single row count.
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  });
 }
 
 interface ItemFilters {

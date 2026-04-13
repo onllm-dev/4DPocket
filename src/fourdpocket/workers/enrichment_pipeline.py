@@ -225,7 +225,8 @@ def handle_embedding(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> Non
 
 
 def handle_tagging(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """Auto-tag item using AI."""
+    """Auto-tag item using AI, plus attach a domain tag for generic items."""
+    from fourdpocket.ai.domain_tagger import attach_domain_tag
     from fourdpocket.ai.sanitizer import sanitize_for_prompt
     from fourdpocket.ai.tagger import auto_tag_item
     from fourdpocket.models.item import KnowledgeItem
@@ -251,6 +252,20 @@ def handle_tagging(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
                 apply_hierarchy(tag_info["name"], user_id, db)
         except Exception as e:
             logger.debug("Hierarchy application failed: %s", e)
+
+    # For generic/web items, also attach the source domain as a deterministic tag
+    # so "everything from theverge.com" is one click away.
+    try:
+        platform = item.source_platform.value if item.source_platform else None
+        attach_domain_tag(
+            item_id=item.id,
+            user_id=user_id,
+            url=item.url,
+            source_platform=platform,
+            db=db,
+        )
+    except Exception as e:
+        logger.debug("Domain-tag attach failed: %s", e)
 
 
 def handle_summarization(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:

@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Star, Clock, GitFork, MessageSquare, Eye, ArrowUp, Hash } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
-import { useUpdateItem } from "@/hooks/use-items";
+import { useUpdateItem, useQueueStats, type EnrichmentStatus } from "@/hooks/use-items";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
+import { EnrichmentBadge } from "@/components/bookmark/EnrichmentBadge";
 
 interface BookmarkCardProps {
   item: {
@@ -19,6 +20,7 @@ interface BookmarkCardProps {
     created_at: string;
     item_metadata?: Record<string, unknown>;
     tags?: Array<{ id: string; name: string; color?: string | null }>;
+    enrichment_status?: EnrichmentStatus | null;
   };
   variant?: "grid" | "list" | "compact";
 }
@@ -118,6 +120,13 @@ function PlatformMeta({ platform, metadata }: { platform: string; metadata?: Rec
 
 export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
   const updateItem = useUpdateItem();
+  // Queue stats only fetched once per app session (TanStack Query dedups)
+  // and only used to contextualize "queued" items; skip if status is done.
+  const enrichmentProcessing =
+    item.enrichment_status?.overall === "processing" ||
+    item.enrichment_status?.overall === "pending";
+  const queueStats = useQueueStats();
+  const itemsAhead = enrichmentProcessing ? queueStats.data?.items_in_flight : undefined;
   // Prefer thumbnail with local_path (cached) over remote URL
   const thumbMedia = item.media?.find((m) => m.role === "thumbnail" && m.local_path)
     || item.media?.find((m) => m.role === "thumbnail");
@@ -150,6 +159,7 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
         <span className="text-sm truncate flex-1 text-gray-700 dark:text-gray-300">
           {item.title || item.url || "Untitled"}
         </span>
+        <EnrichmentBadge status={item.enrichment_status} itemsAhead={itemsAhead} />
         <span className="text-xs text-gray-400 flex items-center gap-1">
           <Clock className="w-3 h-3" />
           {timeAgo(item.created_at)}
@@ -184,6 +194,9 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
           </p>
           <PlatformMeta platform={item.source_platform} metadata={item.item_metadata} />
           <CardTags tags={item.tags} />
+          <div className="mt-1.5">
+            <EnrichmentBadge status={item.enrichment_status} itemsAhead={itemsAhead} />
+          </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <button onClick={toggleFavorite} aria-label="Toggle favorite" className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
@@ -231,9 +244,12 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
         </p>
         <PlatformMeta platform={item.source_platform} metadata={item.item_metadata} />
         <CardTags tags={item.tags} />
-        <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
-          <Clock className="w-3 h-3" />
-          {timeAgo(item.created_at)}
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <div className="flex items-center gap-1 text-xs text-gray-400 min-w-0">
+            <Clock className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{timeAgo(item.created_at)}</span>
+          </div>
+          <EnrichmentBadge status={item.enrichment_status} itemsAhead={itemsAhead} />
         </div>
       </div>
     </Link>

@@ -15,7 +15,13 @@ from sqlmodel import delete as sql_delete
 
 from fourdpocket.api.deps import get_current_user, get_db
 from fourdpocket.models.base import ItemType, ReadingStatus, SourcePlatform
-from fourdpocket.models.item import ItemCreate, ItemRead, ItemUpdate, KnowledgeItem
+from fourdpocket.models.enrichment import EnrichmentStage
+from fourdpocket.models.item import (
+    ItemCreate,
+    ItemRead,
+    ItemUpdate,
+    KnowledgeItem,
+)
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
 
@@ -235,7 +241,7 @@ def list_items(
     query = query.offset(offset).limit(limit)
     items = db.exec(query).all()
 
-    # Batch-fetch tags for all items (avoids N+1)
+    # Batch-fetch tags + enrichment status for all items (avoids N+1)
     if items:
         item_ids = [i.id for i in items]
         tag_rows = db.exec(
@@ -248,10 +254,16 @@ def list_items(
             tags_by_item.setdefault(row[0], []).append(
                 {"id": str(row[1]), "name": row[2], "color": row[3]}
             )
+
+        from fourdpocket.workers.enrichment_summary import batch_enrichment_summary
+        enrich_by_item = batch_enrichment_summary(db, item_ids)
+
         result = []
         for item in items:
             d = item.model_dump()
             d["tags"] = tags_by_item.get(item.id, [])
+            summary = enrich_by_item.get(item.id)
+            d["enrichment_status"] = summary.model_dump() if summary else None
             result.append(d)
         return result
 
@@ -370,6 +382,20 @@ def check_url(
     return {"exists": False}
 
 
+@router.get("/queue-stats")
+def get_queue_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a cheap snapshot of in-flight enrichment work for the user.
+
+    Used by the UI to show "~N items ahead" hints on pending items.
+    Intentionally not an ETA — queue depth alone is honest.
+    """
+    from fourdpocket.workers.enrichment_summary import queue_stats
+    return queue_stats(db, current_user.id)
+
+
 @router.get("/{item_id}", response_model=ItemRead)
 def get_item(
     item_id: uuid.UUID,
@@ -379,7 +405,14 @@ def get_item(
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-    return item
+
+    # Attach enrichment summary so the detail page can show the same badge
+    from fourdpocket.workers.enrichment_summary import batch_enrichment_summary
+    summaries = batch_enrichment_summary(db, [item.id])
+    payload = item.model_dump()
+    summary = summaries.get(item.id)
+    payload["enrichment_status"] = summary.model_dump() if summary else None
+    return payload
 
 
 @router.get("/{item_id}/tags")
@@ -444,7 +477,6 @@ def cascade_delete_item(db: Session, item: KnowledgeItem) -> None:
     from fourdpocket.models.collection import CollectionItem
     from fourdpocket.models.comment import Comment
     from fourdpocket.models.embedding import Embedding
-    from fourdpocket.models.enrichment import EnrichmentStage
     from fourdpocket.models.entity import ItemEntity
     from fourdpocket.models.entity_relation import RelationEvidence
     from fourdpocket.models.highlight import Highlight
@@ -672,7 +704,6 @@ def get_enrichment_status(
 
     from sqlmodel import select
 
-    from fourdpocket.models.enrichment import EnrichmentStage
 
     stages = db.exec(
         select(EnrichmentStage).where(EnrichmentStage.item_id == item_id)

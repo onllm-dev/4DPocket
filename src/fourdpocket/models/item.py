@@ -86,6 +86,19 @@ class ItemCreate(BaseModel):
         return v
 
 
+class EnrichmentSummary(BaseModel):
+    """Compact per-item enrichment snapshot for list views.
+
+    ``overall`` collapses the per-stage grid to a single badge state so
+    the card UI doesn't need to know every pipeline stage.
+    """
+
+    overall: str  # "done" | "processing" | "failed" | "pending" | "none"
+    stages: dict[str, str]  # stage -> status
+    failed_stages: list[str]
+    last_error: str | None = None
+
+
 class ItemRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -109,6 +122,7 @@ class ItemRead(BaseModel):
     read_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    enrichment_status: EnrichmentSummary | None = None
 
     model_config = {"from_attributes": True}
 

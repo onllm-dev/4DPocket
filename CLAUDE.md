@@ -19,21 +19,62 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 
 ## Commands
 
+All lifecycle operations go through `./app.sh` — single entry point that handles processes, ports, PID/log files, Huey worker, and Docker services.
+
 ```bash
-# Backend
-uv sync --all-extras          # Install deps
-uv run uvicorn fourdpocket.main:app --port 4040  # Run server
-uv run pytest tests/ -x -q    # Run tests (183 tests)
-make test                      # Run tests (alias)
-make lint                      # ruff check
+# Setup (first time)
+./app.sh setup                 # Install deps, build frontend, create .env
+./app.sh setup --deps          # Also install system packages (Python, Node, etc.)
 
-# Frontend (from frontend/)
-pnpm install                   # Install deps
-pnpm dev                       # Dev server on :5173
-pnpm build                     # Production build (tsc + vite)
+# Lifecycle
+./app.sh start                 # Start backend + frontend + worker (reads .env)
+./app.sh start --sqlite        # Zero-config start (SQLite, no Docker)
+./app.sh start --postgres      # PostgreSQL + Meilisearch (auto-starts Docker)
+./app.sh start --full          # Full stack (+ ChromaDB + Ollama)
+./app.sh start -b              # Backend only (-f frontend, -w worker)
+./app.sh stop                  # Stop all (or --backend / --frontend / --worker)
+./app.sh restart               # Restart all (or --backend / --frontend / --worker)
+./app.sh status                # Service + Docker + .env summary
+./app.sh logs [backend|frontend|worker|all]
 
-# Multi-user mode
-FDP_AUTH__MODE=multi uv run uvicorn fourdpocket.main:app --port 4040
+# Test, lint, build
+./app.sh test                  # uv run pytest tests/ -x -q (forwards extra args)
+./app.sh lint                  # ruff check src/ tests/
+./app.sh build                 # Build frontend + Chrome extension (default: both)
+./app.sh build --frontend      # Frontend only (--extension for extension only)
+
+# Database
+./app.sh db init               # Create tables (safe to re-run)
+./app.sh db reset              # Drop + recreate (DESTRUCTIVE, prompts)
+./app.sh db migrate            # Alembic upgrade head
+./app.sh db shell              # Open psql or sqlite3
+
+# Docker services (individual containers)
+./app.sh services up [postgres meili chroma ollama all]
+./app.sh services down [names...]
+./app.sh services status
+
+# Docker compose (full deployment)
+./app.sh docker up | down | build | logs | simple
+
+# Maintenance
+./app.sh clean                 # Remove build artifacts, logs, caches
+./app.sh help                  # Full help
+
+# Multi-user mode (env override before start)
+FDP_AUTH__MODE=multi ./app.sh start
+```
+
+### Direct tool fallbacks
+
+For ad-hoc workflows that bypass `app.sh` (custom uvicorn flags, single-test selection, etc.):
+
+```bash
+uv sync --all-extras
+uv run uvicorn fourdpocket.main:app --port 4040
+uv run pytest tests/ -x -q
+cd frontend && pnpm dev       # Dev server on :5173
+cd frontend && pnpm build     # tsc + vite
 ```
 
 ## Versioning
