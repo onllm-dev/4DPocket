@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from html import unescape
 
 import httpx
@@ -93,6 +94,8 @@ class RedditProcessor(BaseProcessor):
     async def _fetch_reddit_json(self, url: str) -> tuple[list, str]:
         """Fetch the json endpoint with a Reddit-friendly UA. Returns (data, final_url)."""
         json_url = url.rstrip("/")
+        # old.reddit.com is more permissive with .json endpoints than www
+        json_url = re.sub(r"(https?://)(?:www\.)?reddit\.com", r"\1old.reddit.com", json_url)
         if not json_url.endswith(".json"):
             json_url += ".json"
         # Force public sort + threaded view; raw_json skips HTML entity escaping

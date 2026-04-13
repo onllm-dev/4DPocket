@@ -86,7 +86,7 @@ def test_reddit_emits_sectioned_post_and_threaded_comments():
 
     with respx.mock(assert_all_called=False) as r:
         # _fetch_reddit_json hits the .json endpoint with our query string
-        r.get(url__regex=r"https://www\.reddit\.com/r/python/comments/abc/why\.json.*").mock(
+        r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/abc/why\.json.*").mock(
             return_value=httpx.Response(200, json=REDDIT_PAYLOAD)
         )
         result = asyncio.run(

@@ -27,6 +27,14 @@ from fourdpocket.processors.sections import Section, make_section_id
 
 logger = logging.getLogger(__name__)
 
+# Medium aggressively blocks non-browser UAs on both the JSON and
+# HTML endpoints. A realistic Chrome UA is required.
+_CHROME_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
 # Medium paragraph type codes (from the bodyModel.paragraphs[] schema)
 _PARA_TYPE = {
     1: ("paragraph", 0),
@@ -61,10 +69,11 @@ def _try_json_endpoint(url: str) -> dict | None:
         resp = httpx.get(
             json_url,
             headers={
-                "User-Agent": "Mozilla/5.0 (compatible; 4DPocket/1.0)",
-                "Accept": "application/json",
+                "User-Agent": _CHROME_UA,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
             },
-            follow_redirects=False,
+            follow_redirects=True,
             timeout=15,
         )
         if resp.status_code != 200:
@@ -184,8 +193,15 @@ class MediumProcessor(BaseProcessor):
                 )
 
         # ─── Path 2: HTML + trafilatura/readability fallback ───
+        # Use Chrome UA — Medium 403s bot-like User-Agents.
         try:
-            response = await self._fetch_url(url, timeout=15)
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                response = await client.get(url, headers={
+                    "User-Agent": _CHROME_UA,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                })
+                response.raise_for_status()
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url, source_platform="medium",
