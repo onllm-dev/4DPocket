@@ -64,7 +64,16 @@ class ExtractionPipeline:
             else:
                 result = asyncio.run(processor.process(url))
         except RuntimeError:
-            result = asyncio.run(processor.process(url))
+            try:
+                result = asyncio.run(processor.process(url))
+            except Exception as e:
+                logger.error("Processor failed for %s: %s", url, e)
+                result = ProcessorResult(
+                    title=url,
+                    source_platform="generic",
+                    status=ProcessorStatus.failed,
+                    error=str(e)[:500],
+                )
         except Exception as e:
             logger.error("Processor failed for %s: %s", url, e)
             result = ProcessorResult(

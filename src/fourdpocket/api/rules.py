@@ -72,8 +72,8 @@ def create_rule(
     rule = Rule(
         user_id=current_user.id,
         name=body.name,
-        condition=body.condition,
-        action=body.action,
+        condition=body.condition.model_dump(),
+        action=body.action.model_dump(),
         is_active=body.is_active,
     )
     db.add(rule)
