@@ -4,6 +4,7 @@ import { timeAgo } from "@/lib/utils";
 import { useUpdateItem, useQueueStats, type EnrichmentStatus } from "@/hooks/use-items";
 import { PlatformIcon } from "@/components/common/PlatformIcon";
 import { EnrichmentBadge } from "@/components/bookmark/EnrichmentBadge";
+import { BookmarkThumbnail } from "@/components/bookmark/BookmarkThumbnail";
 
 interface BookmarkCardProps {
   item: {
@@ -127,21 +128,6 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
     item.enrichment_status?.overall === "pending";
   const queueStats = useQueueStats();
   const itemsAhead = enrichmentProcessing ? queueStats.data?.items_in_flight : undefined;
-  // Prefer thumbnail with local_path (cached) over remote URL
-  const thumbMedia = item.media?.find((m) => m.role === "thumbnail" && m.local_path)
-    || item.media?.find((m) => m.role === "thumbnail");
-  const thumbUrl = thumbMedia?.url?.replaceAll("&amp;", "&");
-  // LinkedIn and Reddit block hotlinking - proxy those images through backend
-  const needsProxy = thumbUrl && (
-    thumbUrl.includes("licdn.com") ||
-    thumbUrl.includes("linkedin.com") ||
-    thumbUrl.includes("preview.redd.it")
-  );
-  const thumbnail = thumbMedia?.local_path
-    ? `/api/v1/items/${item.id}/media/${thumbMedia.local_path}`
-    : needsProxy
-    ? `/api/v1/items/${item.id}/media-proxy?url=${encodeURIComponent(thumbUrl)}`
-    : thumbUrl || undefined;
 
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -174,13 +160,17 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
         to={`/item/${item.id}`}
         className="flex items-center gap-4 p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-sky-200 dark:hover:border-sky-800 transition-colors duration-200 cursor-pointer group"
       >
-        {thumbnail ? (
-          <img src={thumbnail} alt="" loading="lazy" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
-        ) : (
-          <div className="w-16 h-16 rounded-xl bg-sky-50 dark:bg-sky-950 flex items-center justify-center flex-shrink-0">
-            <PlatformIcon platform={item.source_platform} url={item.url} faviconUrl={item.favicon_url} className="w-6 h-6" />
-          </div>
-        )}
+        <BookmarkThumbnail
+          itemId={item.id}
+          itemType={item.item_type}
+          sourcePlatform={item.source_platform}
+          url={item.url}
+          faviconUrl={item.favicon_url}
+          media={item.media}
+          metadata={item.item_metadata}
+          shape="square-16"
+          iconSize="w-6 h-6"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <PlatformIcon platform={item.source_platform} url={item.url} faviconUrl={item.favicon_url} className="w-3.5 h-3.5" />
@@ -217,15 +207,17 @@ export function BookmarkCard({ item, variant = "grid" }: BookmarkCardProps) {
       to={`/item/${item.id}`}
       className="flex flex-col rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:border-sky-200 dark:hover:border-sky-800 transition-colors duration-200 cursor-pointer group"
     >
-      {thumbnail ? (
-        <div className="aspect-video bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img src={thumbnail} alt="" loading="lazy" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="aspect-video bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-950 dark:to-gray-900 flex items-center justify-center">
-          <PlatformIcon platform={item.source_platform} url={item.url} faviconUrl={item.favicon_url} className="w-10 h-10" />
-        </div>
-      )}
+      <BookmarkThumbnail
+        itemId={item.id}
+        itemType={item.item_type}
+        sourcePlatform={item.source_platform}
+        url={item.url}
+        faviconUrl={item.favicon_url}
+        media={item.media}
+        metadata={item.item_metadata}
+        shape="aspect-video"
+        iconSize="w-10 h-10"
+      />
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
