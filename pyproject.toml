@@ -46,6 +46,7 @@ processors = [
     "PyMuPDF>=1.24.0",
     "pymupdf4llm>=0.0.17",
     "Pillow>=10.0.0",
+    "curl_cffi>=0.7.0",
 ]
 meilisearch = [
     "meilisearch>=0.31.0",

@@ -59,7 +59,46 @@ def _extract_publication(url: str, og_meta: dict) -> str | None:
     return m.group(1) if m else None
 
 
+def _extract_post_id(url: str) -> str | None:
+    """Extract the hex post ID from a Medium URL (last segment after final dash)."""
+    m = re.search(r"-([0-9a-f]{8,})(?:[/?#]|$)", url)
+    return m.group(1) if m else None
+
+
+def _try_internal_api(url: str) -> dict | None:
+    """Try Medium's internal API with TLS fingerprint impersonation.
+
+    Uses curl_cffi to impersonate Chrome's TLS handshake — Medium blocks
+    requests based on TLS fingerprint, not just User-Agent.
+    """
+    post_id = _extract_post_id(url)
+    if not post_id:
+        return None
+    try:
+        from curl_cffi import requests as cffi_requests
+
+        api_url = f"https://medium.com/_/api/posts/{post_id}"
+        resp = cffi_requests.get(api_url, impersonate="chrome", headers={
+            "Accept": "application/json",
+            "Referer": "https://medium.com/",
+        }, timeout=15)
+        if resp.status_code != 200:
+            return None
+        text = resp.text
+        # Strip CSRF prefix (variable format: ])}while(1);</x> or )]}'  )
+        brace = text.find("{")
+        if brace > 0:
+            text = text[brace:]
+        return json.loads(text).get("payload", {})
+    except ImportError:
+        logger.debug("curl_cffi not installed — skipping internal API for %s", url)
+    except Exception as e:
+        logger.debug("Medium internal API failed for %s: %s", url, e)
+    return None
+
+
 def _try_json_endpoint(url: str) -> dict | None:
+    """Fallback: try the public ?format=json endpoint with Chrome UA."""
     from fourdpocket.processors.base import _is_safe_url
 
     json_url = url.rstrip("/") + "?format=json"
@@ -164,8 +203,8 @@ class MediumProcessor(BaseProcessor):
     priority = 10
 
     async def process(self, url: str, **kwargs) -> ProcessorResult:
-        # ─── Path 1: structured JSON ───
-        payload = _try_json_endpoint(url)
+        # ─── Path 1: internal API with TLS impersonation (most reliable) ───
+        payload = _try_internal_api(url) or _try_json_endpoint(url)
         if payload:
             sections, metadata = _sections_from_medium_payload(payload, url)
             if sections:
