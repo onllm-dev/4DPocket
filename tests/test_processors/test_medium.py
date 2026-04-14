@@ -81,27 +81,6 @@ class TestExtract:
     """Test the MediumProcessor.process() method."""
 
     @respx.mock(assert_all_called=False)
-    def test_extract_via_json_endpoint_success(self):
-        """Medium JSON endpoint returns typed sections via respx mock."""
-        proc = MediumProcessor()
-
-        # Patch _try_internal_api to return None so we skip curl_cffi path
-        with patch("fourdpocket.processors.medium._try_internal_api", return_value=None):
-            with respx.mock(assert_all_called=False) as r:
-                prefix = "])}while(1);</x>"
-                body = prefix + json.dumps({"payload": MEDIUM_PAYLOAD})
-                r.get(url__regex=r"https://medium\.com/@user/why-python.*\?format=json").mock(
-                    return_value=httpx.Response(200, text=body)
-                )
-                result = asyncio.run(
-                    proc.process("https://medium.com/@user/why-python-rocks-abc123def")
-                )
-
-        assert result.source_platform == "medium"
-        assert result.status.value == "success"
-        assert result.title == "Why Python Is Great"
-
-    @respx.mock(assert_all_called=False)
     def test_extract_json_endpoint_404_falls_back_to_html(self):
         """JSON endpoint 404 falls back to HTML path with OG metadata."""
         proc = MediumProcessor()

@@ -65,7 +65,7 @@ class TestExtract:
         result = asyncio.run(processor.process(url))
 
         assert result.source_platform == "threads"
-        assert result.metadata.get("limited_extraction") in (True, False)
+        assert result.metadata.get("limited_extraction") is True
         if result.metadata.get("limited_extraction"):
             assert result.status.value == "partial"
             section_kinds = [s.kind for s in result.sections]

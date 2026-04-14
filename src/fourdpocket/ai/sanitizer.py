@@ -54,10 +54,12 @@ def sanitize_for_prompt(text: str, max_length: int = 4000) -> str:
     # Normalize unicode homoglyphs (Cyrillic/Greek lookalikes → ASCII)
     text = text.translate(_HOMOGLYPH_MAP)
 
-    # URL-decode and re-check (catches %3Cscript%3E etc.)
+    # URL-decode repeatedly until stable (catches double/triple-encoded %3Cscript%3E etc.)
     try:
-        decoded = urllib.parse.unquote(text)
-        if decoded != text:
+        while True:
+            decoded = urllib.parse.unquote(text)
+            if decoded == text:
+                break
             text = decoded
     except Exception:
         pass

@@ -1,12 +1,65 @@
 """Tests for the legacy ai_enrichment.enrich_item task."""
 
 import uuid
+from dataclasses import dataclass, field
 
 import pytest
 from sqlmodel import Session, select
 
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.item_chunk import ItemChunk
+
+
+@dataclass
+class _FakeSection:
+    id: str = ""
+    kind: str = "main"
+    text: str = ""
+    order: int = 0
+    role: str = "main"
+    depth: int = 0
+    parent_id: str | None = None
+    raw_html: str | None = None
+    source_url: str | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    page_no: int | None = None
+    timestamp_start_s: float | None = None
+    timestamp_end_s: float | None = None
+    author: str | None = None
+    author_id: str | None = None
+    score: int | None = None
+    upvotes: int | None = None
+    is_accepted: bool = False
+    created_at: str | None = None
+    extra: dict = field(default_factory=dict)
+
+
+class _FakeEmbedder:
+    dimensions = 384
+
+    def embed_single(self, text):
+        return [0.1] * 384
+
+    def embed(self, texts):
+        return [[0.1] * 384 for _ in texts]
+
+
+def _mock_settings(monkeypatch):
+    """Apply common search/config mocks."""
+    from unittest.mock import MagicMock
+
+    mock_settings = MagicMock()
+    mock_settings.search.chunk_size_tokens = 256
+    mock_settings.search.chunk_overlap_tokens = 40
+    mock_settings.search.max_chunks_per_item = 20
+    monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
+    monkeypatch.setattr("fourdpocket.search.semantic.add_embedding", lambda **kw: None)
+    monkeypatch.setattr("fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None)
+    monkeypatch.setattr(
+        "fourdpocket.search.get_search_service",
+        lambda: MagicMock(index_item=lambda db, item: None),
+    )
 
 
 @pytest.fixture
@@ -77,8 +130,6 @@ class TestEnrichItemSuccess:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Full pipeline succeeds when all steps work."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         # Patch get_engine at its definition source
@@ -97,40 +148,12 @@ class TestEnrichItemSuccess:
         )
 
         # Mock embedding provider
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
 
-        # Mock add_embedding and add_chunk_embedding (no-op)
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
-
-        # Mock get_settings for chunking
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        # Mock search service index_item
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 
@@ -154,8 +177,6 @@ class TestEnrichItemSuccess:
         self, db: Session, enrich_item_no_content, enrich_user, monkeypatch
     ):
         """Item with no content skips chunking step."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -170,36 +191,12 @@ class TestEnrichItemSuccess:
             "fourdpocket.ai.hierarchy.apply_hierarchy", lambda *a, **kw: None
         )
 
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_no_content.id), str(enrich_user.id))
 
@@ -213,8 +210,6 @@ class TestEnrichItemChunkingFailure:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Chunking failure does not stop the rest of the pipeline."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -235,36 +230,12 @@ class TestEnrichItemChunkingFailure:
             "fourdpocket.ai.hierarchy.apply_hierarchy", lambda *a, **kw: None
         )
 
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 
@@ -280,8 +251,6 @@ class TestEnrichItemTaggingFailure:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Tagging failure does not stop summarization, embedding, or indexing."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -297,36 +266,12 @@ class TestEnrichItemTaggingFailure:
             "fourdpocket.ai.hierarchy.apply_hierarchy", lambda *a, **kw: None
         )
 
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 
@@ -343,8 +288,6 @@ class TestEnrichItemSummarizationFailure:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Summarization failure does not stop embedding or indexing."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -360,36 +303,12 @@ class TestEnrichItemSummarizationFailure:
             "fourdpocket.ai.hierarchy.apply_hierarchy", lambda *a, **kw: None
         )
 
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 
@@ -404,8 +323,6 @@ class TestEnrichItemEmbeddingFailure:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Item-level embedding failure does not stop chunk embedding or indexing."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -421,7 +338,7 @@ class TestEnrichItemEmbeddingFailure:
         )
 
         # Make embed_single raise but embed work
-        class FakeEmbedder:
+        class _FailingEmbedder:
             dimensions = 384
 
             def embed_single(self, text):
@@ -430,27 +347,12 @@ class TestEnrichItemEmbeddingFailure:
             def embed(self, texts):
                 return [[0.1] * 384 for _ in texts]
 
-        fake_provider = FakeEmbedder()
+        fake_provider = _FailingEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 
@@ -465,8 +367,6 @@ class TestEnrichItemIndexingFailure:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """Indexing failure is caught and logged but pipeline returns success."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -481,31 +381,20 @@ class TestEnrichItemIndexingFailure:
             "fourdpocket.ai.hierarchy.apply_hierarchy", lambda *a, **kw: None
         )
 
-        class FakeEmbedder:
-            dimensions = 384
-
-            def embed_single(self, text):
-                return [0.1] * 384
-
-            def embed(self, texts):
-                return [[0.1] * 384 for _ in texts]
-
-        fake_provider = FakeEmbedder()
+        fake_provider = _FakeEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
+
+        from unittest.mock import MagicMock
 
         mock_settings = MagicMock()
         mock_settings.search.chunk_size_tokens = 256
         mock_settings.search.chunk_overlap_tokens = 40
         mock_settings.search.max_chunks_per_item = 20
         monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
+        monkeypatch.setattr("fourdpocket.search.semantic.add_embedding", lambda **kw: None)
+        monkeypatch.setattr("fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None)
 
         # Make index_item raise
         def index_error(db, item):
@@ -528,8 +417,6 @@ class TestEnrichItemEmptyEmbedding:
         self, db: Session, enrich_item_with_content, enrich_user, monkeypatch
     ):
         """None embedding from provider is recorded as skipped."""
-        from unittest.mock import MagicMock
-
         from fourdpocket.workers.ai_enrichment import enrich_item
 
         monkeypatch.setattr("fourdpocket.db.session.get_engine", lambda: db.get_bind())
@@ -545,7 +432,7 @@ class TestEnrichItemEmptyEmbedding:
         )
 
         # Return None embedding
-        class FakeEmbedder:
+        class _NoneEmbedder:
             dimensions = 384
 
             def embed_single(self, text):
@@ -554,27 +441,12 @@ class TestEnrichItemEmptyEmbedding:
             def embed(self, texts):
                 return [None] * len(texts)
 
-        fake_provider = FakeEmbedder()
+        fake_provider = _NoneEmbedder()
         monkeypatch.setattr(
             "fourdpocket.ai.factory.get_embedding_provider", lambda: fake_provider
         )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_embedding", lambda **kw: None
-        )
-        monkeypatch.setattr(
-            "fourdpocket.search.semantic.add_chunk_embedding", lambda **kw: None
-        )
 
-        mock_settings = MagicMock()
-        mock_settings.search.chunk_size_tokens = 256
-        mock_settings.search.chunk_overlap_tokens = 40
-        mock_settings.search.max_chunks_per_item = 20
-        monkeypatch.setattr("fourdpocket.config.get_settings", lambda: mock_settings)
-
-        monkeypatch.setattr(
-            "fourdpocket.search.get_search_service",
-            lambda: MagicMock(index_item=lambda db, item: None),
-        )
+        _mock_settings(monkeypatch)
 
         result = enrich_item.call_local(str(enrich_item_with_content.id), str(enrich_user.id))
 

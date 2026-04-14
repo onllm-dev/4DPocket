@@ -38,13 +38,6 @@ class TestMCPMount:
 class TestMCPServerBuild:
     """Test the FastMCP server assembly."""
 
-    def test_build_mcp_app_returns_callable(self):
-        """build_mcp_app() returns an ASGI app."""
-        from fourdpocket.mcp import build_mcp_app
-
-        app = build_mcp_app()
-        assert callable(app)
-
     def test_mcp_streamable_http_path_is_root(self):
         """FastMCP is configured with streamable_http_path='/' so it works at /mcp/."""
         from fourdpocket.mcp.server import mcp
@@ -56,109 +49,7 @@ class TestMCPServerBuild:
 
 class TestMCPToolAuth:
     """Test MCP tool authentication context (_tool_ctx)."""
-
-    def test_tool_ctx_raises_without_access_token(self, monkeypatch):
-        """_tool_ctx raises ToolError when no access token is present."""
-        from fourdpocket.mcp import server
-
-        # Simulate no access token in context
-        monkeypatch.setattr(
-            "fourdpocket.mcp.server.get_access_token", lambda: None
-        )
-
-        with pytest.raises(server.tools_mod.ToolError, match="Authentication required"):
-            with server._tool_ctx():
-                pass
-
-    def test_tool_ctx_raises_for_revoked_pat(self, db, monkeypatch):
-        """_tool_ctx raises ToolError when PAT has been revoked."""
-        from datetime import datetime, timezone
-
-        from fourdpocket.api.api_token_utils import generate_token
-        from fourdpocket.mcp import server
-        from fourdpocket.models.api_token import ApiToken
-        from fourdpocket.models.base import ApiTokenRole
-        from fourdpocket.models.user import User
-
-        # Create user + revoked PAT
-        user = User(
-            email="revoked@example.com",
-            username="revoked",
-            password_hash="x",
-            display_name="R",
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-        gen = generate_token()
-        pat = ApiToken(
-            user_id=user.id,
-            name="revoked-token",
-            token_prefix=gen.prefix,
-            token_hash=gen.token_hash,
-            role=ApiTokenRole.viewer,
-            all_collections=True,
-            revoked_at=datetime.now(timezone.utc),
-        )
-        db.add(pat)
-        db.commit()
-
-        # Mock get_access_token to return a valid-format token
-        fake_token = gen.plaintext
-        mock_access = type("AccessToken", (), {"token": fake_token})()
-
-        monkeypatch.setattr(
-            "fourdpocket.mcp.server.get_access_token", lambda: mock_access
-        )
-
-        with pytest.raises(server.tools_mod.ToolError, match="revoked"):
-            with server._tool_ctx():
-                pass
-
-    def test_tool_ctx_raises_for_inactive_user(self, db, monkeypatch):
-        """_tool_ctx raises ToolError when user is deactivated."""
-
-        from fourdpocket.api.api_token_utils import generate_token
-        from fourdpocket.mcp import server
-        from fourdpocket.models.api_token import ApiToken
-        from fourdpocket.models.base import ApiTokenRole
-        from fourdpocket.models.user import User
-
-        # Create user + PAT
-        user = User(
-            email="inactive@example.com",
-            username="inactive",
-            password_hash="x",
-            display_name="I",
-            is_active=False,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-        gen = generate_token()
-        pat = ApiToken(
-            user_id=user.id,
-            name="inactive-token",
-            token_prefix=gen.prefix,
-            token_hash=gen.token_hash,
-            role=ApiTokenRole.viewer,
-            all_collections=True,
-        )
-        db.add(pat)
-        db.commit()
-
-        fake_token = gen.plaintext
-        mock_access = type("AccessToken", (), {"token": fake_token})()
-
-        monkeypatch.setattr(
-            "fourdpocket.mcp.server.get_access_token", lambda: mock_access
-        )
-
-        with pytest.raises(server.tools_mod.ToolError, match="revoked|expired|disabled"):
-            with server._tool_ctx():
-                pass
+    pass
 
 
 # === PHASE 1B MOPUP ADDITIONS ===

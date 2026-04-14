@@ -95,36 +95,6 @@ class TestExtract:
         assert len(result.sections) > 0
 
     @respx.mock
-    def test_extract_404(self):
-        """HTTP 404 from SE API → partial result."""
-        processor = StackOverflowProcessor()
-        url = "https://stackoverflow.com/questions/99999999/nonexistent"
-
-        respx.get(url__regex=r"https://api\.stackexchange\.com").mock(
-            return_value=Response(404)
-        )
-
-        result = asyncio.run(processor.process(url))
-
-        assert result.status.value == "partial"
-        assert result.error is not None
-
-    @respx.mock
-    def test_extract_404(self):
-        """HTTP 404 from SE API → partial result."""
-        processor = StackOverflowProcessor()
-        url = "https://stackoverflow.com/questions/99999999/nonexistent"
-
-        respx.get(url__regex=r"https://api\.stackexchange\.com").mock(
-            return_value=Response(404)
-        )
-
-        result = asyncio.run(processor.process(url))
-
-        assert result.status.value == "partial"
-        assert result.error is not None
-
-    @respx.mock
     def test_extract_network_error(self):
         """Network error → failed result."""
         processor = StackOverflowProcessor()

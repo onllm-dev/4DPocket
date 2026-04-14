@@ -80,7 +80,7 @@ class TestPromptInjectionDefense:
     @pytest.mark.security
     @pytest.mark.parametrize("payload", [
         "%3Csystem%3E",
-        "%3Csystem%3E",  # double-encoded variant
+        "%253Csystem%253E",  # double-encoded variant
     ])
     def test_url_encoded_payloads(self, payload):
         """URL-encoded injection attempts must be decoded and stripped."""

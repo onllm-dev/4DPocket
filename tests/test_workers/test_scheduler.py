@@ -118,20 +118,6 @@ class TestRunBackup:
         assert result is None or isinstance(result, str)
 
 
-class TestCleanupStaleTasks:
-    """Tests for cleanup_stale_tasks."""
-
-    def test_cleanup_stale_tasks_runs(self, caplog):
-        """cleanup_stale_tasks executes without error (body is a Phase 2 stub)."""
-
-        import logging
-
-        with caplog.at_level(logging.INFO):
-            cleanup_stale_tasks.call_local()
-
-        assert "Running stale task cleanup" in caplog.text
-
-
 class TestReprocessPendingItems:
     """Tests for reprocess_pending_items."""
 
@@ -158,8 +144,7 @@ class TestReprocessPendingItems:
         db.commit()
 
         # Set the test engine as the global engine
-        original_engine = db_module._engine
-        db_module._engine = db.get_bind()
+        monkeypatch.setattr(db_module, "_engine", db.get_bind())
 
         call_count = 0
 
@@ -171,10 +156,7 @@ class TestReprocessPendingItems:
             "fourdpocket.workers.fetcher.fetch_and_process_url", fake_fetch
         )
 
-        try:
-            reprocess_pending_items.call_local()
-        finally:
-            db_module._engine = original_engine
+        reprocess_pending_items.call_local()
 
         assert call_count == 0, "Item with max retries should not be enqueued"
 
@@ -199,8 +181,7 @@ class TestReprocessPendingItems:
         db.add(item)
         db.commit()
 
-        original_engine = db_module._engine
-        db_module._engine = db.get_bind()
+        monkeypatch.setattr(db_module, "_engine", db.get_bind())
 
         call_count = 0
         captured_id = [None]
@@ -214,10 +195,7 @@ class TestReprocessPendingItems:
             "fourdpocket.workers.fetcher.fetch_and_process_url", fake_fetch
         )
 
-        try:
-            reprocess_pending_items.call_local()
-        finally:
-            db_module._engine = original_engine
+        reprocess_pending_items.call_local()
 
         assert call_count == 1
         assert captured_id[0] == str(item.id)
@@ -243,8 +221,7 @@ class TestReprocessPendingItems:
         db.add(item)
         db.commit()
 
-        original_engine = db_module._engine
-        db_module._engine = db.get_bind()
+        monkeypatch.setattr(db_module, "_engine", db.get_bind())
 
         call_count = 0
 
@@ -256,9 +233,6 @@ class TestReprocessPendingItems:
             "fourdpocket.workers.fetcher.fetch_and_process_url", fake_fetch
         )
 
-        try:
-            reprocess_pending_items.call_local()
-        finally:
-            db_module._engine = original_engine
+        reprocess_pending_items.call_local()
 
         assert call_count == 0, "Item without URL should not be enqueued"

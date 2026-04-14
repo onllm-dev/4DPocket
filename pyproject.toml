@@ -64,6 +64,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=5.0.0",
+    "pytest-xdist>=3.0.0",
     "respx>=0.21.0",
     "ruff>=0.7.0",
     "mypy>=1.13.0",
@@ -81,6 +82,7 @@ packages = ["src/fourdpocket"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-n auto --dist=loadscope"
 markers = [
     "slow: marks tests that take >5s (deselect with -m 'not slow')",
     "integration: marks integration tests requiring full app stack",

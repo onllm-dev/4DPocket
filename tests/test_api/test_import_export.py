@@ -440,3 +440,93 @@ class TestExportMarkdown:
         response = client.get("/api/v1/export/markdown", headers=auth_headers)
         content = response.content.decode("utf-8")
         assert "markdown" in content.lower() or "export" in content.lower()
+
+
+class TestExportImportRoundTrip:
+    """End-to-end: export from User A, import into User B, verify fidelity."""
+
+    def test_json_roundtrip_preserves_urls_and_titles(self, client, auth_headers, second_user_headers):
+        """Items exported as JSON can be imported by another user with URL/title fidelity."""
+        # User A creates items
+        client.post("/api/v1/items", json={"url": "https://roundtrip1.com", "title": "First Article"}, headers=auth_headers)
+        client.post(
+            "/api/v1/items",
+            json={"url": "https://roundtrip2.com", "title": "Second Article", "content": "Some body content"},
+            headers=auth_headers,
+        )
+
+        # User A exports
+        export_resp = client.get("/api/v1/export/json", headers=auth_headers)
+        assert export_resp.status_code == 200
+        export_data = export_resp.json()
+        assert len(export_data["items"]) >= 2
+
+        # User B imports the export payload
+        import_payload = json.dumps(export_data)
+        import_resp = client.post(
+            "/api/v1/import/json",
+            files={"file": ("roundtrip.json", io.BytesIO(import_payload.encode()), "application/json")},
+            headers=second_user_headers,
+        )
+        assert import_resp.status_code == 200
+        assert import_resp.json()["imported"] >= 2
+
+        # Verify User B has the items
+        user_b_export = client.get("/api/v1/export/json", headers=second_user_headers)
+        user_b_items = user_b_export.json()["items"]
+        user_b_urls = {i["url"] for i in user_b_items}
+        assert "https://roundtrip1.com" in user_b_urls
+        assert "https://roundtrip2.com" in user_b_urls
+
+        # Verify titles preserved
+        user_b_titles = {i["title"] for i in user_b_items}
+        assert "First Article" in user_b_titles
+        assert "Second Article" in user_b_titles
+
+    def test_json_roundtrip_content_preserved(self, client, auth_headers, second_user_headers):
+        """Content and description survive the export→import cycle."""
+        client.post(
+            "/api/v1/items",
+            json={
+                "url": "https://content-test.com",
+                "title": "Content Test",
+                "content": "This is the full body content that should survive the round-trip.",
+            },
+            headers=auth_headers,
+        )
+
+        export_resp = client.get("/api/v1/export/json", headers=auth_headers)
+        export_data = export_resp.json()
+
+        import_resp = client.post(
+            "/api/v1/import/json",
+            files={"file": ("content.json", io.BytesIO(json.dumps(export_data).encode()), "application/json")},
+            headers=second_user_headers,
+        )
+        assert import_resp.status_code == 200
+
+        user_b_export = client.get("/api/v1/export/json", headers=second_user_headers)
+        items = user_b_export.json()["items"]
+        content_item = next((i for i in items if i["url"] == "https://content-test.com"), None)
+        assert content_item is not None
+        assert content_item["content"] == "This is the full body content that should survive the round-trip."
+
+    def test_json_roundtrip_user_isolation(self, client, auth_headers, second_user_headers):
+        """After import, User A's items list is unchanged — import doesn't cross-pollinate."""
+        client.post("/api/v1/items", json={"url": "https://user-a-only.com", "title": "A Only"}, headers=auth_headers)
+
+        export_resp = client.get("/api/v1/export/json", headers=auth_headers)
+        export_data = export_resp.json()
+        user_a_count = len(export_data["items"])
+
+        # User B imports
+        client.post(
+            "/api/v1/import/json",
+            files={"file": ("iso.json", io.BytesIO(json.dumps(export_data).encode()), "application/json")},
+            headers=second_user_headers,
+        )
+
+        # User A's count unchanged
+        user_a_after = client.get("/api/v1/export/json", headers=auth_headers)
+        assert len(user_a_after.json()["items"]) == user_a_count
+

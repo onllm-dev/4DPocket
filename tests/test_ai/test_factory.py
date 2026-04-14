@@ -125,45 +125,6 @@ class TestGetChatProvider:
         from fourdpocket.ai.base import NoOpChatProvider
         assert isinstance(provider, NoOpChatProvider)
 
-    def test_ollama_provider_returns_openai_compatible_instance(self, monkeypatch):
-        """ollama provider name results in an OpenAICompatibleProvider instance."""
-        # Verify the code path: when chat_provider is 'ollama', the factory tries to
-        # instantiate OpenAICompatibleProvider and falls back to NoOpChatProvider on error.
-        # We test this by verifying the code path is correct (provider is not NoOpChatProvider
-        # when no exception occurs). Since we can't easily mock the internal import,
-        # we verify the logic flow: get_resolved_ai_config returns 'ollama'.
-        monkeypatch.setattr(
-            factory, "get_resolved_ai_config",
-            lambda: {
-                "chat_provider": "ollama",
-                "ollama_url": "http://localhost:11434",
-                "ollama_model": "llama3",
-            }
-        )
-        monkeypatch.setattr(factory, "get_settings", lambda: MagicMock())
-
-        provider = factory.get_chat_provider()
-
-        # With the test ollama_url it will try to connect and might return NoOpChatProvider
-        # if the connection fails (which is expected in test environment).
-        # The key assertion is that the code path for 'ollama' was taken (not empty/disabled path).
-        # Either it's OpenAICompatibleProvider (if connection succeeds) or
-        # NoOpChatProvider (fallback when connection fails) - both validate the code path
-        assert not isinstance(provider, type(None))
-
-    def test_groq_provider_code_path(self, monkeypatch):
-        """groq provider name uses the OpenAI-compatible code path."""
-        monkeypatch.setattr(
-            factory, "get_resolved_ai_config",
-            lambda: {"chat_provider": "groq", "groq_api_key": "test-key"}
-        )
-        monkeypatch.setattr(factory, "get_settings", lambda: MagicMock())
-
-        provider = factory.get_chat_provider()
-
-        # Same as above - test the code path, not the specific provider type
-        assert provider is not None
-
     def test_fallback_to_noop_on_exception(self, monkeypatch):
         """If provider creation raises, falls back to NoOpChatProvider."""
         def raise_on_import(*args, **kwargs):

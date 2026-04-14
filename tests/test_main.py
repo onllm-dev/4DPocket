@@ -79,13 +79,13 @@ class TestMCPMount:
         """GET /mcp redirects to /mcp/ with 307 status."""
         response = client.get("/mcp", follow_redirects=False)
         # Either redirect or mounted app responds
-        assert response.status_code in (200, 204, 307, 404)
+        assert response.status_code in (200, 307)
 
     def test_mcp_mount_handles_post(self, client):
         """MCP mount accepts POST requests (MCP protocol)."""
         response = client.post("/mcp/", follow_redirects=False)
         # MCP server responds with appropriate status (not 404 means mounted)
-        assert response.status_code != 404
+        assert response.status_code in (400, 401, 405, 415, 422)
 
 
 class TestMiddlewareStack:
@@ -95,7 +95,7 @@ class TestMiddlewareStack:
         """RequestIDMiddleware adds X-Request-ID header."""
         response = client.get("/api/v1/health")
         # RequestIDMiddleware should add a request ID header
-        assert "X-Request-ID" in response.headers or response.status_code == 200
+        assert "X-Request-ID" in response.headers
 
 
 # === PHASE 3 MOPUP ADDITIONS ===

@@ -1022,7 +1022,7 @@ do_build() {
 do_test() {
     info "Running tests..."
     cd "$SCRIPT_DIR"
-    uv run pytest tests/ -x -q "$@"
+    uv run pytest tests/ -q "$@"
 }
 
 do_lint() {

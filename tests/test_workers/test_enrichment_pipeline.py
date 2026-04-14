@@ -21,12 +21,12 @@ from fourdpocket.workers.enrichment_pipeline import (
 
 
 @pytest.fixture
-def enrich_user(db: Session):
+def enrich_user_p1(db: Session):
     user = User(
-        email="enrichtest@example.com",
-        username="enrichuser",
+        email="enrichtest_p1@example.com",
+        username="enrichuserp1",
         password_hash="$2b$12$fakehash",
-        display_name="Enrich Test User",
+        display_name="Enrich Test User P1",
     )
     db.add(user)
     db.commit()
@@ -35,9 +35,9 @@ def enrich_user(db: Session):
 
 
 @pytest.fixture
-def enrich_item(db: Session, enrich_user):
+def enrich_item(db: Session, enrich_user_p1):
     item = KnowledgeItem(
-        user_id=enrich_user.id,
+        user_id=enrich_user_p1.id,
         title="Enrichment Pipeline Test Article",
         content=(
             "Machine learning is transforming software engineering. "
@@ -147,8 +147,8 @@ class TestDependencies:
 
 
 class TestHandleChunking:
-    def test_chunks_created(self, db: Session, enrich_item, enrich_user):
-        handle_chunking(db, enrich_item.id, enrich_user.id)
+    def test_chunks_created(self, db: Session, enrich_item):
+        handle_chunking(db, enrich_item.id, enrich_item.user_id)
 
         from fourdpocket.models.item_chunk import ItemChunk
 
@@ -158,11 +158,11 @@ class TestHandleChunking:
         assert len(chunks) >= 1
         for c in chunks:
             assert c.text.strip()
-            assert c.user_id == enrich_user.id
+            assert c.user_id == enrich_item.user_id
 
-    def test_chunking_idempotent(self, db: Session, enrich_item, enrich_user):
-        handle_chunking(db, enrich_item.id, enrich_user.id)
-        handle_chunking(db, enrich_item.id, enrich_user.id)
+    def test_chunking_idempotent(self, db: Session, enrich_item):
+        handle_chunking(db, enrich_item.id, enrich_item.user_id)
+        handle_chunking(db, enrich_item.id, enrich_item.user_id)
 
         from fourdpocket.models.item_chunk import ItemChunk
 
@@ -255,7 +255,6 @@ class TestHandleEntityExtraction:
         mock_extractor = MagicMock(return_value=mock_result)
         monkeypatch.setattr("fourdpocket.ai.extractor.extract_entities", mock_extractor)
         monkeypatch.setattr("fourdpocket.ai.llm_cache.get_cached_response", lambda *a: None)
-        monkeypatch.setattr("fourdpocket.ai.llm_cache.store_cached_response", lambda *a: None)
         monkeypatch.setattr("fourdpocket.config.get_settings", lambda: MagicMock(enrichment=MagicMock(
             extract_entities=True,
             max_entities_per_chunk=10,

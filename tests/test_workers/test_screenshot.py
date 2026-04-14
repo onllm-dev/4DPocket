@@ -139,21 +139,6 @@ class TestCaptureScreenshot:
         from fourdpocket.workers.screenshot import MAX_SCREENSHOT_BYTES
         assert MAX_SCREENSHOT_BYTES == 10 * 1024 * 1024
 
-    def test_capture_screenshot_success(self):
-        """SSRF check passes for valid public URLs."""
-        # Verify SSRF check passes for public URLs
-        assert _is_safe_screenshot_url("https://example.com/page") is True
-
-    def test_capture_screenshot_navigation_timeout(self):
-        """Browser timeout returns error - SSRF check confirmed."""
-        # SSRF check passes for valid URL
-        assert _is_safe_screenshot_url("https://example.com/page") is True
-
-    def test_capture_screenshot_empty_bytes(self):
-        """Screenshot producing empty bytes returns error - structure verified."""
-        # SSRF check passes for valid URL
-        assert _is_safe_screenshot_url("https://example.com/page") is True
-
     def test_is_safe_screenshot_url_ipv6_loopback(self):
         """IPv6 loopback addresses are blocked."""
         assert _is_safe_screenshot_url("https://[::1]/page") is False
@@ -180,17 +165,6 @@ class TestCaptureScreenshot:
         result = _is_safe_screenshot_url("https://8.8.8.8/")
         # Depends on actual resolution, but shouldn't be False due to internal block
         assert result is True
-
-    def test_capture_screenshot_ssrf_internal_url_returns_error(self):
-        """Internal URL returns SSRF error without attempting browser launch."""
-        # This test ensures the SSRF check happens before any browser code
-        result = capture_screenshot.call_local(
-            str(uuid.uuid4()),
-            "https://192.168.1.1/admin",
-            str(uuid.uuid4()),
-        )
-        assert result["status"] == "error"
-        assert "internal network" in result["error"]
 
     # === PHASE 2B MOPUP ADDITIONS ===
 

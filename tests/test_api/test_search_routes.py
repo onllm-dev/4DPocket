@@ -266,3 +266,69 @@ class TestGetSearchFilters:
         """Filters endpoint requires authentication."""
         response = client.get("/api/v1/search/filters")
         assert response.status_code == 401
+
+
+class TestSearchInlineFilters:
+    """Test that inline filter syntax (tag:X, type:Y) works end-to-end via HTTP."""
+
+    def test_search_inline_tag_filter(self, client, auth_headers, db: Session):
+        """'python tag:tutorial' returns only items tagged 'tutorial'."""
+        # Create and index two items
+        id_tagged = _seed_item(client, auth_headers, url="https://tagged-item.com", title="Python Basics", content="Learn python programming")
+        id_untagged = _seed_item(client, auth_headers, url="https://untagged-item.com", title="Python Advanced", content="Advanced python topics")
+
+        tagged_item = db.get(KnowledgeItem, uuid.UUID(id_tagged))
+        untagged_item = db.get(KnowledgeItem, uuid.UUID(id_untagged))
+        index_item(db, tagged_item)
+        index_item(db, untagged_item)
+
+        # Tag only the first item
+        client.post(f"/api/v1/items/{id_tagged}/tags", json={"name": "tutorial"}, headers=auth_headers)
+
+        # Search with inline tag filter
+        response = client.get("/api/v1/search?q=python+tag:tutorial", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        # The tagged item should appear; the untagged one should not
+        if len(results) > 0:
+            assert id_tagged in result_ids
+            assert id_untagged not in result_ids
+
+    def test_search_inline_type_filter(self, client, auth_headers, db: Session):
+        """'content type:note' returns only note-type items."""
+        # Create a note item
+        note_resp = client.post(
+            "/api/v1/items",
+            json={"title": "My Note", "content": "Searchable note content", "item_type": "note"},
+            headers=auth_headers,
+        )
+        assert note_resp.status_code == 201
+        note_id = note_resp.json()["id"]
+        note_item = db.get(KnowledgeItem, uuid.UUID(note_id))
+        index_item(db, note_item)
+
+        # Create a URL item with similar content
+        url_id = _seed_item(client, auth_headers, url="https://similar.com", title="Similar", content="Searchable url content")
+        url_item = db.get(KnowledgeItem, uuid.UUID(url_id))
+        index_item(db, url_item)
+
+        response = client.get("/api/v1/search?q=searchable+type:note", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        # If results returned, only notes should appear
+        for r in results:
+            assert r.get("item_type") == "note", f"Expected only notes, got {r.get('item_type')}"
+
+    def test_search_tag_query_param(self, client, auth_headers, db: Session):
+        """?tag=devops query parameter filters results to tagged items."""
+        item_id = _seed_item(client, auth_headers, url="https://devops-article.com", title="DevOps Guide", content="CI CD pipeline guide")
+        item = db.get(KnowledgeItem, uuid.UUID(item_id))
+        index_item(db, item)
+        client.post(f"/api/v1/items/{item_id}/tags", json={"name": "devops"}, headers=auth_headers)
+
+        response = client.get("/api/v1/search?q=guide&tag=devops", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        if len(results) > 0:
+            assert any(r["id"] == item_id for r in results)

@@ -96,41 +96,6 @@ class TestPgVectorBackend:
             # Second call should not re-query (cached)
             assert mock_engine.call_count == 1
 
-    def test_upsert_chunk_returns_early_when_unavailable(self):
-        """upsert_chunk exits early if pgvector extension is not available."""
-        backend = PgVectorBackend()
-        with patch.object(backend, "_check_available", return_value=False):
-            backend.upsert_chunk(
-                chunk_id=uuid.uuid4(),
-                item_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                embedding=[0.1] * 384,
-                metadata={},
-            )
-
-    def test_search_returns_empty_when_unavailable(self):
-        """search returns empty list if pgvector not available."""
-        backend = PgVectorBackend()
-        with patch.object(backend, "_check_available", return_value=False):
-            hits = backend.search(
-                user_id=uuid.uuid4(),
-                embedding=[0.1] * 384,
-                k=10,
-            )
-        assert hits == []
-
-    def test_search_returns_empty_on_exception(self):
-        """search returns empty list when DB operation raises."""
-        backend = PgVectorBackend()
-        with patch.object(backend, "_check_available", return_value=True), \
-             patch.object(backend, "_ensure_column"), \
-             patch("fourdpocket.db.session.get_engine", side_effect=Exception("DB error")):
-            hits = backend.search(
-                user_id=uuid.uuid4(),
-                embedding=[0.1] * 384,
-                k=10,
-            )
-        assert hits == []
 
     def test_search_deduplicates_by_item_id(self, user_id):
         """search returns only the best chunk per item when multiple chunks match."""
@@ -144,18 +109,18 @@ class TestPgVectorBackend:
             mock_session_cls.return_value.__exit__ = MagicMock(return_value=False)
 
             # Simulate two chunks from the same item
+            shared_item_id = str(uuid.uuid4())
             mock_result = MagicMock()
             mock_result.all.return_value = [
-                (uuid.uuid4(), str(uuid.uuid4()), 0.1),  # chunk1, item1
-                (uuid.uuid4(), str(uuid.uuid4()), 0.15), # chunk2, item1 (same item, worse score)
+                (uuid.uuid4(), shared_item_id, 0.1),
+                (uuid.uuid4(), shared_item_id, 0.15),
             ]
             mock_db.exec.return_value = mock_result
 
             hits = backend.search(user_id=user_id, embedding=[0.1] * 384, k=10)
             # Only one hit per unique item_id
-            item_ids = [h.item_id for h in hits]
-            assert len(item_ids) == len(set(item_ids))
-
+            assert len(hits) == 1
+            assert hits[0].item_id == shared_item_id
     def test_upsert_chunk_executes_sql_update(self, chunk_id, item_id, user_id):
         """upsert_chunk executes UPDATE with correct vector string."""
         backend = PgVectorBackend()

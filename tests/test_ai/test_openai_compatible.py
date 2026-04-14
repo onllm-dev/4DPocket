@@ -5,29 +5,38 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+def _make_settings(provider, **overrides):
+    """Factory for FakeSettings with provider-specific defaults + overrides."""
+    defaults = {
+        "chat_provider": provider,
+        "ollama_url": "http://localhost:11434",
+        "ollama_model": "llama3.2",
+        "ollama_api_key": "",
+        "groq_api_key": "",
+        "nvidia_api_key": "",
+        "custom_base_url": "",
+        "custom_api_key": "",
+        "custom_model": "",
+        "custom_api_type": "",
+        "embedding_provider": "local",
+        "embedding_model": "",
+    }
+    defaults.update(overrides)
+
+    class FakeAI:
+        def __init__(self):
+            for k, v in defaults.items():
+                setattr(self, k, v)
+
+    return type("FakeSettings", (), {"ai": FakeAI()})()
+
+
 class TestOpenAICompatibleProviderInit:
     """Tests for OpenAICompatibleProvider.__init__()."""
 
     def test_ollama_sets_correct_base_url(self, monkeypatch):
         """Ollama provider uses settings.ai.ollama_url for base URL."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
@@ -39,23 +48,7 @@ class TestOpenAICompatibleProviderInit:
 
     def test_groq_uses_groq_base_url(self, monkeypatch):
         """Groq provider uses groq config base URL."""
-        class FakeAI:
-            chat_provider = "groq"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = "groq-test-key"
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("groq", groq_api_key="groq-test-key"))
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
@@ -67,23 +60,7 @@ class TestOpenAICompatibleProviderInit:
 
     def test_nvidia_sets_nvidia_base_url(self, monkeypatch):
         """NVIDIA provider uses NVIDIA config base URL."""
-        class FakeAI:
-            chat_provider = "nvidia"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = "nvda-test-key"
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("nvidia", nvidia_api_key="nvda-test-key"))
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
@@ -92,23 +69,10 @@ class TestOpenAICompatibleProviderInit:
 
     def test_custom_with_anthropic_api_type(self, monkeypatch):
         """Custom provider with anthropic api_type sets _api_type correctly."""
-        class FakeAI:
-            chat_provider = "custom"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = "https://api.anthropic.com"
-            custom_api_key = "anthropic-key"
-            custom_model = "claude-3-5-sonnet"
-            custom_api_type = "anthropic"
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("custom", custom_base_url="https://api.anthropic.com", custom_api_key="anthropic-key", custom_model="claude-3-5-sonnet", custom_api_type="anthropic"),
+        )
 
         from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
         provider = OpenAICompatibleProvider(provider="custom")
@@ -120,23 +84,7 @@ class TestOpenAICompatibleProviderInit:
 
     def test_custom_missing_base_url_raises(self, monkeypatch):
         """Custom provider without base_url raises ValueError."""
-        class FakeAI:
-            chat_provider = "custom"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = "some-key"
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("custom", custom_base_url="", custom_api_key="some-key", custom_model=""))
 
         from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
         with pytest.raises(ValueError, match="base_url"):
@@ -148,23 +96,7 @@ class TestGenerate:
 
     def test_generate_calls_openai_api(self, monkeypatch):
         """generate() calls OpenAI chat completions API with correct model and messages."""
-        class FakeAI:
-            chat_provider = "groq"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = "test-key"
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("groq", groq_api_key="test-key"))
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Hello world"))]
@@ -192,24 +124,7 @@ class TestGenerate:
 
     def test_generate_with_system_prompt(self, monkeypatch):
         """generate() prepends system message when system_prompt is provided."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Response"))]
@@ -234,23 +149,7 @@ class TestGenerate:
 
     def test_generate_api_error_returns_empty(self, monkeypatch):
         """generate() returns empty string when OpenAI API raises an exception."""
-        class FakeAI:
-            chat_provider = "groq"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = "test-key"
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("groq", groq_api_key="test-key"))
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai_cls:
             mock_client = MagicMock()
@@ -265,24 +164,7 @@ class TestGenerate:
 
     def test_generate_timeout_returns_empty(self, monkeypatch):
         """generate() returns empty string on timeout."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         import httpx
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai_cls:
@@ -300,23 +182,7 @@ class TestGenerate:
 
     def test_generate_null_content_returns_empty(self, monkeypatch):
         """generate() returns empty string when message content is None."""
-        class FakeAI:
-            chat_provider = "groq"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = "test-key"
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("groq", groq_api_key="test-key"))
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content=None))]
@@ -338,24 +204,7 @@ class TestGenerateJSON:
 
     def test_generate_json_parses_response(self, monkeypatch):
         """generate_json() parses JSON response and returns dict."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content='{"key": "value"}'))]
@@ -373,24 +222,7 @@ class TestGenerateJSON:
 
     def test_generate_json_with_code_block(self, monkeypatch):
         """generate_json() strips markdown code fences before parsing."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         mock_response = MagicMock()
         mock_response.choices = [
@@ -410,24 +242,7 @@ class TestGenerateJSON:
 
     def test_generate_json_invalid_returns_empty_dict(self, monkeypatch):
         """generate_json() returns empty dict on JSON parse failure."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="not valid json"))]
@@ -445,24 +260,7 @@ class TestGenerateJSON:
 
     def test_generate_json_api_error_returns_empty_dict(self, monkeypatch):
         """generate_json() returns empty dict when API raises an exception."""
-        class FakeAI:
-            chat_provider = "ollama"
-            ollama_url = "http://localhost:11434"
-            ollama_model = "llama3.2"
-            ollama_api_key = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = ""
-            custom_api_key = ""
-            custom_model = ""
-            custom_api_type = ""
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: _make_settings("ollama", ollama_url="http://localhost:11434", ollama_model="llama3.2"))
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai_cls:
             mock_client = MagicMock()
@@ -481,23 +279,10 @@ class TestAnthropicPath:
 
     def test_generate_uses_anthropic_path(self, monkeypatch):
         """When _api_type=anthropic, generate() calls _call_anthropic()."""
-        class FakeAI:
-            chat_provider = "custom"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = "https://api.anthropic.com"
-            custom_api_key = "anthropic-key"
-            custom_model = "claude-3-5-sonnet"
-            custom_api_type = "anthropic"
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("custom", custom_base_url="https://api.anthropic.com", custom_api_key="anthropic-key", custom_model="claude-3-5-sonnet", custom_api_type="anthropic"),
+        )
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -518,23 +303,10 @@ class TestAnthropicPath:
 
     def test_anthropic_path_error_returns_empty(self, monkeypatch):
         """Anthropic path returns empty string on API error."""
-        class FakeAI:
-            chat_provider = "custom"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = "https://api.anthropic.com"
-            custom_api_key = "anthropic-key"
-            custom_model = "claude-3-5-sonnet"
-            custom_api_type = "anthropic"
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("custom", custom_base_url="https://api.anthropic.com", custom_api_key="anthropic-key", custom_model="claude-3-5-sonnet", custom_api_type="anthropic"),
+        )
 
         import respx
         from httpx import Response
@@ -552,23 +324,10 @@ class TestAnthropicPath:
 
     def test_generate_json_uses_anthropic_path(self, monkeypatch):
         """generate_json() uses Anthropic path when api_type=anthropic."""
-        class FakeAI:
-            chat_provider = "custom"
-            ollama_url = ""
-            ollama_model = ""
-            groq_api_key = ""
-            nvidia_api_key = ""
-            custom_base_url = "https://api.anthropic.com"
-            custom_api_key = "anthropic-key"
-            custom_model = "claude-3-5-sonnet"
-            custom_api_type = "anthropic"
-            embedding_provider = "local"
-            embedding_model = ""
-
-        class FakeSettings:
-            ai = FakeAI()
-
-        monkeypatch.setattr("fourdpocket.ai.openai_compatible.get_settings", lambda: FakeSettings())
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("custom", custom_base_url="https://api.anthropic.com", custom_api_key="anthropic-key", custom_model="claude-3-5-sonnet", custom_api_type="anthropic"),
+        )
 
         mock_response = MagicMock()
         mock_response.json.return_value = {

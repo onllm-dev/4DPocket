@@ -225,8 +225,7 @@ class TestShareAccess:
         token = share_resp.json()["public_token"]
 
         # Patch validate_public_token in the sharing module where it's imported
-        from fourdpocket.api import sharing
-        sharing.validate_public_token = lambda db, token=None: None
+        monkeypatch.setattr("fourdpocket.api.sharing.validate_public_token", lambda db, token=None: None)
 
         resp = client.get(f"/api/v1/public/{token}")
         assert resp.status_code == 404

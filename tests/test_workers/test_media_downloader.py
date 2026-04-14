@@ -438,22 +438,14 @@ class TestDownloadVideo:
 
     def test_download_video_yt_dlp_success(self, monkeypatch, tmp_path):
         """yt-dlp returns file path on success."""
-        downloaded_file = tmp_path / "video.mp4"
-        downloaded_file.write_bytes(b"fake video")
-
         def mock_run(cmd, *args, **kwargs):
             return type("Result", (), {"returncode": 0})()
 
-        def mock_glob(self, pattern):
-            return [downloaded_file]
-
         monkeypatch.setattr("subprocess.run", mock_run)
-        # Patch Path.glob method
-        monkeypatch.setattr("pathlib.Path.glob", mock_glob)
 
         result = download_video("https://example.com/video.mp4", str(tmp_path))
-        # With mocked glob returning the file, result would be the path
-        # Without the mock matching, returns None
+        # returncode=0 but no file on disk → None
+        assert result is None
 
     def test_download_video_yt_dlp_failure(self, monkeypatch, tmp_path):
         """yt-dlp non-zero return code yields None."""

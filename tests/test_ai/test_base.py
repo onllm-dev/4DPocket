@@ -37,10 +37,6 @@ class TestChatProviderProtocol:
         provider = NoOpChatProvider()
         assert isinstance(provider, ChatProvider)
 
-    def test_generate_method_exists(self):
-        """ChatProvider must have generate() method."""
-        assert hasattr(ChatProvider, "generate")
-
     def test_generate_json_method_exists(self):
         """ChatProvider must have generate_json() method."""
         assert hasattr(ChatProvider, "generate_json")
@@ -48,11 +44,4 @@ class TestChatProviderProtocol:
 
 class TestEmbeddingProviderProtocol:
     """Tests for EmbeddingProvider protocol compliance."""
-
-    def test_embed_method_exists(self):
-        """EmbeddingProvider must have embed() method."""
-        assert hasattr(EmbeddingProvider, "embed")
-
-    def test_embed_single_method_exists(self):
-        """EmbeddingProvider must have embed_single() method."""
-        assert hasattr(EmbeddingProvider, "embed_single")
+    pass

@@ -300,20 +300,24 @@ def test_extract_entities_basic(db, monkeypatch):
 
 def test_extract_entities_gleaning_merges_entities(db, monkeypatch):
     """Second pass entities are merged into the first pass."""
-    fake = _FakeChat({
-        "entities": [
-            {"name": "FastAPI", "type": "tool", "description": ""},
-        ],
-        "relations": [],
-    })
+    class _FakeGleanChat:
+        def __init__(self):
+            self.call_count = 0
+
+        def generate_json(self, prompt, **kwargs):
+            self.call_count += 1
+            if self.call_count == 1:
+                return {"entities": [{"name": "FastAPI", "type": "tool", "description": ""}], "relations": []}
+            return {"entities": [{"name": "Starlette", "type": "tool", "description": ""}], "relations": []}
+
+    fake = _FakeGleanChat()
     monkeypatch.setattr(extractor, "get_chat_provider", lambda: fake)
 
     result = extractor.extract_entities("FastAPI is built on Starlette.", enable_gleaning=True)
 
-    # Gleaning should add Starlette from the context
     names = {e.name for e in result.entities}
-    # At minimum, FastAPI should be present
     assert "FastAPI" in names
+    assert "Starlette" in names
 
 
 def test_extract_entities_gleaning_deduplicates_relations(db, monkeypatch):
@@ -321,26 +325,36 @@ def test_extract_entities_gleaning_deduplicates_relations(db, monkeypatch):
     call_count = [0]
 
     class CountingFake:
-        def __init__(self, response):
-            self.response = response
+        def __init__(self):
+            self.call_count = 0
 
         def generate_json(self, prompt, **kwargs):
             call_count[0] += 1
-            return self.response
+            if self.call_count == 1:
+                return {
+                    "entities": [{"name": "A", "type": "other", "description": ""}],
+                    "relations": [{"source": "A", "target": "B", "keywords": "relates", "description": "A to B"}],
+                }
+            # Return both B and C so the A→B relation survives _parse_relations' entity_names check.
+            # The duplicate A→B relation is then dropped by _merge_gleaning's existing_rels dedup.
+            return {
+                "entities": [
+                    {"name": "B", "type": "other", "description": ""},
+                    {"name": "C", "type": "other", "description": ""},
+                ],
+                "relations": [{"source": "A", "target": "B", "keywords": "relates", "description": "A to B"}],
+            }
 
-    base_response = {
-        "entities": [{"name": "A", "type": "other", "description": ""}],
-        "relations": [],
-    }
     monkeypatch.setattr(
         extractor, "get_chat_provider",
-        lambda: CountingFake(base_response)
+        lambda: CountingFake()
     )
 
-    extractor.extract_entities("Content about A and B.", enable_gleaning=True)
+    result = extractor.extract_entities("Content about A, B, and C.", enable_gleaning=True)
 
-    # Both calls should have been made (initial + gleaning)
     assert call_count[0] == 2
+    # Duplicate A→B relation from gleaning pass is filtered by _merge_gleaning's existing_rels dedup.
+    assert len(result.relations) == 0
 
 
 def test_extract_entities_empty_content(db, monkeypatch):

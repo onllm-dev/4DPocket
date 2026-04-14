@@ -25,7 +25,7 @@ def test_add_comment_to_item(client, auth_headers):
     assert "user_id" in data
     assert "created_at" in data
     # user_display_name may be None if display_name is not set on the user
-    assert data.get("user_display_name") is not None or True
+    assert "user_display_name" in data
 
 
 def test_add_comment_strips_html_tags(client, auth_headers):

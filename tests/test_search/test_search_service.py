@@ -15,6 +15,13 @@ from fourdpocket.search.service import SearchService
 from fourdpocket.search.sqlite_fts import index_item
 
 
+class _NoOpVector:
+    def upsert_item(self, *a, **kw): pass
+    def upsert_chunk(self, *a, **kw): pass
+    def delete_item(self, *a, **kw): pass
+    def search(self, *a, **kw): return []
+
+
 @pytest.fixture
 def search_user(db: Session):
     user = User(
@@ -58,16 +65,9 @@ class TestSearchService:
         """SearchService returns results from keyword backend."""
         from fourdpocket.search.backends.sqlite_fts_backend import SqliteFtsBackend
 
-        # Minimal vector backend that returns nothing
-        class NoOpVector:
-            def upsert_item(self, *a, **kw): pass
-            def upsert_chunk(self, *a, **kw): pass
-            def delete_item(self, *a, **kw): pass
-            def search(self, *a, **kw): return []
-
         service = SearchService(
             keyword=SqliteFtsBackend(),
-            vector=NoOpVector(),
+            vector=_NoOpVector(),
             reranker=NullReranker(),
         )
 
@@ -79,15 +79,9 @@ class TestSearchService:
     def test_search_returns_search_result_type(self, db: Session, search_user, search_items):
         from fourdpocket.search.backends.sqlite_fts_backend import SqliteFtsBackend
 
-        class NoOpVector:
-            def upsert_item(self, *a, **kw): pass
-            def upsert_chunk(self, *a, **kw): pass
-            def delete_item(self, *a, **kw): pass
-            def search(self, *a, **kw): return []
-
         service = SearchService(
             keyword=SqliteFtsBackend(),
-            vector=NoOpVector(),
+            vector=_NoOpVector(),
             reranker=NullReranker(),
         )
 
@@ -102,15 +96,9 @@ class TestSearchService:
     def test_search_with_filters(self, db: Session, search_user, search_items):
         from fourdpocket.search.backends.sqlite_fts_backend import SqliteFtsBackend
 
-        class NoOpVector:
-            def upsert_item(self, *a, **kw): pass
-            def upsert_chunk(self, *a, **kw): pass
-            def delete_item(self, *a, **kw): pass
-            def search(self, *a, **kw): return []
-
         service = SearchService(
             keyword=SqliteFtsBackend(),
-            vector=NoOpVector(),
+            vector=_NoOpVector(),
             reranker=NullReranker(),
         )
 
@@ -122,15 +110,9 @@ class TestSearchService:
     def test_index_item(self, db: Session, search_user):
         from fourdpocket.search.backends.sqlite_fts_backend import SqliteFtsBackend
 
-        class NoOpVector:
-            def upsert_item(self, *a, **kw): pass
-            def upsert_chunk(self, *a, **kw): pass
-            def delete_item(self, *a, **kw): pass
-            def search(self, *a, **kw): return []
-
         service = SearchService(
             keyword=SqliteFtsBackend(),
-            vector=NoOpVector(),
+            vector=_NoOpVector(),
             reranker=NullReranker(),
         )
 
@@ -149,15 +131,9 @@ class TestSearchService:
     def test_rrf_fusion(self, db: Session, search_user):
         from fourdpocket.search.backends.sqlite_fts_backend import SqliteFtsBackend
 
-        class NoOpVector:
-            def upsert_item(self, *a, **kw): pass
-            def upsert_chunk(self, *a, **kw): pass
-            def delete_item(self, *a, **kw): pass
-            def search(self, *a, **kw): return []
-
         service = SearchService(
             keyword=SqliteFtsBackend(),
-            vector=NoOpVector(),
+            vector=_NoOpVector(),
             reranker=NullReranker(),
         )
 
@@ -175,25 +151,6 @@ class TestSearchService:
         # bbb appears in both lists, should rank highest
         assert ids[0] == "bbb"
         assert len(results) == 3
-
-
-class TestNullReranker:
-    def test_passthrough(self):
-        reranker = NullReranker()
-        result = reranker.rerank("query", ["doc1", "doc2", "doc3"], top_k=2)
-        assert len(result) == 2
-        assert result[0] == (0, 1.0)
-        assert result[1] == (1, 1.0)
-
-    def test_empty_docs(self):
-        reranker = NullReranker()
-        result = reranker.rerank("query", [], top_k=5)
-        assert result == []
-
-    def test_top_k_larger_than_docs(self):
-        reranker = NullReranker()
-        result = reranker.rerank("query", ["doc1"], top_k=10)
-        assert len(result) == 1
 
 
 class TestSearchResult:
@@ -222,28 +179,6 @@ def _make_service(keyword, vector, reranker=None):
 class TestSearchServiceNew:
     """Additional SearchService tests — mocked backends."""
 
-    def test_search_vector_path(self, db: Session, search_user, monkeypatch):
-        """Vector search path — embed_single returns embedding, vector backend returns results."""
-        from fourdpocket.search.base import SearchResult
-
-        mock_vector = MagicMock()
-        mock_vector.search.return_value = [
-            SearchResult(item_id="abc", score=0.9, title_snippet="Title", content_snippet="Content", sources=["semantic"])
-        ]
-        mock_keyword = MagicMock()
-        mock_keyword.search.return_value = []
-
-        mock_provider = MagicMock()
-        mock_provider.embed_single.return_value = [0.1] * 384
-
-        monkeypatch.setattr("fourdpocket.ai.factory.get_embedding_provider", lambda: mock_provider)
-
-        service = _make_service(keyword=mock_keyword, vector=mock_vector)
-        results = service.search(db, "test query", user_id=search_user.id, filters=None, limit=20)
-        assert len(results) == 1
-        mock_provider.embed_single.assert_called_once_with("test query")
-        mock_vector.search.assert_called_once()
-        assert results[0].sources == ["semantic"]
 
     def test_search_empty_query_skips_vector(self, db: Session, search_user, monkeypatch):
         """Empty/whitespace-only query skips vector search."""

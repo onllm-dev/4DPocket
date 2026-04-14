@@ -149,8 +149,8 @@ def test_generate_tags_strips_invalid_characters(db, monkeypatch):
 
     names = [r["name"] for r in result]
     assert "python" in names
-    # The SQL-injection-like name gets slugified to empty or filtered out
-    assert any("DROP" not in n for n in names)
+    # The SQL-injection-like name gets slugified to "foo-drop-table-tags" and filtered out
+    assert "foo-drop-table-tags" not in names, f"SQL injection tag should have been filtered: {names}"
 
 
 def test_generate_tags_rejects_excessive_length(db, monkeypatch):

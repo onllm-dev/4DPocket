@@ -114,8 +114,9 @@ class TestDetectKnowledgeGaps:
         assert response.status_code == 200
         gaps = response.json()
         tag_names = {g.get("tag") for g in gaps}
-        assert "alpha" in tag_names or len(gaps) == 0
-        assert "beta" not in tag_names
+        if len(gaps) > 0:
+            assert "alpha" in tag_names
+            assert "beta" not in tag_names
 
     def test_knowledge_gaps_requires_auth(self, client):
         """Knowledge gaps endpoint requires authentication."""
@@ -179,7 +180,7 @@ class TestFindCrossPlatformConnections:
             source_platform = conn.get("source", {}).get("platform", "")
             # User A's items are from 'generic' platform
             if source_platform:
-                assert source_platform != "" or True  # Just verify it doesn't crash
+                assert isinstance(source_platform, str)
 
     def test_cross_platform_requires_auth(self, client):
         """Cross-platform endpoint requires authentication."""

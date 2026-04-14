@@ -71,7 +71,7 @@ class TestExtract:
 
         assert result.source_platform == "linkedin"
         # Posts behind auth wall typically get limited extraction
-        assert result.metadata.get("limited_extraction", False) in (True, False)
+        assert result.metadata.get("limited_extraction") is True
 
     @respx.mock
     def test_extract_fetch_returns_none(self):
@@ -129,8 +129,8 @@ class TestExtract:
         assert result.source_platform == "linkedin"
         assert result.metadata.get("limited_extraction") is True
         # OG description used as fallback body
-        assert "great article" in (result.description or "").lower() or \
-               result.sections[-1].kind == "metadata_block"
+        assert result.description is not None
+        assert result.sections[-1].kind == "metadata_block"
 
     def test_url_pattern_matching(self):
         """Processor URL regex patterns match expected URLs via match_processor."""

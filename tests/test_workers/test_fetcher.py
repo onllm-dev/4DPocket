@@ -1,12 +1,50 @@
 """Tests for the URL fetcher background task."""
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlmodel import Session
 
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.workers.fetcher import _fetch_favicon, fetch_and_process_url
+
+
+@dataclass
+class _FakeSection:
+    id: str = ""
+    kind: str = "main"
+    text: str = ""
+    order: int = 0
+    role: str = "main"
+    depth: int = 0
+    parent_id: str | None = None
+    raw_html: str | None = None
+    source_url: str | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    page_no: int | None = None
+    timestamp_start_s: float | None = None
+    timestamp_end_s: float | None = None
+    author: str | None = None
+    author_id: str | None = None
+    score: int | None = None
+    upvotes: int | None = None
+    is_accepted: bool = False
+    created_at: str | None = None
+    extra: dict = field(default_factory=dict)
+
+
+@dataclass
+class _FakeResult:
+    title: str | None = None
+    description: str | None = None
+    content: str | None = None
+    raw_content: str | None = None
+    media: list = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+    source_platform: str = "generic"
+    item_type: str = "url"
+    sections: list = field(default_factory=list)
 
 
 def make_user(db: Session, email="fetcher@test.com", username="fetchuser") -> "User":
@@ -268,60 +306,20 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeSection:
-            id: str
-            kind: str
-            text: str
-            order: int = 0
-            role: str = "main"
-            depth: int = 0
-            parent_id: str | None = None
-            raw_html: str | None = None
-            source_url: str | None = None
-            char_start: int | None = None
-            char_end: int | None = None
-            page_no: int | None = None
-            timestamp_start_s: float | None = None
-            timestamp_end_s: float | None = None
-            author: str | None = None
-            author_id: str | None = None
-            score: int | None = None
-            upvotes: int | None = None
-            is_accepted: bool = False
-            created_at: str | None = None
-            extra: dict = None
-
-            def __post_init__(self):
-                if self.extra is None:
-                    self.extra = {}
-
-        @dataclass
-        class FakeResult:
-            title: str = "Article Title"
-            description: str = "Article description"
-            content: str | None = "legacy content (should be ignored)"
-            raw_content: str | None = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = []
-                if self.metadata is None:
-                    self.metadata = {}
-                if self.sections is None:
-                    self.sections = [
-                        FakeSection(id="s1", kind="title", text="First Heading", order=0),
-                        FakeSection(id="s2", kind="paragraph", text="This is a paragraph.", order=1),
-                    ]
+        def _make_result_with_sections():
+            return _FakeResult(
+                title="Article Title",
+                description="Article description",
+                content="legacy content (should be ignored)",
+                sections=[
+                    _FakeSection(id="s1", kind="title", text="First Heading", order=0),
+                    _FakeSection(id="s2", kind="paragraph", text="This is a paragraph.", order=1),
+                ],
+            )
 
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _make_result_with_sections()
 
         def fake_asyncio_run(coro):
             """Run the coroutine in a fresh event loop and return the result."""
@@ -391,29 +389,13 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeResult:
-            title: str = "No Sections Title"
-            description: str = "No sections desc"
-            content: str = "Plain content from processor"
-            raw_content: str = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = []
-                if self.metadata is None:
-                    self.metadata = {}
-                if self.sections is None:
-                    self.sections = []
-
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _FakeResult(
+                    title="No Sections Title",
+                    description="No sections desc",
+                    content="Plain content from processor",
+                )
 
         def fake_asyncio_run(coro):
             loop = asyncio.new_event_loop()
@@ -462,32 +444,16 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeResult:
-            title: str = None
-            description: str = None
-            content: str = "content"
-            raw_content: str = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = [
-                        {"url": "https://cdn.example.com/image.png", "type": "image", "role": "thumbnail"},
-                        {"url": "https://cdn.example.com/video.mp4", "type": "video", "role": "content"},
-                    ]
-                if self.metadata is None:
-                    self.metadata = {}
-                if self.sections is None:
-                    self.sections = []
-
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _FakeResult(
+                    title=None,
+                    content="content",
+                    media=[
+                        {"url": "https://cdn.example.com/image.png", "type": "image", "role": "thumbnail"},
+                        {"url": "https://cdn.example.com/video.mp4", "type": "video", "role": "content"},
+                    ],
+                )
 
         def fake_asyncio_run(coro):
             loop = asyncio.new_event_loop()
@@ -536,29 +502,9 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeResult:
-            title: str = "Title"
-            description: str = None
-            content: str = "content"
-            raw_content: str = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = []
-                if self.metadata is None:
-                    self.metadata = {}
-                if self.sections is None:
-                    self.sections = []
-
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _FakeResult(title="Title", content="content")
 
         def fake_asyncio_run(coro):
             loop = asyncio.new_event_loop()
@@ -607,29 +553,9 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeResult:
-            title: str = "Title"
-            description: str = None
-            content: str = "content"
-            raw_content: str = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = []
-                if self.metadata is None:
-                    self.metadata = {}
-                if self.sections is None:
-                    self.sections = []
-
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _FakeResult(title="Title", content="content")
 
         def fake_asyncio_run(coro):
             loop = asyncio.new_event_loop()
@@ -676,59 +602,14 @@ class TestFetchAndProcessUrlSuccess:
 
         from unittest.mock import MagicMock
 
-        @dataclass
-        class FakeSection:
-            id: str
-            kind: str
-            text: str
-            order: int = 0
-            role: str = "main"
-            depth: int = 0
-            parent_id: str | None = None
-            raw_html: str | None = None
-            source_url: str | None = None
-            char_start: int | None = None
-            char_end: int | None = None
-            page_no: int | None = None
-            timestamp_start_s: float | None = None
-            timestamp_end_s: float | None = None
-            author: str | None = None
-            author_id: str | None = None
-            score: int | None = None
-            upvotes: int | None = None
-            is_accepted: bool = False
-            created_at: str | None = None
-            extra: dict = None
-
-            def __post_init__(self):
-                if self.extra is None:
-                    self.extra = {}
-
-        @dataclass
-        class FakeResult:
-            title: str = "Title"
-            description: str = None
-            content: str = "content"
-            raw_content: str = None
-            media: list = None
-            metadata: dict = None
-            source_platform: str = "generic"
-            item_type: str = "url"
-            sections: list = None
-
-            def __post_init__(self):
-                if self.media is None:
-                    self.media = []
-                if self.metadata is None:
-                    self.metadata = {"custom_key": "custom_value"}
-                if self.sections is None:
-                    self.sections = [
-                        FakeSection(id="s1", kind="paragraph", text="Para text", order=0),
-                    ]
-
         class FakeProcessor:
             async def process(self, url):
-                return FakeResult()
+                return _FakeResult(
+                    title="Title",
+                    content="content",
+                    metadata={"custom_key": "custom_value"},
+                    sections=[_FakeSection(id="s1", kind="paragraph", text="Para text", order=0)],
+                )
 
         def fake_asyncio_run(coro):
             loop = asyncio.new_event_loop()

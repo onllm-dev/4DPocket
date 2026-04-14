@@ -48,7 +48,7 @@ class TestExtract:
         assert "metadata_block" in section_kinds
 
     @respx.mock
-    def test_extract_instaloader_not_installed(self):
+    def test_extract_instaloader_not_installed(self, monkeypatch):
         """instaloader not installed → OG fallback."""
         processor = InstagramProcessor()
         url = "https://www.instagram.com/p/HiJkLmNoPqR/"
@@ -68,22 +68,10 @@ class TestExtract:
 
         respx.get(url).mock(return_value=Response(200, text=html_content))
 
-        # Patch instaloader import to raise ImportError
-        original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else None
+        import sys
+        monkeypatch.setitem(sys.modules, "instaloader", None)
 
-        def mock_import(name, *args, **kwargs):
-            if name == 'instaloader':
-                raise ImportError("instaloader not installed")
-            return original_import(name, *args, **kwargs) if original_import else __import__(name, *args, **kwargs)
-
-        import builtins
-        saved_import = builtins.__import__
-        builtins.__import__ = mock_import
-
-        try:
-            result = asyncio.run(processor.process(url))
-        finally:
-            builtins.__import__ = saved_import
+        result = asyncio.run(processor.process(url))
 
         assert result.source_platform == "instagram"
         assert result.status.value == "partial"

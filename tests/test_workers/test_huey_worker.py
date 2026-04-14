@@ -22,12 +22,6 @@ class TestHueyWorkerImports:
         assert hasattr(scheduler, "cleanup_stale_tasks")
         assert hasattr(scheduler, "reprocess_pending_items")
 
-    def test_huey_worker_module_executes_without_error(self):
-        """Executing huey_worker as a module should not raise."""
-        # We just need to ensure the module loads - importing it exercises
-        # the sys.path manipulation code paths
-        import fourdpocket.workers.huey_worker  # noqa: F401
-
     def test_project_root_detection(self, tmp_path):
         """_project_root detection and sys.path insert works for source trees."""
         # Create a fake source tree structure:

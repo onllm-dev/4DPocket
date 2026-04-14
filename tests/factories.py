@@ -9,6 +9,7 @@ from fourdpocket.models.entity import Entity
 from fourdpocket.models.item import KnowledgeItem as Item
 from fourdpocket.models.item_chunk import ItemChunk
 from fourdpocket.models.tag import Tag
+from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User
 
 
@@ -19,9 +20,9 @@ def make_user(db: Session, email="factory@test.com", username="factoryuser", **k
     user = User(
         email=email,
         username=username,
-        hashed_password=hash_password("TestPass123!"),
+        password_hash=hash_password("TestPass123!"),
         display_name=kw.get("display_name", "Factory User"),
-        is_admin=kw.get("is_admin", False),
+        role=kw.get("role", UserRole.user),
     )
     db.add(user)
     db.commit()

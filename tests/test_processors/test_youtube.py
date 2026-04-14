@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import re
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -57,71 +59,7 @@ class TestYouTubeProcessor:
         assert "Could not extract video ID" in result.error
 
 
-class TestYouTubeSectionsStructure:
-    """Test section structure from YouTube processor."""
-
-    def test_title_section_structure(self):
-        """Title section has correct structure."""
-        from fourdpocket.processors.sections import Section, make_section_id
-
-        title_section = Section(
-            id=make_section_id("https://youtube.com/watch?v=abc", 0),
-            kind="title", order=0, role="main", text="Test Video"
-        )
-        assert title_section.kind == "title"
-        assert title_section.role == "main"
-        assert title_section.text == "Test Video"
-
-    def test_chapter_section_structure(self):
-        """Chapter sections have navigational role and timestamps."""
-        from fourdpocket.processors.sections import Section, make_section_id
-
-        ch = Section(
-            id=make_section_id("https://youtube.com/watch?v=abc", 1),
-            kind="chapter", order=1, role="navigational",
-            depth=0, text="Introduction",
-            timestamp_start_s=0.0, timestamp_end_s=120.0,
-        )
-        assert ch.kind == "chapter"
-        assert ch.role == "navigational"
-        assert ch.timestamp_start_s == 0.0
-        assert ch.timestamp_end_s == 120.0
-
-    def test_transcript_segment_structure(self):
-        """Transcript segments have timestamps and parent_id."""
-        from fourdpocket.processors.sections import Section, make_section_id
-
-        parent_id = make_section_id("https://youtube.com/watch?v=abc", 1)
-        seg = Section(
-            id=make_section_id("https://youtube.com/watch?v=abc", 2),
-            kind="transcript_segment", order=2, role="main",
-            parent_id=parent_id, text="Hello world",
-            timestamp_start_s=10.0, timestamp_end_s=20.0,
-        )
-        assert seg.kind == "transcript_segment"
-        assert seg.parent_id == parent_id
-        assert seg.timestamp_start_s == 10.0
-        assert seg.timestamp_end_s == 20.0
-
-    def test_paragraph_section_for_description(self):
-        """Description becomes paragraph section with supplemental role."""
-        from fourdpocket.processors.sections import Section, make_section_id
-
-        desc = Section(
-            id=make_section_id("https://youtube.com/watch?v=abc", 0),
-            kind="paragraph", order=0, role="supplemental",
-            text="Video description here",
-            extra={"source": "video_description"},
-        )
-        assert desc.kind == "paragraph"
-        assert desc.role == "supplemental"
-        assert desc.extra.get("source") == "video_description"
-
-
 # === PHASE 2A MOPUP ADDITIONS ===
-import sys
-from unittest.mock import MagicMock, patch
-
 
 def _make_mock_ytdlp(info=None, exc=None):
     """Build a fake yt_dlp module whose YoutubeDL returns a context manager."""

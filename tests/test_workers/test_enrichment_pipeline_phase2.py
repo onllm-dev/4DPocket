@@ -28,12 +28,12 @@ from fourdpocket.workers.enrichment_pipeline import (
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def enrich_user(db: Session):
+def enrich_user_p1(db: Session):
     user = User(
-        email="enrichtest2@example.com",
-        username="enrichuser2",
+        email="enrichtest_p2@example.com",
+        username="enrichuserp2",
         password_hash="$2b$12$fakehash",
-        display_name="Enrich Test User 2",
+        display_name="Enrich Test User P2",
     )
     db.add(user)
     db.commit()
@@ -42,9 +42,9 @@ def enrich_user(db: Session):
 
 
 @pytest.fixture
-def enrich_item(db: Session, enrich_user):
+def enrich_item(db: Session, enrich_user_p1):
     item = KnowledgeItem(
-        user_id=enrich_user.id,
+        user_id=enrich_user_p1.id,
         title="Test Article for Phase 2",
         content=(
             "Machine learning is transforming software engineering. "
@@ -388,18 +388,6 @@ class TestHandleEntityExtraction:
         monkeypatch.setattr(
             "fourdpocket.ai.llm_cache.store_cached_response",
             lambda *a, **k: None,
-        )
-        monkeypatch.setattr(
-            "fourdpocket.ai.extractor._parse_entities",
-            lambda *a, **k: [],
-        )
-        monkeypatch.setattr(
-            "fourdpocket.ai.extractor._parse_relations",
-            lambda *a, **k: [],
-        )
-        monkeypatch.setattr(
-            "fourdpocket.ai.extractor.ExtractionResult",
-            lambda **kw: MagicMock(entities=[], relations=[]),
         )
         monkeypatch.setattr(
             "fourdpocket.ai.canonicalizer.canonicalize_entity",
