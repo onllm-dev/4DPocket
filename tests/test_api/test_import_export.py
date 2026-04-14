@@ -164,25 +164,16 @@ class TestImportJSON:
         assert response.status_code == 200
         assert response.json()["imported"] == 1
 
-    def test_import_json_invalid_format_returns_error(self):
-        import uuid
+    def test_import_json_invalid_format_returns_error(self, client, auth_headers):
+        # Create a separate TestClient with raise_server_exceptions=False to catch 500
+        from starlette.testclient import TestClient
         from fourdpocket.main import app
-        # Use raise_server_exceptions=False to get error response instead of exception
+
         error_client = TestClient(app, raise_server_exceptions=False)
-
-        unique = uuid.uuid4().hex[:8]
-        error_client.post(
-            "/api/v1/auth/register",
-            json={"email": f"err{unique}@test.com", "username": f"erruser{unique}", "password": "TestPass123!", "display_name": "E"},
-        )
-        resp = error_client.post("/api/v1/auth/login", data={"username": f"err{unique}@test.com", "password": "TestPass123!"})
-        token = resp.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
         response = error_client.post(
             "/api/v1/import/json",
             files={"file": ("bad.json", io.BytesIO(b"not valid json{"), "application/json")},
-            headers=headers,
+            headers=auth_headers,
         )
         # Invalid JSON returns 500 (unhandled JSONDecodeError)
         assert response.status_code == 500
