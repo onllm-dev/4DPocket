@@ -55,11 +55,13 @@ Plain paragraph without heading."""
 
     def test_url_pattern_matching(self):
         """PDF processor is file-upload based, not URL matched."""
-        from fourdpocket.processors.registry import match_processor
+        import fourdpocket.processors  # noqa: F401 — ensures all processors are registered
+        # Import from registry directly to get the current module-level function
+        from fourdpocket.processors.registry import match_processor as _match_processor
 
         # PDF processor doesn't have URL patterns, so match_processor
         # returns GenericURLProcessor for PDF URLs
-        proc = match_processor("https://example.com/document.pdf")
+        proc = _match_processor("https://example.com/document.pdf")
         assert type(proc).__name__ == "GenericURLProcessor"
 
 
@@ -80,20 +82,6 @@ class TestPyMuPdf4llm:
             {"text": "# Page 1\n\nSome text on page one.", "metadata": {"page": 0}},
             {"text": "## Page 2\n\nText on page two.", "metadata": {"page": 1}},
         ]
-
-        monkeypatch.setattr(pymupdf4llm_mock, "to_markdown", lambda doc, **kw: page_chunks)
-
-        class FakeDoc:
-            def __init__(self):
-                self.metadata = {"title": "Test Doc"}
-
-            def __len__(self):
-                return 2
-
-            def close(self):
-                pass
-
-        monkeypatch.setattr(pymupdf_mock, "open", lambda *a, **kw: FakeDoc())
 
         import pymupdf as pm
         import pymupdf4llm as pml

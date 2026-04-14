@@ -21,6 +21,7 @@ class TestExtract:
 
     def test_url_pattern_matching(self):
         """Image processor is file-upload based, not URL matched."""
+        import fourdpocket.processors  # noqa: F401 — ensures all processors are registered
         from fourdpocket.processors.registry import match_processor
 
         proc = match_processor("https://example.com/image.jpg")

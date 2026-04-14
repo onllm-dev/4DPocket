@@ -262,7 +262,8 @@ def test_check_url_requires_auth(client):
 
 def test_get_timeline(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     _ = make_item(db, user.id, title="Timeline Item", item_type="url")
     response = client.get("/api/v1/items/timeline", headers=auth_headers)
@@ -280,7 +281,8 @@ def test_get_timeline_empty(client, auth_headers):
 
 def test_get_reading_queue(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, content="Some content", reading_progress=30, item_type="url")
     response = client.get("/api/v1/items/reading-queue", headers=auth_headers)
@@ -291,7 +293,8 @@ def test_get_reading_queue(client, auth_headers, db):
 
 def test_get_reading_queue_excludes_completed(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, content="Full content", reading_progress=100, item_type="url")
     response = client.get("/api/v1/items/reading-queue", headers=auth_headers)
@@ -303,7 +306,8 @@ def test_get_reading_queue_excludes_completed(client, auth_headers, db):
 def test_get_reading_list(client, auth_headers, db):
     from fourdpocket.models.base import ReadingStatus
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     _ = make_item(db, user.id, reading_status=ReadingStatus.reading_list, item_type="url")
     response = client.get("/api/v1/items/reading-list", headers=auth_headers)
@@ -316,7 +320,8 @@ def test_get_reading_list(client, auth_headers, db):
 def test_get_read_items(client, auth_headers, db):
     from fourdpocket.models.base import ReadingStatus
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, reading_status=ReadingStatus.read, item_type="url")
     response = client.get("/api/v1/items/read", headers=auth_headers)
@@ -334,7 +339,8 @@ def test_get_queue_stats(client, auth_headers, db):
 
 def test_archive_item(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", item_type="url")
     monkeypatch.setattr("fourdpocket.api.items.logger", __import__("logging").getLogger("test"))
@@ -346,7 +352,8 @@ def test_archive_item(client, auth_headers, db, monkeypatch):
 
 def test_archive_item_no_url(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url=None, item_type="note")
     response = client.post(f"/api/v1/items/{item.id}/archive", headers=auth_headers)
@@ -355,7 +362,8 @@ def test_archive_item_no_url(client, auth_headers, db):
 
 def test_reprocess_item(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", item_type="url")
     monkeypatch.setattr("fourdpocket.workers.fetcher.fetch_and_process_url", lambda *a, **k: None)
@@ -366,7 +374,8 @@ def test_reprocess_item(client, auth_headers, db, monkeypatch):
 
 def test_reprocess_item_no_url(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url=None, item_type="note")
     response = client.post(f"/api/v1/items/{item.id}/reprocess", headers=auth_headers)
@@ -375,7 +384,8 @@ def test_reprocess_item_no_url(client, auth_headers, db):
 
 def test_get_related_items(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     monkeypatch.setattr("fourdpocket.ai.connector.find_related", lambda *a, **k: [])
@@ -386,7 +396,8 @@ def test_get_related_items(client, auth_headers, db, monkeypatch):
 
 def test_update_reading_progress(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.patch(
@@ -401,7 +412,8 @@ def test_update_reading_progress(client, auth_headers, db):
 
 def test_bulk_archive(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item1 = make_item(db, user.id, item_type="url")
     item2 = make_item(db, user.id, item_type="url")
@@ -417,7 +429,8 @@ def test_bulk_archive(client, auth_headers, db):
 
 def test_bulk_delete(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item1 = make_item(db, user.id, item_type="url")
     item2 = make_item(db, user.id, item_type="url")
@@ -433,7 +446,8 @@ def test_bulk_delete(client, auth_headers, db):
 
 def test_bulk_favorite(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.post(
@@ -447,7 +461,8 @@ def test_bulk_favorite(client, auth_headers, db):
 
 def test_bulk_unfavorite(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, is_favorite=True, item_type="url")
     response = client.post(
@@ -461,8 +476,9 @@ def test_bulk_unfavorite(client, auth_headers, db):
 
 def test_bulk_tag_by_id(client, auth_headers, db):
     from fourdpocket.models.user import User
+    from sqlmodel import select
     from tests.factories import make_item, make_tag
-    user = db.query(User).first()
+    user = db.exec(select(User)).first()
     item = make_item(db, user.id, item_type="url")
     tag = make_tag(db, user.id, name="BulkTag")
     response = client.post(
@@ -476,8 +492,9 @@ def test_bulk_tag_by_id(client, auth_headers, db):
 
 def test_bulk_tag_by_name(client, auth_headers, db):
     from fourdpocket.models.user import User
+    from sqlmodel import select
     from tests.factories import make_item
-    user = db.query(User).first()
+    user = db.exec(select(User)).first()
     item = make_item(db, user.id, item_type="url")
     response = client.post(
         "/api/v1/items/bulk",
@@ -490,7 +507,8 @@ def test_bulk_tag_by_name(client, auth_headers, db):
 
 def test_bulk_enrich(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     # Just ensure no exception propagates — the function may do nothing if AI is unconfigured
@@ -504,7 +522,8 @@ def test_bulk_enrich(client, auth_headers, db, monkeypatch):
 
 def test_media_proxy_unsafe_localhost(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.get(
@@ -516,7 +535,8 @@ def test_media_proxy_unsafe_localhost(client, auth_headers, db):
 
 def test_media_proxy_unsafe_10_network(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.get(
@@ -528,7 +548,8 @@ def test_media_proxy_unsafe_10_network(client, auth_headers, db):
 
 def test_media_proxy_unsafe_172_network(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.get(
@@ -540,7 +561,8 @@ def test_media_proxy_unsafe_172_network(client, auth_headers, db):
 
 def test_media_proxy_unsafe_dot_local(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.get(
@@ -552,7 +574,8 @@ def test_media_proxy_unsafe_dot_local(client, auth_headers, db):
 
 def test_media_proxy_unsafe_ftp_scheme(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
     response = client.get(
@@ -566,7 +589,8 @@ def test_media_proxy_cache_hit(client, auth_headers, db, monkeypatch):
     import tempfile
 
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
 
@@ -596,7 +620,8 @@ def test_serve_media(client, auth_headers, db, monkeypatch):
     from pathlib import Path
 
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
 
@@ -620,7 +645,8 @@ def test_serve_media(client, auth_headers, db, monkeypatch):
 
 def test_serve_media_wrong_user_path(client, auth_headers, db):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
 
@@ -632,7 +658,8 @@ def test_serve_media_wrong_user_path(client, auth_headers, db):
 def test_download_video(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.base import SourcePlatform
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://youtube.com/watch?v=abc", source_platform=SourcePlatform.youtube, item_type="url")
     monkeypatch.setattr("fourdpocket.workers.media_downloader.download_video", lambda *a, **k: "/path/video.mp4")
@@ -644,7 +671,8 @@ def test_download_video(client, auth_headers, db, monkeypatch):
 def test_download_video_unsupported_platform(client, auth_headers, db):
     from fourdpocket.models.base import SourcePlatform
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", source_platform=SourcePlatform.generic, item_type="url")
     response = client.post(f"/api/v1/items/{item.id}/download-video", headers=auth_headers)
@@ -684,7 +712,8 @@ def test_is_safe_proxy_url_ftp(client, auth_headers):
 
 def test_try_sync_enrich_noop_when_tags_exist(client, auth_headers, db, monkeypatch):
     from fourdpocket.models.user import User
-    user = db.query(User).first()
+    from sqlmodel import select
+    user = db.exec(select(User)).first()
     from tests.factories import make_enrichment_stage, make_item, make_tag
 
     item = make_item(db, user.id, item_type="url")
@@ -710,3 +739,77 @@ def test_create_item_duplicate_url_returns_409(client, auth_headers):
         headers=auth_headers,
     )
     assert response.status_code == 409
+
+
+class TestListItemsSortAndFilter:
+    """Test sort_by, sort_order, tag_id, and is_archived list filters."""
+
+    def test_list_items_sort_by_title_asc(self, client, auth_headers):
+        """sort_by=title&sort_order=asc returns items alphabetically."""
+        client.post("/api/v1/items", json={"url": "https://z.com", "title": "Zulu Article"}, headers=auth_headers)
+        client.post("/api/v1/items", json={"url": "https://a.com", "title": "Alpha Article"}, headers=auth_headers)
+        client.post("/api/v1/items", json={"url": "https://m.com", "title": "Mid Article"}, headers=auth_headers)
+
+        response = client.get("/api/v1/items?sort_by=title&sort_order=asc", headers=auth_headers)
+        assert response.status_code == 200
+        titles = [item["title"] for item in response.json()]
+        assert titles == sorted(titles), f"Expected alphabetical order, got {titles}"
+
+    def test_list_items_sort_by_title_desc(self, client, auth_headers):
+        """sort_by=title&sort_order=desc returns reverse alphabetical."""
+        client.post("/api/v1/items", json={"url": "https://z2.com", "title": "Zulu"}, headers=auth_headers)
+        client.post("/api/v1/items", json={"url": "https://a2.com", "title": "Alpha"}, headers=auth_headers)
+
+        response = client.get("/api/v1/items?sort_by=title&sort_order=desc", headers=auth_headers)
+        assert response.status_code == 200
+        titles = [item["title"] for item in response.json()]
+        assert titles == sorted(titles, reverse=True), f"Expected reverse order, got {titles}"
+
+    def test_list_items_sort_by_invalid_field_returns_422(self, client, auth_headers):
+        """sort_by with an invalid field name is rejected by the regex pattern."""
+        response = client.get("/api/v1/items?sort_by=email", headers=auth_headers)
+        assert response.status_code == 422
+
+    def test_list_items_filter_by_tag_id(self, client, auth_headers):
+        """tag_id filter returns only items with that tag."""
+        # Create two items
+        r1 = client.post("/api/v1/items", json={"url": "https://tagged.com", "title": "Tagged"}, headers=auth_headers)
+        r2 = client.post("/api/v1/items", json={"url": "https://untagged.com", "title": "Untagged"}, headers=auth_headers)
+        item1_id = r1.json()["id"]
+        item2_id = r2.json()["id"]
+
+        # Create a tag and add it to the first item via tag_id query param
+        tag_resp = client.post("/api/v1/tags", json={"name": "filter-test-tag"}, headers=auth_headers)
+        assert tag_resp.status_code in (200, 201)
+        tag_id = tag_resp.json()["id"]
+
+        # Add tag to item 1
+        add_resp = client.post(f"/api/v1/items/{item1_id}/tags?tag_id={tag_id}", headers=auth_headers)
+        assert add_resp.status_code in (200, 201)
+
+        # Filter by tag_id
+        response = client.get(f"/api/v1/items?tag_id={tag_id}", headers=auth_headers)
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) >= 1
+        returned_ids = {i["id"] for i in items}
+        assert item1_id in returned_ids
+        assert item2_id not in returned_ids
+
+    def test_list_items_filter_is_archived(self, client, auth_headers):
+        """is_archived=true returns only archived items."""
+        r = client.post("/api/v1/items", json={"url": "https://archive-me.com", "title": "Archive Me"}, headers=auth_headers)
+        item_id = r.json()["id"]
+
+        # Use bulk action to archive (sets is_archived=True directly)
+        archive_resp = client.post("/api/v1/items/bulk", json={"action": "archive", "item_ids": [item_id]}, headers=auth_headers)
+        assert archive_resp.status_code == 200
+
+        # Create a non-archived item
+        client.post("/api/v1/items", json={"url": "https://keep-active.com", "title": "Active"}, headers=auth_headers)
+
+        response = client.get("/api/v1/items?is_archived=true", headers=auth_headers)
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) >= 1
+        assert all(i.get("is_archived") for i in items)

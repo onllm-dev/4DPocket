@@ -117,7 +117,7 @@ def execute_saved_filter(
 
     from fourdpocket.models.item import KnowledgeItem
 
-    item_ids = [uuid.UUID(r["item_id"]) for r in results]
+    item_ids = [uuid.UUID(getattr(r, "item_id", None) or r["item_id"]) for r in results]
     items = db.exec(
         select(KnowledgeItem).where(
             KnowledgeItem.id.in_(item_ids),

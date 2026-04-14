@@ -178,7 +178,6 @@ def test_create_filter_accepts_empty_filters_dict(client, auth_headers):
     assert response.json()["filters"] == {}
 
 
-@pytest.mark.skip(reason="execute endpoint has a SearchResult subscriptable bug in saved_filters.py")
 def test_execute_filter_with_results(client, auth_headers):
     """Execute filter with matching items returns those items."""
     # Create items first
@@ -207,7 +206,6 @@ def test_execute_filter_with_results(client, auth_headers):
     assert len(items) >= 1
 
 
-@pytest.mark.skip(reason="execute endpoint has a SearchResult subscriptable bug in saved_filters.py")
 def test_execute_filter_with_no_results(client, auth_headers):
     """Execute filter with no matching items returns empty list."""
     filter_resp = client.post(
