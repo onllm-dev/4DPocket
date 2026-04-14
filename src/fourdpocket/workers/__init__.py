@@ -8,8 +8,9 @@ _huey_instance = None
 def _get_huey():
     global _huey_instance
     if _huey_instance is None:
-        from fourdpocket.config import get_settings
         from pathlib import Path
+
+        from fourdpocket.config import get_settings
 
         settings = get_settings()
         base = settings.storage.base_path
