@@ -57,7 +57,7 @@ class TestMCPToolAuth:
 # ─── _tool_ctx error paths ───────────────────────────────────────────────────
 
 
-def test_tool_ctx_no_access_token(monkeypatch):
+def test_tool_ctx_no_access_token(db, monkeypatch):
     """_tool_ctx raises ToolError when get_access_token returns None."""
     from fourdpocket.mcp import server
 
@@ -66,17 +66,13 @@ def test_tool_ctx_no_access_token(monkeypatch):
     )
 
     with pytest.raises(server.tools_mod.ToolError, match="Authentication required"):
-        with server._tool_ctx():
+        with server._tool_ctx(db=db):
             pass
 
 
-def test_tool_ctx_revoked_pat(db, monkeypatch, engine):
+def test_tool_ctx_revoked_pat(db, monkeypatch):
     """_tool_ctx raises ToolError when resolve_token returns None (revoked/expired PAT)."""
-    import fourdpocket.db.session as db_module
-
-    # Patch get_engine so _tool_ctx() uses the test engine
-    original_get_engine = db_module.get_engine
-    db_module.get_engine = lambda: engine
+    from fourdpocket.mcp import server as server_module
 
     # Create a valid user
     user_obj = User(
@@ -98,25 +94,17 @@ def test_tool_ctx_revoked_pat(db, monkeypatch, engine):
     def fake_resolve(db_session, token_str):
         return None  # Simulates revoked/expired token
 
-    from fourdpocket.mcp import server as server_module
-
     monkeypatch.setattr("fourdpocket.mcp.server.get_access_token", fake_get_token)
     monkeypatch.setattr("fourdpocket.mcp.server.resolve_token", fake_resolve)
 
     with pytest.raises(server_module.tools_mod.ToolError, match="revoked|expired"):
-        with server_module._tool_ctx():
+        with server_module._tool_ctx(db=db):
             pass
 
-    db_module.get_engine = original_get_engine
 
-
-def test_tool_ctx_inactive_user(db, monkeypatch, engine):
+def test_tool_ctx_inactive_user(db, monkeypatch):
     """_tool_ctx raises ToolError when the resolved user is inactive."""
-    import fourdpocket.db.session as db_module
     from fourdpocket.mcp import server as server_module
-
-    original_get_engine = db_module.get_engine
-    db_module.get_engine = lambda: engine
 
     # Create an inactive user with a PAT
     inactive_user = User(
@@ -158,19 +146,13 @@ def test_tool_ctx_inactive_user(db, monkeypatch, engine):
     monkeypatch.setattr("fourdpocket.mcp.server.resolve_token", fake_resolve)
 
     with pytest.raises(server_module.tools_mod.ToolError, match="disabled"):
-        with server_module._tool_ctx():
+        with server_module._tool_ctx(db=db):
             pass
 
-    db_module.get_engine = original_get_engine
 
-
-def test_tool_ctx_deleted_user(db, monkeypatch, engine):
+def test_tool_ctx_deleted_user(db, monkeypatch):
     """_tool_ctx raises ToolError when the resolved user no longer exists in DB."""
-    import fourdpocket.db.session as db_module
     from fourdpocket.mcp import server as server_module
-
-    original_get_engine = db_module.get_engine
-    db_module.get_engine = lambda: engine
 
     # Create a user, then delete them (simulate user_id points to nothing)
     ghost_user = User(
@@ -216,10 +198,8 @@ def test_tool_ctx_deleted_user(db, monkeypatch, engine):
     monkeypatch.setattr("fourdpocket.mcp.server.resolve_token", fake_resolve)
 
     with pytest.raises(server_module.tools_mod.ToolError, match="disabled"):
-        with server_module._tool_ctx():
+        with server_module._tool_ctx(db=db):
             pass
-
-    db_module.get_engine = original_get_engine
 
 
 # ─── Tool call wrapper ───────────────────────────────────────────────────────

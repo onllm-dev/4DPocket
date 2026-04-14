@@ -59,7 +59,7 @@ mcp = _build_mcp()
 
 
 @contextmanager
-def _tool_ctx():
+def _tool_ctx(db=None):
     """Yield ``(User, ApiToken, Session)`` for the current tool call.
 
     Raises :class:`tools_mod.ToolError` if the caller is unauthenticated or
@@ -69,14 +69,22 @@ def _tool_ctx():
     if access is None:
         raise tools_mod.ToolError("Authentication required.")
 
-    with Session(get_engine()) as db:
-        pat: ApiToken | None = resolve_token(db, access.token)
+    def _create_session():
+        return Session(get_engine())
+
+    if db is not None:
+        session_factory = lambda: db
+    else:
+        session_factory = _create_session
+
+    with session_factory() as session:
+        pat: ApiToken | None = resolve_token(session, access.token)
         if pat is None:
             raise tools_mod.ToolError("Token has been revoked or expired.")
-        user = db.get(User, pat.user_id)
+        user = session.get(User, pat.user_id)
         if user is None or user.is_active is False:
             raise tools_mod.ToolError("User account disabled.")
-        yield user, pat, db
+        yield user, pat, session
 
 
 # ─── Tool registration ────────────────────────────────────────────────────
