@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> &middot; <a href="https://onllm.dev">onllm.dev</a> &middot; <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
+  <a href="https://github.com/onllm-dev/4DPocket">GitHub</a> &middot; <a href="https://onllm.dev">onllm.dev</a> &middot; <a href="https://chromewebstore.google.com/detail/jhcbhfaobhignepcfnfchecociapldio">Chrome Web Store</a> &middot; <a href="https://buymeacoffee.com/prakersh">Support 4DPocket</a>
 </p>
 
 ---
@@ -508,19 +508,17 @@ URL validation on import, content size caps (1MB content, 50K description), XSS-
 - Responsive — mobile (bottom nav), tablet (collapsible sidebar), desktop (full sidebar + shortcuts)
 - Dark mode — system-aware with manual toggle (Doraemon Blue theme)
 
-### Chrome Extension (Beta)
+### Chrome Extension
 
-Save pages with one click, highlight text on any page, view highlights in a sidebar. Currently in beta — tested with Google Chrome.
+Save pages with one click, highlight text on any page, view highlights in a sidebar. Published on the Chrome Web Store — install with one click, no manual zip upload needed.
 
-**Install from release:** Download `4dpocket-chrome-extension-*.zip` from the [latest release](https://github.com/onllm-dev/4DPocket/releases/latest), unzip, load in `chrome://extensions` (Developer mode > Load unpacked).
+**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/jhcbhfaobhignepcfnfchecociapldio)**
 
 **Build from source:**
 ```bash
-./app.sh build                    # builds frontend + extension together
-./app.sh build --extension        # extension only
-# or manually: cd extension && pnpm install && pnpm build
+cd extension && pnpm install && pnpm build
 ```
-Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions` (Developer mode → Load unpacked). `./app.sh setup` also installs extension dependencies and produces this build out of the box.
+Load `extension/dist/chrome-mv3` as an unpacked extension in `chrome://extensions` (Developer mode → Load unpacked).
 
 - One-click save current page
 - Right-click context menu save

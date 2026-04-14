@@ -60,16 +60,11 @@ function BellIcon() {
 
 function SidebarLogo() {
   return (
-    <svg viewBox="0 0 512 512" className="w-8 h-8 flex-shrink-0">
-      <circle cx="256" cy="256" r="240" fill="#0096C7"/>
-      <circle cx="256" cy="280" r="160" fill="white"/>
-      <path d="M176 300 Q176 380 256 380 Q336 380 336 300" fill="none" stroke="#0096C7" strokeWidth="8" strokeLinecap="round"/>
-      <path d="M196 300 Q196 260 256 260 Q316 260 316 300" fill="#F0F9FF" stroke="#0096C7" strokeWidth="4"/>
-      <text x="230" y="240" fontFamily="Inter, Arial, sans-serif" fontWeight="900" fontSize="64" fill="#0096C7">4D</text>
-      <circle cx="256" cy="340" r="16" fill="#FCD34D" stroke="#D97706" strokeWidth="2"/>
-      <line x1="256" y1="340" x2="256" y2="356" stroke="#D97706" strokeWidth="2"/>
-      <circle cx="256" cy="196" r="12" fill="#EF4444"/>
-    </svg>
+    <img
+      src="/icons/icon-192.png"
+      alt="4DPocket"
+      className="w-8 h-8 flex-shrink-0 rounded-md"
+    />
   );
 }
 

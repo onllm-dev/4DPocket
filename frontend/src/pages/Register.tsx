@@ -5,29 +5,11 @@ import { useRegister, useLogin } from "@/hooks/use-auth";
 
 function DoraemonLogo() {
   return (
-    <div className="relative w-24 h-24 mx-auto mb-4">
-      <svg viewBox="0 0 512 512" className="w-full h-full drop-shadow-lg">
-        <circle cx="256" cy="256" r="240" fill="#0096C7"/>
-        <ellipse cx="256" cy="280" rx="175" ry="165" fill="white"/>
-        <ellipse cx="222" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" strokeWidth="3"/>
-        <ellipse cx="290" cy="190" rx="32" ry="36" fill="white" stroke="#0C1222" strokeWidth="3"/>
-        <circle cx="232" cy="195" r="12" fill="#0C1222"/>
-        <circle cx="280" cy="195" r="12" fill="#0C1222"/>
-        <circle cx="236" cy="189" r="4" fill="white"/>
-        <circle cx="284" cy="189" r="4" fill="white"/>
-        <circle cx="256" cy="228" r="16" fill="#EF4444"/>
-        <line x1="256" y1="244" x2="256" y2="300" stroke="#0C1222" strokeWidth="3"/>
-        <path d="M176 280 Q216 340 256 300 Q296 340 336 280" fill="none" stroke="#0C1222" strokeWidth="3" strokeLinecap="round"/>
-        <line x1="90" y1="230" x2="190" y2="248" stroke="#0C1222" strokeWidth="2.5"/>
-        <line x1="85" y1="260" x2="188" y2="265" stroke="#0C1222" strokeWidth="2.5"/>
-        <line x1="90" y1="290" x2="190" y2="282" stroke="#0C1222" strokeWidth="2.5"/>
-        <line x1="422" y1="230" x2="322" y2="248" stroke="#0C1222" strokeWidth="2.5"/>
-        <line x1="427" y1="260" x2="324" y2="265" stroke="#0C1222" strokeWidth="2.5"/>
-        <line x1="422" y1="290" x2="322" y2="282" stroke="#0C1222" strokeWidth="2.5"/>
-        <rect x="140" y="390" width="232" height="24" rx="12" fill="#EF4444"/>
-        <circle cx="256" cy="414" r="18" fill="#FCD34D" stroke="#D97706" strokeWidth="2"/>
-      </svg>
-    </div>
+    <img
+      src="/icons/icon-512.png"
+      alt="4DPocket"
+      className="relative w-24 h-24 mx-auto mb-4 rounded-2xl"
+    />
   );
 }
 

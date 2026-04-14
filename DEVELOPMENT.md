@@ -234,6 +234,8 @@ pnpm build     # Production build
 
 Load `extension/dist/chrome-mv3` as unpacked extension in `chrome://extensions`.
 
+**[Published on Chrome Web Store](https://chromewebstore.google.com/detail/jhcbhfaobhignepcfnfchecociapldio)** — install the published version for auto-updates.
+
 ## Troubleshooting
 
 **Port already in use:**
