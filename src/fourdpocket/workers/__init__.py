@@ -1,6 +1,5 @@
 """Background workers using Huey with SQLite backend."""
 
-import os
 from pathlib import Path
 
 from huey import SqliteHuey
@@ -34,4 +33,3 @@ def __getattr__(name: str):
     if name == "huey":
         return _get_huey()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

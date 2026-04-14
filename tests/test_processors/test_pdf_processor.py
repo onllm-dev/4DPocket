@@ -56,12 +56,11 @@ Plain paragraph without heading."""
     def test_url_pattern_matching(self):
         """PDF processor is file-upload based, not URL matched."""
         import fourdpocket.processors  # noqa: F401 — ensures all processors are registered
-        # Import from registry directly to get the current module-level function
-        from fourdpocket.processors.registry import match_processor as _match_processor
+        from fourdpocket.processors.registry import match_processor
 
         # PDF processor doesn't have URL patterns, so match_processor
         # returns GenericURLProcessor for PDF URLs
-        proc = _match_processor("https://example.com/document.pdf")
+        proc = match_processor("https://example.com/document.pdf")
         assert type(proc).__name__ == "GenericURLProcessor"
 
 

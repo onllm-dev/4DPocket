@@ -29,16 +29,15 @@ class TestExtract:
     def test_url_pattern_matching(self):
         """Processor URL regex patterns match expected URLs via match_processor."""
         import fourdpocket.processors  # noqa: F401 — ensures all processors are registered
-        # Import from registry directly to get the current module-level function
-        from fourdpocket.processors.registry import match_processor as _match_processor
+        from fourdpocket.processors.registry import match_processor
 
-        proc = _match_processor("https://www.tiktok.com/@user/video/1234567890")
+        proc = match_processor("https://www.tiktok.com/@user/video/1234567890")
         assert type(proc).__name__ == "TikTokProcessor"
 
-        proc = _match_processor("https://vm.tiktok.com/AbCdEf/")
+        proc = match_processor("https://vm.tiktok.com/AbCdEf/")
         assert type(proc).__name__ == "TikTokProcessor"
 
-        proc = _match_processor("https://tiktok.com/t/abc123DEF/")
+        proc = match_processor("https://tiktok.com/t/abc123DEF/")
         assert type(proc).__name__ == "TikTokProcessor"
 
     @respx.mock
