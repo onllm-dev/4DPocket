@@ -73,7 +73,8 @@ def _tool_ctx(db=None):
         return Session(get_engine())
 
     if db is not None:
-        session_factory = lambda: db
+        def session_factory():
+            return db
     else:
         session_factory = _create_session
 
