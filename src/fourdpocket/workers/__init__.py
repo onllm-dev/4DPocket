@@ -21,6 +21,7 @@ def _get_huey():
             name="4dpocket",
             filename=str(base_path / "huey_tasks.db"),
             immediate=False,
+            timeout=30,
         )
     return _huey_instance
 
