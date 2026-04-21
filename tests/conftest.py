@@ -46,6 +46,32 @@ def reset_search_singleton():
 
 
 @pytest.fixture(autouse=True)
+def reset_processor_registry():
+    """Snapshot/restore the processor registry around every test.
+
+    ``fourdpocket.processors.registry`` keeps two module-level lists
+    (_REGISTRY, _PATTERNS). When tests register throwaway processors inside
+    an xdist worker, any leak — even temporary — can flip the output of
+    ``match_processor`` for later tests in the same worker, producing flaky
+    failures like ``test_url_pattern_matching`` intermittently seeing a wrong
+    processor class. Snapshotting covers the whole class of issues regardless
+    of which test is to blame.
+    """
+    # Import eagerly so the full processor set is registered before we snapshot.
+    import fourdpocket.processors  # noqa: F401
+    from fourdpocket.processors import registry
+
+    reg_before = dict(registry._REGISTRY)
+    pat_before = list(registry._PATTERNS)
+    try:
+        yield
+    finally:
+        registry._REGISTRY.clear()
+        registry._REGISTRY.update(reg_before)
+        registry._PATTERNS[:] = pat_before
+
+
+@pytest.fixture(autouse=True)
 def reset_settings_singleton():
     """Reset the settings singleton between tests.
 
