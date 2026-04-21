@@ -41,6 +41,12 @@ interface AIConfig {
   sync_enrichment: boolean;
 }
 
+interface SearchConfig {
+  graph_ranker_enabled: boolean;
+  graph_ranker_hop_decay: number;
+  graph_ranker_top_k: number;
+}
+
 export default function Admin() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
@@ -100,6 +106,18 @@ export default function Admin() {
     mutationFn: (data: Partial<AIConfig>) =>
       api.patch("/api/v1/admin/ai-settings", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "ai-settings"] }),
+  });
+
+  const { data: searchConfig } = useQuery<SearchConfig>({
+    queryKey: ["admin", "search-settings"],
+    queryFn: () => api.get("/api/v1/admin/search-settings"),
+    enabled: !!currentUser && currentUser.role === "admin",
+  });
+
+  const updateSearch = useMutation({
+    mutationFn: (data: Partial<SearchConfig>) =>
+      api.patch("/api/v1/admin/search-settings", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "search-settings"] }),
   });
 
   // Role guard: redirect non-admins
@@ -219,6 +237,9 @@ export default function Admin() {
 
       {/* AI Configuration */}
       <AIConfigSection config={aiConfig} onUpdate={(data) => updateAI.mutate(data)} />
+
+      {/* Search Configuration */}
+      <SearchConfigSection config={searchConfig} onUpdate={(data) => updateSearch.mutate(data)} />
 
       {/* Users Table */}
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
@@ -596,6 +617,139 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <button
               onClick={handleDiscard}
               className="px-5 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Discard
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SearchConfigSection({ config, onUpdate }: { config?: SearchConfig; onUpdate: (data: Partial<SearchConfig>) => void }) {
+  const [localConfig, setLocalConfig] = useState<SearchConfig | null>(null);
+  const effective = localConfig ?? config;
+  const isDirty = localConfig !== null && JSON.stringify(localConfig) !== JSON.stringify(config);
+
+  const updateLocal = (patch: Partial<SearchConfig>) => {
+    setLocalConfig({ ...(effective as SearchConfig), ...patch });
+  };
+
+  const handleSave = () => {
+    if (!localConfig || !config) return;
+    const changed: Partial<SearchConfig> = {};
+    (Object.keys(localConfig) as (keyof SearchConfig)[]).forEach((k) => {
+      if (localConfig[k] !== config[k]) {
+        (changed as Record<string, unknown>)[k] = localConfig[k];
+      }
+    });
+    if (Object.keys(changed).length > 0) {
+      onUpdate(changed);
+      setLocalConfig(null);
+    }
+  };
+
+  if (!effective) {
+    return (
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <SettingsIcon className="w-5 h-5 text-sky-600" />
+          <h2 className="font-bold text-gray-900 dark:text-gray-100">Search Configuration</h2>
+        </div>
+        <div className="h-24 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <SettingsIcon className="w-5 h-5 text-sky-600" />
+        <h2 className="font-bold text-gray-900 dark:text-gray-100">Search Configuration</h2>
+        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">Admin overrides .env</span>
+      </div>
+
+      <div className="space-y-4">
+        {/* Section header */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Graph-Anchored Ranker</p>
+        </div>
+
+        {/* Enable toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Enable graph ranker</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Rank items by matching entities and 1-hop relations alongside keyword and vector search.
+              No-op until entity extraction has populated the concept graph.
+            </p>
+          </div>
+          <button
+            onClick={() => updateLocal({ graph_ranker_enabled: !effective.graph_ranker_enabled })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              effective.graph_ranker_enabled ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+              effective.graph_ranker_enabled ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+
+        {/* Hop decay */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1 pr-4">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Hop decay</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Neighbor contribution multiplier (0.0 = seeds only, 1.0 = neighbors fully weighted)
+            </p>
+          </div>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={effective.graph_ranker_hop_decay}
+            onChange={(e) => updateLocal({ graph_ranker_hop_decay: parseFloat(e.target.value) })}
+            className="w-24 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+          />
+        </div>
+
+        {/* Top k */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1 pr-4">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Top K</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Max items returned by the graph ranker before fusion</p>
+          </div>
+          <input
+            type="number"
+            min={1}
+            max={500}
+            step={10}
+            value={effective.graph_ranker_top_k}
+            onChange={(e) => updateLocal({ graph_ranker_top_k: parseInt(e.target.value, 10) })}
+            className="w-24 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5"
+          />
+        </div>
+
+        {/* Save / Discard */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={handleSave}
+            disabled={!isDirty}
+            className={`px-4 py-2 text-sm font-medium rounded-lg ${
+              isDirty
+                ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            Save
+          </button>
+          {isDirty && (
+            <button
+              onClick={() => setLocalConfig(null)}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
             >
               Discard
             </button>

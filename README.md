@@ -365,9 +365,9 @@ Independent stages run in parallel. Dependent stages auto-enqueue when prerequis
 **Architecture:**
 
 ```
-Query → Keyword Backend → ┐
-                          ├→ RRF Fusion → Reranker (optional) → Results
-Query → Vector Backend  → ┘
+Query → Keyword Backend ─────────────────────┐
+Query → Vector Backend ──────────────────────┤→ N-ranker RRF → Reranker (optional) → Results
+Query → Graph Ranker (entities, 1-hop) ─────┘  (opt-in)
 ```
 
 | Stage | How It Works |
@@ -375,7 +375,8 @@ Query → Vector Backend  → ┘
 | **Chunking** | Section-aware chunking — content split per-section with provenance (section_kind, author, heading_path). Overlapping chunks (512 tokens, 64 overlap) indexed with metadata for paragraph-level precision |
 | **Keyword Search** | SQLite FTS5 (BM25, porter stemming) or Meilisearch — searches both item-level and chunk-level indexes |
 | **Vector Search** | Sentence-transformers embeddings stored in ChromaDB (SQLite) or pgvector (Postgres). Chunk-level + item-level embeddings |
-| **RRF Fusion** | Reciprocal Rank Fusion (k=60) merges keyword + vector results, deduplicates by item |
+| **Graph Ranker** (default-on) | Third RRF input: seeds entities by token match on `canonical_name`/alias, expands 1-hop via `EntityRelation`, scores items by `ItemEntity.salience × (seed ? 1 : edge_weight × hop_decay)`. Default enabled (`FDP_SEARCH__GRAPH_RANKER_ENABLED=true`); admins can disable from **Admin → Search Configuration**. No-op until entity extraction has populated the concept graph. Results carry a `"graph"` source tag |
+| **RRF Fusion** | Reciprocal Rank Fusion (k=60) merges N ranker outputs (keyword + vector + optional graph), deduplicates by item |
 | **Reranking** | Optional cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-scores top candidates for precision |
 | **Unified Search** | Returns items AND notes together with inline filter syntax |
 
@@ -570,6 +571,9 @@ FDP_AUTH__MODE=single                 # single (no login) or multi (JWT)
 FDP_SEARCH__VECTOR_BACKEND=auto       # auto (pgvector for Postgres, chroma for SQLite), chroma, pgvector
 FDP_SEARCH__CHUNK_SIZE_TOKENS=512     # Target chunk size for content splitting
 FDP_SEARCH__CHUNK_OVERLAP_TOKENS=64   # Overlap between adjacent chunks
+FDP_SEARCH__GRAPH_RANKER_ENABLED=true  # Third RRF input from the concept graph (default on; admin-disableable)
+FDP_SEARCH__GRAPH_RANKER_HOP_DECAY=0.5 # Neighbor contribution multiplier (0.0-1.0)
+FDP_SEARCH__GRAPH_RANKER_TOP_K=50      # Max items returned by the graph ranker
 
 # Reranker (optional, improves search precision)
 FDP_RERANK__ENABLED=false             # Enable cross-encoder reranking
@@ -622,7 +626,7 @@ Interactive docs at http://localhost:4040/docs when running.
 
 **MCP** — Streamable-HTTP server at `/mcp`; see [Using 4DPocket as an MCP Server](#using-4dpocket-as-an-mcp-server)
 
-**Admin** — User management, AI config, instance settings, saved filters
+**Admin** — User management, AI config (`GET/PATCH /admin/ai-settings`), search config (`GET/PATCH /admin/search-settings` — graph ranker toggle), instance settings, saved filters
 
 **Auth** — Register, login, logout, profile update, password change
 
@@ -642,8 +646,9 @@ Interactive docs at http://localhost:4040/docs when running.
 │   ├── processors/            # 17 platform extractors
 │   ├── ai/                    # Providers, tagger, summarizer, extractor, canonicalizer, LLM cache
 │   ├── search/                # Search service + pluggable backends
-│   │   ├── service.py         # SearchService orchestrator (keyword + vector + RRF + rerank)
-│   │   ├── base.py            # Protocol definitions (KeywordBackend, VectorBackend, Reranker)
+│   │   ├── service.py         # SearchService orchestrator (keyword + vector + graph + RRF + rerank)
+│   │   ├── base.py            # Protocol definitions (KeywordBackend, VectorBackend, Reranker, GraphHit)
+│   │   ├── graph_ranker.py    # Graph-anchored ranker (opt-in third RRF input; entities + 1-hop)
 │   │   ├── backends/          # Backend implementations
 │   │   │   ├── sqlite_fts_backend.py   # SQLite FTS5 (item + chunk search)
 │   │   │   ├── chroma_backend.py       # ChromaDB vector store

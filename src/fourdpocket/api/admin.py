@@ -8,7 +8,12 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_db, get_or_create_settings, require_admin
+from fourdpocket.api.deps import (
+    get_db,
+    get_or_create_settings,
+    require_admin,
+    require_jwt_session,
+)
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.collection import Collection
 from fourdpocket.models.entity import Entity
@@ -122,6 +127,7 @@ def update_user(
     data: AdminUserUpdate,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
 ):
     user = db.get(User, user_id)
     if not user:
@@ -143,6 +149,7 @@ def delete_user(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
 ):
     user = db.get(User, user_id)
     if not user:
@@ -319,6 +326,7 @@ def update_ai_settings(
     data: AISettingsUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
 ):
     """Update AI settings (stored in InstanceSettings.extra['ai_config']).
 
@@ -358,6 +366,69 @@ def update_ai_settings(
     return masked
 
 
+# ─── Search Settings (admin-controlled) ─────────────────────────
+
+SEARCH_CONFIG_KEYS = {
+    "graph_ranker_enabled",
+    "graph_ranker_hop_decay",
+    "graph_ranker_top_k",
+}
+
+
+@router.get("/search-settings")
+def get_search_settings(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get resolved search configuration (env defaults + admin overrides)."""
+    from fourdpocket.search.admin_config import get_resolved_search_config
+
+    return get_resolved_search_config()
+
+
+class SearchSettingsUpdate(BaseModel):
+    graph_ranker_enabled: bool | None = None
+    graph_ranker_hop_decay: float | None = None
+    graph_ranker_top_k: int | None = None
+
+
+@router.patch("/search-settings")
+def update_search_settings(
+    data: SearchSettingsUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
+):
+    """Update search settings (stored in InstanceSettings.extra['search_config']).
+
+    Admin panel settings take precedence over .env values.
+    """
+    settings = get_or_create_settings(db)
+    # Deep copy both layers so SQLAlchemy detects the JSON-column change.
+    extra = dict(settings.extra) if settings.extra else {}
+    search_config = dict(extra.get("search_config", {}))
+
+    update_dict = data.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        if key in SEARCH_CONFIG_KEYS:
+            # Light validation on numeric bounds
+            if key == "graph_ranker_hop_decay" and value is not None:
+                value = max(0.0, min(1.0, float(value)))
+            if key == "graph_ranker_top_k" and value is not None:
+                value = max(1, min(500, int(value)))
+            search_config[key] = value
+
+    extra["search_config"] = search_config
+    settings.extra = extra
+    db.add(settings)
+    db.commit()
+    db.refresh(settings)
+
+    from fourdpocket.search.admin_config import get_resolved_search_config
+
+    return get_resolved_search_config()
+
+
 # ─── Instance Settings ──────────────────────────────────────────
 
 class InstanceSettingsRead(BaseModel):
@@ -390,6 +461,7 @@ def update_instance_settings(
     data: InstanceSettingsUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
 ):
     settings = get_or_create_settings(db)
     update_dict = data.model_dump(exclude_unset=True)

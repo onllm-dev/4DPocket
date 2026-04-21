@@ -7,6 +7,7 @@ from collections import defaultdict
 from sqlmodel import Session
 
 from fourdpocket.search.base import (
+    GraphHit,
     KeywordBackend,
     KeywordHit,
     SearchFilters,
@@ -146,8 +147,33 @@ class SearchService:
             except Exception as e:
                 logger.debug("Vector search unavailable: %s", e)
 
-        # 3. RRF fusion
-        merged = self._rrf_fusion(keyword_hits, vector_hits)
+        # 2b. Graph-anchored ranker (third RRF input).
+        # Default-on at env level; admin can disable via InstanceSettings.
+        # No-op silently if entity data has not been populated yet.
+        graph_hits: list[GraphHit] = []
+        try:
+            from fourdpocket.search.admin_config import get_resolved_search_config
+
+            search_cfg = get_resolved_search_config()
+            if search_cfg.get("graph_ranker_enabled", True):
+                from fourdpocket.search.graph_ranker import graph_anchored_hits
+
+                graph_hits = graph_anchored_hits(
+                    db,
+                    query,
+                    user_id,
+                    k=int(search_cfg.get("graph_ranker_top_k", 50)),
+                    hop_decay=float(search_cfg.get("graph_ranker_hop_decay", 0.5)),
+                )
+        except Exception as e:
+            logger.debug("Graph ranker unavailable: %s", e)
+
+        # 3. RRF fusion (N rankers)
+        merged = self._rrf_fusion_n([
+            ("fts", keyword_hits),
+            ("semantic", vector_hits),
+            ("graph", graph_hits),
+        ])
 
         # 3b. Apply collection-level ACL by intersecting with the allow-set.
         if filters.allowed_item_ids is not None:
@@ -191,20 +217,40 @@ class SearchService:
         vector_hits: list,
         k: int = 60,
     ) -> list[SearchResult]:
-        """Reciprocal Rank Fusion of keyword and vector results."""
+        """Backward-compatible 2-ranker fusion (keyword + vector).
+
+        Preserved for existing callers/tests. Delegates to _rrf_fusion_n.
+        """
+        return self._rrf_fusion_n(
+            [("fts", keyword_hits), ("semantic", vector_hits)], k=k
+        )
+
+    def _rrf_fusion_n(
+        self,
+        rankers: list[tuple[str, list]],
+        k: int = 60,
+    ) -> list[SearchResult]:
+        """Reciprocal Rank Fusion across N named ranker outputs.
+
+        Each ranker is (source_name, hits). Hits just need an ``item_id`` attr.
+        KeywordHit's snippets (if present) are captured for the result — fusion
+        prefers the first snippet seen per item (FTS wins in practice since it
+        runs first and is the only source that carries snippets today).
+        """
         scores: dict[str, float] = defaultdict(float)
         sources: dict[str, set] = defaultdict(set)
         snippets: dict[str, tuple] = {}
 
-        for rank, hit in enumerate(keyword_hits):
-            scores[hit.item_id] += 1.0 / (k + rank)
-            sources[hit.item_id].add("fts")
-            if hit.item_id not in snippets:
-                snippets[hit.item_id] = (hit.title_snippet, hit.content_snippet)
-
-        for rank, hit in enumerate(vector_hits):
-            scores[hit.item_id] += 1.0 / (k + rank)
-            sources[hit.item_id].add("semantic")
+        for source_name, hits in rankers:
+            for rank, hit in enumerate(hits):
+                item_id = hit.item_id
+                scores[item_id] += 1.0 / (k + rank)
+                sources[item_id].add(source_name)
+                if item_id not in snippets:
+                    title_snip = getattr(hit, "title_snippet", None)
+                    content_snip = getattr(hit, "content_snippet", None)
+                    if title_snip is not None or content_snip is not None:
+                        snippets[item_id] = (title_snip, content_snip)
 
         results = []
         for item_id, score in sorted(scores.items(), key=lambda x: -x[1]):

@@ -81,6 +81,13 @@ class SearchSettings(BaseSettings):
     chunk_size_tokens: int = 512
     chunk_overlap_tokens: int = 64
     max_chunks_per_item: int = 200
+    # Graph-anchored ranker — third RRF input sourced from the concept graph.
+    # Default-on: no-op for users without entity data, contributes when entities
+    # have been populated by the enrichment pipeline. Admins can disable from
+    # the admin panel (InstanceSettings.extra["search_config"]).
+    graph_ranker_enabled: bool = True
+    graph_ranker_hop_decay: float = 0.5  # neighbor contribution = weight * hop_decay
+    graph_ranker_top_k: int = 50  # max items returned by the graph ranker
 
 
 class AISettings(BaseSettings):

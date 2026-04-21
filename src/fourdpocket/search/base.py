@@ -26,6 +26,16 @@ class VectorHit:
 
 
 @dataclass
+class GraphHit:
+    """Hit produced by the graph-anchored ranker.
+
+    score is an internal ordering signal — fusion consumes the rank, not the value.
+    """
+    item_id: str
+    score: float = 0.0
+
+
+@dataclass
 class SearchResult:
     item_id: str
     score: float = 0.0

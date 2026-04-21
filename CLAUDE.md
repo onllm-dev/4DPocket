@@ -116,15 +116,17 @@ frontend/src/
 ## Search Architecture
 
 ```
-Query → KeywordBackend.search() → ┐
-                                   ├→ RRF Fusion (k=60) → Reranker (optional) → Results
-Query → embed → VectorBackend.search() → ┘
+Query → KeywordBackend.search() ─────────────┐
+Query → embed → VectorBackend.search() ──────┤→ N-ranker RRF (k=60) → Reranker (optional) → Results
+Query → GraphRanker (entities + 1-hop) ─────┘  (opt-in via FDP_SEARCH__GRAPH_RANKER_ENABLED)
 ```
 
 - **Auto-detection**: `vector_backend=auto` picks pgvector for Postgres, ChromaDB for SQLite
 - **Chunk-level**: Content split into overlapping chunks, indexed in both keyword + vector backends
 - **Fallback**: Chunk search → item-level search if no chunks exist
 - **pgvector dimensions**: Auto-detected from embedding provider (not hardcoded)
+- **Graph ranker** (default-on, admin-disableable): third RRF input that seeds entities by token match on `canonical_name`/alias, expands 1-hop via `EntityRelation`, and scores items by `ItemEntity.salience × (seed ? 1 : edge_weight × hop_decay)`. Source tag `"graph"` appears in `SearchResult.sources`. No-op when the concept graph is empty (users without entity extraction see zero behavior change). Implemented in `src/fourdpocket/search/graph_ranker.py`; fusion is generic via `SearchService._rrf_fusion_n` (old `_rrf_fusion(kw, vec)` kept as a thin wrapper).
+- **Admin override**: `InstanceSettings.extra["search_config"]` mirrors the AI pattern. Endpoints `GET/PATCH /api/v1/admin/search-settings` (admin-gated); resolver in `src/fourdpocket/search/admin_config.py` (.env defaults < admin panel overrides). Admin toggle lives under "Search Configuration" in the admin panel.
 
 ## Enrichment Pipeline
 
