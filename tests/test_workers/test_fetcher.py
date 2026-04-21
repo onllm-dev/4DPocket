@@ -333,10 +333,12 @@ class TestFetchAndProcessUrlSuccess:
         # Instead, use call_local which bypasses Huey and calls the function directly
         monkeypatch.setattr("asyncio.run", fake_asyncio_run)
 
-        # Mock match_processor to return our FakeProcessor
-        import fourdpocket.processors.registry as registry_module
-        original_match = registry_module.match_processor
-        registry_module.match_processor = lambda url: FakeProcessor()
+        # Mock match_processor to return our FakeProcessor. Use ONLY
+        # monkeypatch so teardown reverts cleanly — a prior direct assignment
+        # like ``registry.match_processor = lambda ...`` would be captured by
+        # monkeypatch as the "original" value and silently reinstated on
+        # teardown, permanently corrupting the registry module for the rest
+        # of the worker's life and flaking downstream pattern tests.
         monkeypatch.setattr(
             "fourdpocket.processors.registry.match_processor",
             lambda url: FakeProcessor(),
@@ -351,9 +353,6 @@ class TestFetchAndProcessUrlSuccess:
         )
 
         result = fetch_and_process_url.call_local(str(item.id), item.url, str(user.id))
-
-        # Restore
-        registry_module.match_processor = original_match
 
         assert result["status"] == "success"
 
