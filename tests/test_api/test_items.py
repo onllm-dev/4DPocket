@@ -261,8 +261,9 @@ def test_check_url_requires_auth(client):
 
 
 def test_get_timeline(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     _ = make_item(db, user.id, title="Timeline Item", item_type="url")
@@ -280,8 +281,9 @@ def test_get_timeline_empty(client, auth_headers):
 
 
 def test_get_reading_queue(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, content="Some content", reading_progress=30, item_type="url")
@@ -292,8 +294,9 @@ def test_get_reading_queue(client, auth_headers, db):
 
 
 def test_get_reading_queue_excludes_completed(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, content="Full content", reading_progress=100, item_type="url")
@@ -304,9 +307,10 @@ def test_get_reading_queue_excludes_completed(client, auth_headers, db):
 
 
 def test_get_reading_list(client, auth_headers, db):
+    from sqlmodel import select
+
     from fourdpocket.models.base import ReadingStatus
     from fourdpocket.models.user import User
-    from sqlmodel import select
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     _ = make_item(db, user.id, reading_status=ReadingStatus.reading_list, item_type="url")
@@ -318,9 +322,10 @@ def test_get_reading_list(client, auth_headers, db):
 
 
 def test_get_read_items(client, auth_headers, db):
+    from sqlmodel import select
+
     from fourdpocket.models.base import ReadingStatus
     from fourdpocket.models.user import User
-    from sqlmodel import select
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     make_item(db, user.id, reading_status=ReadingStatus.read, item_type="url")
@@ -338,8 +343,9 @@ def test_get_queue_stats(client, auth_headers, db):
 
 
 def test_archive_item(client, auth_headers, db, monkeypatch):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", item_type="url")
@@ -351,8 +357,9 @@ def test_archive_item(client, auth_headers, db, monkeypatch):
 
 
 def test_archive_item_no_url(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url=None, item_type="note")
@@ -361,8 +368,9 @@ def test_archive_item_no_url(client, auth_headers, db):
 
 
 def test_reprocess_item(client, auth_headers, db, monkeypatch):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", item_type="url")
@@ -373,8 +381,9 @@ def test_reprocess_item(client, auth_headers, db, monkeypatch):
 
 
 def test_reprocess_item_no_url(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url=None, item_type="note")
@@ -383,8 +392,9 @@ def test_reprocess_item_no_url(client, auth_headers, db):
 
 
 def test_get_related_items(client, auth_headers, db, monkeypatch):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -395,8 +405,9 @@ def test_get_related_items(client, auth_headers, db, monkeypatch):
 
 
 def test_update_reading_progress(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -411,8 +422,9 @@ def test_update_reading_progress(client, auth_headers, db):
 
 
 def test_bulk_archive(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item1 = make_item(db, user.id, item_type="url")
@@ -428,8 +440,9 @@ def test_bulk_archive(client, auth_headers, db):
 
 
 def test_bulk_delete(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item1 = make_item(db, user.id, item_type="url")
@@ -445,8 +458,9 @@ def test_bulk_delete(client, auth_headers, db):
 
 
 def test_bulk_favorite(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -460,8 +474,9 @@ def test_bulk_favorite(client, auth_headers, db):
 
 
 def test_bulk_unfavorite(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, is_favorite=True, item_type="url")
@@ -475,8 +490,9 @@ def test_bulk_unfavorite(client, auth_headers, db):
 
 
 def test_bulk_tag_by_id(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     from tests.factories import make_item, make_tag
     user = db.exec(select(User)).first()
     item = make_item(db, user.id, item_type="url")
@@ -491,8 +507,9 @@ def test_bulk_tag_by_id(client, auth_headers, db):
 
 
 def test_bulk_tag_by_name(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     from tests.factories import make_item
     user = db.exec(select(User)).first()
     item = make_item(db, user.id, item_type="url")
@@ -506,8 +523,9 @@ def test_bulk_tag_by_name(client, auth_headers, db):
 
 
 def test_bulk_enrich(client, auth_headers, db, monkeypatch):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -521,8 +539,9 @@ def test_bulk_enrich(client, auth_headers, db, monkeypatch):
 
 
 def test_media_proxy_unsafe_localhost(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -534,8 +553,9 @@ def test_media_proxy_unsafe_localhost(client, auth_headers, db):
 
 
 def test_media_proxy_unsafe_10_network(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -547,8 +567,9 @@ def test_media_proxy_unsafe_10_network(client, auth_headers, db):
 
 
 def test_media_proxy_unsafe_172_network(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -560,8 +581,9 @@ def test_media_proxy_unsafe_172_network(client, auth_headers, db):
 
 
 def test_media_proxy_unsafe_dot_local(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -573,8 +595,9 @@ def test_media_proxy_unsafe_dot_local(client, auth_headers, db):
 
 
 def test_media_proxy_unsafe_ftp_scheme(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -588,8 +611,9 @@ def test_media_proxy_unsafe_ftp_scheme(client, auth_headers, db):
 def test_media_proxy_cache_hit(client, auth_headers, db, monkeypatch):
     import tempfile
 
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -619,8 +643,9 @@ def test_serve_media(client, auth_headers, db, monkeypatch):
     import tempfile
     from pathlib import Path
 
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -644,8 +669,9 @@ def test_serve_media(client, auth_headers, db, monkeypatch):
 
 
 def test_serve_media_wrong_user_path(client, auth_headers, db):
-    from fourdpocket.models.user import User
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
@@ -656,9 +682,10 @@ def test_serve_media_wrong_user_path(client, auth_headers, db):
 
 
 def test_download_video(client, auth_headers, db, monkeypatch):
+    from sqlmodel import select
+
     from fourdpocket.models.base import SourcePlatform
     from fourdpocket.models.user import User
-    from sqlmodel import select
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://youtube.com/watch?v=abc", source_platform=SourcePlatform.youtube, item_type="url")
@@ -669,9 +696,10 @@ def test_download_video(client, auth_headers, db, monkeypatch):
 
 
 def test_download_video_unsupported_platform(client, auth_headers, db):
+    from sqlmodel import select
+
     from fourdpocket.models.base import SourcePlatform
     from fourdpocket.models.user import User
-    from sqlmodel import select
     user = db.exec(select(User)).first()
     from tests.factories import make_item
     item = make_item(db, user.id, url="https://example.com/article", source_platform=SourcePlatform.generic, item_type="url")
@@ -679,8 +707,16 @@ def test_download_video_unsupported_platform(client, auth_headers, db):
     assert response.status_code == 400
 
 
-def test_is_safe_proxy_url_valid(client, auth_headers):
+def test_is_safe_proxy_url_valid(client, auth_headers, monkeypatch):
+    import socket
+
     from fourdpocket.api.items import _is_safe_proxy_url
+
+    def fake_getaddrinfo(*args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
     assert _is_safe_proxy_url("http://example.com/image.jpg") is True
     assert _is_safe_proxy_url("https://cdn.example.com/photo.png") is True
 
@@ -710,9 +746,35 @@ def test_is_safe_proxy_url_ftp(client, auth_headers):
     assert _is_safe_proxy_url("ftp://example.com/file") is False
 
 
-def test_try_sync_enrich_noop_when_tags_exist(client, auth_headers, db, monkeypatch):
-    from fourdpocket.models.user import User
+def test_media_proxy_rejects_hostname_resolving_to_loopback(client, auth_headers, db, monkeypatch):
+    import socket
+
     from sqlmodel import select
+
+    from fourdpocket.models.user import User
+
+    user = db.exec(select(User)).first()
+    from tests.factories import make_item
+
+    item = make_item(db, user.id, item_type="url")
+
+    def fake_getaddrinfo(*args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
+    response = client.get(
+        f"/api/v1/items/{item.id}/media-proxy?url=http://blocked.example/image.jpg",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_try_sync_enrich_noop_when_tags_exist(client, auth_headers, db, monkeypatch):
+    from sqlmodel import select
+
+    from fourdpocket.models.user import User
     user = db.exec(select(User)).first()
     from tests.factories import make_enrichment_stage, make_item, make_tag
 

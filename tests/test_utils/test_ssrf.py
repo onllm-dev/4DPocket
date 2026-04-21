@@ -53,14 +53,13 @@ class TestSSRFBlockedIPs:
             assert is_safe_url(f"http://[{ip}]/") is False, f"{ip} should be blocked"
 
     @pytest.mark.security
-    def test_fe80_link_local_not_blocked(self):
-        """fe80::/10 (link-local) is intentionally NOT blocked."""
+    def test_fe80_link_local_is_blocked(self):
+        """fe80::/10 (link-local) must be rejected."""
         with patch("socket.getaddrinfo") as mock_getaddrinfo:
             mock_getaddrinfo.return_value = [
                 (MagicMock(), MagicMock(), MagicMock(), MagicMock(), ("fe80::1", 80))
             ]
-            # Link-local is allowed (not in _BLOCKED_NETWORKS)
-            assert is_safe_url("http://[fe80::1]/") is True
+            assert is_safe_url("http://[fe80::1]/") is False
 
 
 class TestSSRFAllowedIPs:
@@ -138,6 +137,15 @@ class TestSSRFHostnameResolution:
                 (MagicMock(), MagicMock(), MagicMock(), MagicMock(), ("127.0.0.1", 80)),
             ]
             assert is_safe_url("http://multi-lookup.example/") is False
+
+    @pytest.mark.security
+    def test_hostname_resolving_to_loopback_is_rejected(self):
+        """Hostnames that resolve to loopback addresses must be rejected."""
+        with patch("socket.getaddrinfo") as mock_getaddrinfo:
+            mock_getaddrinfo.return_value = [
+                (MagicMock(), MagicMock(), MagicMock(), MagicMock(), ("127.0.0.1", 80))
+            ]
+            assert is_safe_url("http://internal.example/") is False
 
 
 # Import socket at module level for the gaierror reference

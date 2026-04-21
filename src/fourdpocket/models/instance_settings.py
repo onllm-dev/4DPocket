@@ -17,4 +17,8 @@ class InstanceSettings(SQLModel, table=True):
     registration_mode: str = Field(default="open")  # "open", "invite", "disabled"
     default_user_role: str = Field(default="user")
     max_users: int | None = None
+    # Flips to True exactly once, when the first admin is provisioned via
+    # /auth/register. Serves as the atomic lock that prevents two concurrent
+    # first-time registrations from both becoming admin. See api/auth.py.
+    admin_bootstrapped: bool = Field(default=False)
     extra: dict = Field(default_factory=dict, sa_column=Column(JSON))

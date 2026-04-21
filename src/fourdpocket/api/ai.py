@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 logger = logging.getLogger(__name__)
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.config import get_settings
 from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.item import KnowledgeItem
@@ -38,6 +38,7 @@ def enrich_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Trigger AI enrichment (re-tag, re-summarize) for an item."""
     item = db.get(KnowledgeItem, item_id)
@@ -256,6 +257,7 @@ def transcribe_audio(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Transcribe audio using Groq's Whisper API."""
     import httpx

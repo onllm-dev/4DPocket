@@ -1,5 +1,6 @@
 """Tests for RSS feed API endpoints."""
 
+import socket
 import uuid
 
 
@@ -86,6 +87,23 @@ class TestCreateFeed:
         resp = client.post(
             "/api/v1/rss",
             json={"url": "https://mycomputer.local/feed.xml", "title": "Local Feed"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+    def test_create_feed_blocked_hostname_resolving_to_loopback(
+        self, client, auth_headers, monkeypatch
+    ):
+        """Hostnames resolving to loopback addresses are rejected."""
+
+        def fake_getaddrinfo(*args, **kwargs):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+
+        monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
+        resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://blocked.example/feed.xml", "title": "Blocked Feed"},
             headers=auth_headers,
         )
         assert resp.status_code == 400

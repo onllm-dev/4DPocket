@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.share import Share, ShareRecipient, ShareRecipientRole, ShareType
 from fourdpocket.models.tag import ItemTag, Tag
@@ -100,6 +100,7 @@ def create_share_endpoint(
     body: ShareCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     try:
         share = create_share(
@@ -163,6 +164,7 @@ def revoke_share_endpoint(
     share_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     success = revoke_share(db=db, share_id=share_id, owner_id=current_user.id)
     if not success:
@@ -181,6 +183,7 @@ def add_recipient_endpoint(
     body: RecipientAdd,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     share = db.get(Share, share_id)
     if not share or share.owner_id != current_user.id:
@@ -201,6 +204,7 @@ def remove_recipient_endpoint(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     share = db.get(Share, share_id)
     if not share or share.owner_id != current_user.id:
@@ -261,6 +265,7 @@ def accept_share(
     share_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     recipient = db.exec(
         select(ShareRecipient).where(

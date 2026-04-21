@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.user import User
 from fourdpocket.sharing.feed_manager import get_feed_items, subscribe, unsubscribe
 
@@ -17,6 +17,7 @@ def subscribe_to_user(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     if user_id == current_user.id:
         raise HTTPException(
@@ -37,6 +38,7 @@ def unsubscribe_from_user(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     success = unsubscribe(db=db, subscriber_id=current_user.id, publisher_id=user_id)
     if not success:

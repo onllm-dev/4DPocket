@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.entity import Entity, EntityAlias, ItemEntity
 from fourdpocket.models.entity_relation import EntityRelation
 from fourdpocket.models.item import ItemRead, KnowledgeItem
@@ -156,6 +156,7 @@ def regenerate_synthesis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     force: bool = False,
+    _: None = Depends(require_pat_editor),
 ):
     """Regenerate the synthesis for a single entity.
 

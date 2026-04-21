@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
-import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { ExternalLink, Copy, Code, FileText, Check } from "lucide-react";
+import { sanitizeHtml } from "../../lib/sanitize";
 
 interface ContentRendererProps {
   content: string | null;
@@ -55,34 +55,7 @@ export default function ContentRenderer({
     return displayContent;
   }, [displayContent, sourcePlatform]);
 
-  const sanitizedHtml = useMemo(() => {
-    // Add hook to force rel="noopener noreferrer" on all links (tabnabbing protection)
-    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-      if (node.tagName === "A") {
-        node.setAttribute("target", "_blank");
-        node.setAttribute("rel", "noopener noreferrer");
-      }
-    });
-    const result = DOMPurify.sanitize(htmlContent, {
-      ALLOWED_TAGS: [
-        "h1", "h2", "h3", "h4", "h5", "h6",
-        "p", "br", "hr",
-        "strong", "em", "b", "i", "u", "s", "del", "ins",
-        "a", "img",
-        "ul", "ol", "li",
-        "blockquote", "pre", "code",
-        "table", "thead", "tbody", "tr", "th", "td",
-        "div", "span", "figure", "figcaption",
-        "mark", "sub", "sup", "abbr",
-      ],
-      ALLOWED_ATTR: [
-        "href", "src", "alt", "title", "class", "id",
-        "target", "rel", "width", "height",
-      ],
-    });
-    DOMPurify.removeHook("afterSanitizeAttributes");
-    return result;
-  }, [htmlContent]);
+  const sanitizedHtml = useMemo(() => sanitizeHtml(htmlContent), [htmlContent]);
 
   const handleCopy = async () => {
     const text = rawContent || content || "";

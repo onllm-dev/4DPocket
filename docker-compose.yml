@@ -6,10 +6,10 @@ services:
     ports:
       - "${FDP_PORT:-4040}:4040"
     environment:
-      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:-4dp}@db:5432/4dpocket
+      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env (no default permitted)}@db:5432/4dpocket
       - FDP_SEARCH__BACKEND=${SEARCH_BACKEND:-sqlite}
       - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
-      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set in .env (no default permitted)}
       - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
       - FDP_AI__OLLAMA_URL=http://ollama:11434
       - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -18,7 +18,7 @@ services:
       - FDP_AI__CUSTOM_API_KEY=${AI_CUSTOM_API_KEY:-}
       - FDP_AI__CUSTOM_MODEL=${AI_CUSTOM_MODEL:-}
       - FDP_AUTH__MODE=${AUTH_MODE:-multi}
-      - FDP_AUTH__SECRET_KEY=${AUTH_SECRET_KEY:-}
+      - FDP_AUTH__SECRET_KEY=${AUTH_SECRET_KEY:?AUTH_SECRET_KEY must be set in .env (no default permitted)}
       - FDP_STORAGE__BASE_PATH=/data
       - FDP_SERVER__SECURE_COOKIES=${SECURE_COOKIES:-false}
       - FDP_SERVER__CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:4040"]}
@@ -38,10 +38,10 @@ services:
     build: .
     command: ["worker"]
     environment:
-      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:-4dp}@db:5432/4dpocket
+      - FDP_DATABASE__URL=postgresql://4dp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env (no default permitted)}@db:5432/4dpocket
       - FDP_SEARCH__BACKEND=${SEARCH_BACKEND:-sqlite}
       - FDP_SEARCH__MEILI_URL=http://meilisearch:7700
-      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
+      - FDP_SEARCH__MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set in .env (no default permitted)}
       - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
       - FDP_AI__OLLAMA_URL=http://ollama:11434
       - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -66,7 +66,7 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       - POSTGRES_USER=4dp
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-4dp}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env (no default permitted)}
       - POSTGRES_DB=4dpocket
     volumes:
       - 4dp-postgres:/var/lib/postgresql/data
@@ -82,7 +82,7 @@ services:
     image: getmeili/meilisearch:v1.12
     profiles: ["search"]
     environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-changeme-in-production}
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set in .env (no default permitted)}
     volumes:
       - 4dp-meili:/meili_data
     healthcheck:

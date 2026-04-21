@@ -5,10 +5,16 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, field_validator
+from sqlalchemy import text
 from sqlmodel import Session, func, select
 
 from fourdpocket.api.auth_utils import create_access_token, hash_password, verify_password
-from fourdpocket.api.deps import get_current_user, get_db, get_or_create_settings
+from fourdpocket.api.deps import (
+    get_current_user,
+    get_db,
+    get_or_create_settings,
+    require_jwt_session,
+)
 from fourdpocket.api.rate_limit import check_rate_limit, record_attempt, reset_rate_limit
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
@@ -57,9 +63,24 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
             detail="An account with this email or username already exists",
         )
 
-    # First user becomes admin
-    total_users = db.exec(select(func.count()).select_from(User)).one()
-    role = UserRole.admin if total_users == 0 else UserRole.user
+    # First user becomes admin. Use an atomic conditional UPDATE on the
+    # instance_settings singleton to claim the slot — race-free on both
+    # SQLite (writes are serialized) and PostgreSQL (row-level lock on the
+    # UPDATE). Exactly one concurrent registration can flip the flag from
+    # False → True; every other caller gets rowcount=0 and becomes a regular
+    # user. We rely on rowcount, not a separate read, so there is no TOCTOU.
+    # Commit the claim immediately so the write lock is released before we do
+    # further work — prevents SQLITE_BUSY for concurrent registrations that
+    # would otherwise queue behind the User insert below.
+    result = db.execute(
+        text(
+            "UPDATE instance_settings SET admin_bootstrapped = :t "
+            "WHERE id = 1 AND admin_bootstrapped = :f"
+        ),
+        {"t": True, "f": False},
+    )
+    role = UserRole.admin if result.rowcount == 1 else UserRole.user
+    db.commit()
 
     user = User(
         email=user_data.email,
@@ -162,6 +183,7 @@ def update_me(
     data: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     update_data = {
         k: v
@@ -202,6 +224,7 @@ def delete_me(
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     """Self-service account deletion. Cascades through owned items, tokens, etc.
     Clears the auth cookie so the client lands on /login."""
@@ -234,6 +257,7 @@ def change_password(
     data: PasswordChange,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     if not verify_password(data.current_password, current_user.password_hash):
         raise HTTPException(

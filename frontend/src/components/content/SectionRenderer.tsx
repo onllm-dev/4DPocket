@@ -8,6 +8,7 @@ import {
   Quote as QuoteIcon,
   User,
 } from "lucide-react";
+import { sanitizeHtml } from "../../lib/sanitize";
 
 // Matches the backend dataclass in processors/sections.py (camelCase→snake_case).
 export interface Section {
@@ -264,7 +265,7 @@ function QAView({ sections }: { sections: Section[] }) {
               {s.raw_html ? (
                 <div
                   className="prose prose-sm dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: s.raw_html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.raw_html) }}
                 />
               ) : (
                 <ParagraphBlock text={s.text} />
@@ -301,7 +302,7 @@ function QAView({ sections }: { sections: Section[] }) {
               {s.raw_html ? (
                 <div
                   className="prose prose-sm dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: s.raw_html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.raw_html) }}
                 />
               ) : (
                 <ParagraphBlock text={s.text} />

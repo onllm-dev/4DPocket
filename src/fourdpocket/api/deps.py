@@ -182,20 +182,42 @@ def get_current_pat(request: Request) -> ApiToken | None:
     return getattr(request.state, "pat", None)
 
 
-def require_pat_editor(pat: ApiToken | None = Depends(get_current_pat)) -> None:
+def require_pat_editor(
+    auth: tuple[User, ApiToken | None] = Depends(get_current_user_pat_aware),
+) -> None:
     """Reject requests made with a viewer-role PAT."""
     from fourdpocket.api.api_token_utils import require_editor
 
+    _, pat = auth
     if pat is not None:
         require_editor(pat)
 
 
-def require_pat_deletion(pat: ApiToken | None = Depends(get_current_pat)) -> None:
+def require_pat_deletion(
+    auth: tuple[User, ApiToken | None] = Depends(get_current_user_pat_aware),
+) -> None:
     """Reject requests made with a PAT that lacks ``allow_deletion``."""
     from fourdpocket.api.api_token_utils import require_deletion
 
+    _, pat = auth
     if pat is not None:
         require_deletion(pat)
+
+
+def require_jwt_session(
+    auth: tuple[User, ApiToken | None] = Depends(get_current_user_pat_aware),
+) -> None:
+    """Reject requests authenticated with a PAT.
+
+    Some account- and token-management routes must only be reachable from an
+    interactive JWT session to prevent PAT-to-PAT privilege escalation.
+    """
+    _, pat = auth
+    if pat is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This operation requires a JWT-authenticated session.",
+        )
 
 
 def require_admin(

@@ -10,7 +10,12 @@ logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import (
+    get_current_user,
+    get_db,
+    require_pat_deletion,
+    require_pat_editor,
+)
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.note import Note, NoteCreate, NoteRead, NoteUpdate
 from fourdpocket.models.note_tag import NoteTag
@@ -25,6 +30,7 @@ def create_note(
     note_data: NoteCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     if note_data.item_id:
         item = db.get(KnowledgeItem, note_data.item_id)
@@ -120,6 +126,7 @@ def update_note(
     note_data: NoteUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     note = db.get(Note, note_id)
     if not note or note.user_id != current_user.id:
@@ -153,6 +160,7 @@ def delete_note(
     note_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_deletion),
 ):
     note = db.get(Note, note_id)
     if not note or note.user_id != current_user.id:
@@ -232,6 +240,7 @@ def add_tags_to_note(
     body: AddTagsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Add tags to a note. Creates tags if they don't exist."""
     note = db.get(Note, note_id)
@@ -248,6 +257,7 @@ def remove_tag_from_note(
     tag_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Remove a tag link from a note."""
     note = db.get(Note, note_id)
@@ -293,6 +303,7 @@ def summarize_note_endpoint(
     note_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Trigger AI summarization for a note."""
     note = db.get(Note, note_id)
@@ -322,6 +333,7 @@ def generate_note_title(
     note_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Generate an AI title for a note based on its content."""
     note = db.get(Note, note_id)
@@ -369,6 +381,7 @@ def attach_note_to_item(
     note_data: NoteCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:

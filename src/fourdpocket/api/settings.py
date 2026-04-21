@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.user import User
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -35,6 +35,7 @@ def update_user_settings(
     data: UserSettingsSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     current_settings = current_user.settings or {}
     updated = {**current_settings, **data.model_dump(exclude_unset=True)}

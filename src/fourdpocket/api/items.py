@@ -13,7 +13,15 @@ from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Session, col, select
 from sqlmodel import delete as sql_delete
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.api_token_utils import require_deletion
+from fourdpocket.api.deps import (
+    get_current_pat,
+    get_current_user,
+    get_db,
+    require_pat_deletion,
+    require_pat_editor,
+)
+from fourdpocket.models.api_token import ApiToken
 from fourdpocket.models.base import ItemType, ReadingStatus, SourcePlatform
 from fourdpocket.models.enrichment import EnrichmentStage
 from fourdpocket.models.item import (
@@ -24,6 +32,7 @@ from fourdpocket.models.item import (
 )
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
+from fourdpocket.utils.ssrf import is_safe_url
 
 logger = logging.getLogger(__name__)
 
@@ -32,24 +41,7 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 def _is_safe_proxy_url(url: str) -> bool:
     """Validate URL is safe for server-side fetching (no internal networks)."""
-    import ipaddress
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return False
-    hostname = parsed.hostname or ""
-    if hostname in ("localhost", ""):
-        return False
-    try:
-        ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-            return False
-    except ValueError:
-        # hostname is not an IP, check for common internal patterns
-        if hostname.endswith(".local") or hostname.endswith(".internal"):
-            return False
-    return True
+    return is_safe_url(url)
 
 
 def _try_sync_enrich(item: KnowledgeItem, db: Session, user_id: uuid.UUID) -> None:
@@ -136,6 +128,7 @@ def create_item(
     item_data: ItemCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     platform = item_data.source_platform
     if item_data.url and platform == SourcePlatform.generic:
@@ -451,6 +444,7 @@ def update_item(
     item_data: ItemUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
@@ -550,6 +544,7 @@ def delete_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_deletion),
 ):
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
@@ -565,6 +560,7 @@ def add_tag_to_item(
     confidence: float | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
@@ -596,6 +592,7 @@ def remove_tag_from_item(
     tag_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
@@ -621,6 +618,7 @@ def archive_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Trigger full-page archival as background task."""
     item = db.get(KnowledgeItem, item_id)
@@ -641,6 +639,7 @@ def reprocess_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Re-run platform processor on the URL."""
     item = db.get(KnowledgeItem, item_id)
@@ -733,6 +732,7 @@ def update_reading_progress(
     body: ReadingProgressUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Update reading progress for read-it-later mode."""
     item = db.exec(
@@ -775,8 +775,13 @@ def bulk_action(
     data: BulkActionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    pat: ApiToken | None = Depends(get_current_pat),
+    _: None = Depends(require_pat_editor),
 ):
     """Perform bulk action on selected items."""
+    if data.action == BulkAction.delete and pat is not None:
+        require_deletion(pat)
+
     processed = 0
     for iid in data.item_ids:
         item = db.get(KnowledgeItem, iid)
@@ -847,6 +852,7 @@ def download_item_video(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Download video for a YouTube/TikTok item."""
     item = db.exec(
@@ -894,10 +900,11 @@ def media_proxy(
     url: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """
-    Proxy and cache images for an item (no auth required).
-    Item IDs are UUIDs (unguessable). Fetches the URL server-side,
+    Proxy and cache images for an item.
+    Fetches the URL server-side,
     caches locally, then serves from cache.
     Handles CORS-blocked and hotlink-protected URLs (e.g. LinkedIn).
     """

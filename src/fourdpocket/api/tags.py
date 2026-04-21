@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.tag import ItemTag, Tag, TagCreate, TagRead, TagUpdate
 from fourdpocket.models.user import User
@@ -27,6 +27,7 @@ def create_tag(
     tag_data: TagCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     slug = _slugify(tag_data.name)
 
@@ -91,6 +92,7 @@ def update_tag(
     tag_data: TagUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     tag = db.get(Tag, tag_id)
     if not tag or tag.user_id != current_user.id:
@@ -114,6 +116,7 @@ def delete_tag(
     tag_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     tag = db.get(Tag, tag_id)
     if not tag or tag.user_id != current_user.id:
@@ -186,6 +189,7 @@ def merge_tags(
     body: TagMergeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Merge source tag into target tag. All items with source get target instead."""
     source = db.exec(

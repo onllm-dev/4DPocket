@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.feed_entry import FeedEntry, FeedEntryRead
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rss_feed import RSSFeed
 from fourdpocket.models.user import User
+from fourdpocket.utils.ssrf import is_safe_url
 
 router = APIRouter(prefix="/rss", tags=["rss"])
 
@@ -44,30 +45,7 @@ def list_feeds(
 
 def _is_safe_feed_url(url: str) -> bool:
     """Validate RSS feed URL is safe (SSRF protection at creation time)."""
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return False
-        hostname = parsed.hostname
-        if not hostname or hostname in ("localhost",):
-            return False
-        if hostname.endswith(".local") or hostname.endswith(".internal"):
-            return False
-        try:
-            addr_info = socket.getaddrinfo(hostname, None)
-            for family, _, _, _, sockaddr in addr_info:
-                ip = ipaddress.ip_address(sockaddr[0])
-                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                    return False
-        except socket.gaierror:
-            return False
-        return True
-    except Exception:
-        return False
+    return is_safe_url(url)
 
 
 @router.post("", status_code=201)
@@ -75,6 +53,7 @@ def create_feed(
     body: RSSFeedCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     if not _is_safe_feed_url(body.url):
         raise HTTPException(status_code=400, detail="Feed URL targets a blocked network")
@@ -102,6 +81,7 @@ def update_feed(
     body: RSSFeedUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
@@ -118,6 +98,7 @@ def delete_feed(
     feed_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
@@ -135,6 +116,7 @@ def fetch_feed_now(
     feed_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Manually trigger a feed fetch."""
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
@@ -177,6 +159,7 @@ def approve_feed_entry(
     entry_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Approve a feed entry: create a KnowledgeItem from entry data."""
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
@@ -228,6 +211,7 @@ def update_feed_entry_status(
     body: EntryStatusUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Update a feed entry status (approve/reject)."""
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()

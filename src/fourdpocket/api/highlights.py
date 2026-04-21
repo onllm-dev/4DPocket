@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.highlight import Highlight
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.note import Note
@@ -71,6 +71,7 @@ def create_highlight(
     body: HighlightCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     # Verify ownership of the target item/note
     if body.item_id:
@@ -106,6 +107,7 @@ def update_highlight(
     body: HighlightUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == current_user.id)).first()
     if not h:
@@ -124,6 +126,7 @@ def delete_highlight(
     highlight_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     h = db.exec(select(Highlight).where(Highlight.id == highlight_id, Highlight.user_id == current_user.id)).first()
     if not h:

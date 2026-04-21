@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.item_link import ItemLink, ItemLinkCreate, ItemLinkRead
 from fourdpocket.models.user import User
@@ -40,6 +40,7 @@ def create_item_link(
     body: ItemLinkCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Add a link to an item. Auto-extracts domain from URL."""
     item = db.get(KnowledgeItem, item_id)
@@ -70,6 +71,7 @@ def delete_item_link(
     link_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Remove a link from an item."""
     item = db.get(KnowledgeItem, item_id)
@@ -96,6 +98,7 @@ def reorder_item_links(
     data: ReorderLinksRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Reorder links by providing link_ids in desired order."""
     item = db.get(KnowledgeItem, item_id)

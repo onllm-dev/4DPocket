@@ -29,6 +29,45 @@ def test_register_first_user_is_admin(client):
     assert response.json()["role"] == "admin"
 
 
+def test_register_only_first_user_is_admin(client):
+    """Regression: second registrant must not become admin even if they race
+    the first one. Backs the atomic conditional UPDATE in api/auth.py."""
+    r1 = client.post("/api/v1/auth/register", json={
+        "email": "one@example.com", "username": "one", "password": "Pass1234!",
+    })
+    r2 = client.post("/api/v1/auth/register", json={
+        "email": "two@example.com", "username": "two", "password": "Pass1234!",
+    })
+    assert r1.status_code == 201 and r1.json()["role"] == "admin"
+    assert r2.status_code == 201 and r2.json()["role"] == "user"
+
+
+def test_admin_bootstrap_update_is_atomic(db):
+    """Directly exercise the conditional UPDATE: only one caller can flip
+    admin_bootstrapped False→True. Protects against TOCTOU regression if
+    someone reverts to a read-then-write pattern."""
+    from sqlalchemy import text
+
+    from fourdpocket.api.deps import get_or_create_settings
+
+    get_or_create_settings(db)  # ensure singleton row exists, admin_bootstrapped=False
+
+    def _claim() -> int:
+        result = db.execute(
+            text(
+                "UPDATE instance_settings SET admin_bootstrapped = :t "
+                "WHERE id = 1 AND admin_bootstrapped = :f"
+            ),
+            {"t": True, "f": False},
+        )
+        db.commit()
+        return result.rowcount
+
+    assert _claim() == 1   # first caller wins
+    assert _claim() == 0   # every subsequent caller is a no-op
+    assert _claim() == 0
+
+
 def test_register_duplicate_email(client):
     client.post("/api/v1/auth/register", json={
         "email": "dup@example.com",

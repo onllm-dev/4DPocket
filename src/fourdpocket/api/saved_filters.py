@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import (
+    get_current_user,
+    get_db,
+    require_pat_deletion,
+    require_pat_editor,
+)
 from fourdpocket.models.saved_filter import SavedFilter
 from fourdpocket.models.user import User
 
@@ -37,7 +42,12 @@ def list_filters(db: Session = Depends(get_db), current_user: User = Depends(get
 
 
 @router.post("", status_code=201)
-def create_filter(body: FilterCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_filter(
+    body: FilterCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
+):
     f = SavedFilter(user_id=current_user.id, name=body.name, query=body.query, filters=body.filters)
     db.add(f)
     db.commit()
@@ -46,7 +56,12 @@ def create_filter(body: FilterCreate, db: Session = Depends(get_db), current_use
 
 
 @router.delete("/{filter_id}", status_code=204)
-def delete_filter(filter_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_filter(
+    filter_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_deletion),
+):
     f = db.exec(select(SavedFilter).where(SavedFilter.id == filter_id, SavedFilter.user_id == current_user.id)).first()
     if not f:
         raise HTTPException(status_code=404, detail="Filter not found")
@@ -60,6 +75,7 @@ def update_saved_filter(
     body: SavedFilterUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     sf = db.exec(
         select(SavedFilter).where(

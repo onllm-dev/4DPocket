@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.comment import Comment
 from fourdpocket.models.user import User
 from fourdpocket.sharing.permissions import can_view_item
@@ -45,6 +45,7 @@ def add_comment(
     body: CommentCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     if not can_view_item(db, current_user.id, item_id):
         raise HTTPException(
@@ -97,6 +98,7 @@ def delete_comment(
     comment_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     comment = db.get(Comment, comment_id)
     if not comment or comment.item_id != item_id:

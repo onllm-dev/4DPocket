@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.collection import (
     Collection,
     CollectionCreate,
@@ -28,6 +28,7 @@ def create_collection(
     data: CollectionCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = Collection(
         user_id=current_user.id,
@@ -78,6 +79,7 @@ def update_collection(
     data: CollectionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -101,6 +103,7 @@ def delete_collection(
     collection_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -135,6 +138,7 @@ def add_items_to_collection(
     data: AddItemsRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -186,6 +190,7 @@ def remove_item_from_collection(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -223,6 +228,7 @@ def reorder_collection_items(
     data: ReorderRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     collection = db.get(Collection, collection_id)
     if not collection or collection.user_id != current_user.id:
@@ -367,6 +373,7 @@ def add_notes_to_collection(
     data: AddNotesRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Add notes to a collection."""
     collection = db.get(Collection, collection_id)
@@ -419,6 +426,7 @@ def remove_note_from_collection(
     note_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_pat_editor),
 ):
     """Remove a note from a collection."""
     collection = db.get(Collection, collection_id)

@@ -13,7 +13,7 @@ from fourdpocket.api.api_token_utils import (
     compute_expiry,
     generate_token,
 )
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_db, require_jwt_session
 from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
 from fourdpocket.models.base import ApiTokenRole, UserRole
 from fourdpocket.models.collection import Collection
@@ -107,6 +107,7 @@ def create_token(
     data: CreateTokenRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     """Create a new PAT. Returns the plaintext token exactly once."""
     # Only admins may mint admin-scoped tokens.
@@ -180,6 +181,7 @@ def revoke_token(
     token_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     """Revoke a token by id. Idempotent — already-revoked tokens stay revoked."""
     token = db.get(ApiToken, token_id)
@@ -198,6 +200,7 @@ def revoke_token(
 def revoke_all_tokens(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_jwt_session),
 ):
     """Revoke every active token belonging to the current user (big red button)."""
     now = datetime.now(timezone.utc)
