@@ -583,9 +583,9 @@ export default function ItemDetail() {
 
   const addComment = useMutation({
     mutationFn: (content: string) =>
-      api.post(`/api/v1/items/${id}/comments`, { content }),
+      api.post(`/api/v1/items/${validId}/comments`, { content }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["items", id, "comments"] });
+      qc.invalidateQueries({ queryKey: ["items", validId, "comments"] });
       setCommentText("");
     },
   });

@@ -1,5 +1,5 @@
 import { Shield, Users, Settings as SettingsIcon, Loader2, UserX, UserCheck, ShieldX, Sparkles, Eye, EyeOff, Activity, Database, HardDrive, Tag as TagIcon, FolderOpen, FileText, Users as UsersIcon } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -360,12 +360,12 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
 
   // Sync local config from server config on load
   const prevConfig = useRef(config);
-  if (config && !localConfig && config !== prevConfig.current) {
-    prevConfig.current = config;
-  }
-  if (config && !localConfig) {
-    setLocalConfig({ ...config });
-  }
+  useEffect(() => {
+    if (config && !localConfig) {
+      prevConfig.current = config;
+      setLocalConfig({ ...config });
+    }
+  }, [config, localConfig]);
 
   if (!config) return null;
   const effective = localConfig || config;

@@ -59,14 +59,13 @@ interface ItemFilters {
 }
 
 export function useItems(filters: ItemFilters = {}) {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, val]) => {
-    if (val !== undefined && val !== null) params.set(key, String(val));
-  });
-
   return useInfiniteQuery<Item[]>({
     queryKey: ["items", filters],
     queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) params.set(key, String(val));
+      });
       params.set("offset", String(pageParam));
       params.set("limit", "20");
       return api.get(`/api/v1/items?${params.toString()}`);

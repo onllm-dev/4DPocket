@@ -84,6 +84,10 @@ export function RelatedEntitiesMiniGraph({
               <g
                 key={r.entity.id}
                 onClick={() => navigate(`/entities/${r.entity.id}`)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(`/entities/${r.entity.id}`); }}
+                tabIndex={0}
+                role="button"
+                aria-label={r.entity.canonical_name}
                 className="cursor-pointer"
               >
                 <circle cx={x} cy={y} r={18} fill={fill(r.entity.entity_type)} opacity={0.9} />

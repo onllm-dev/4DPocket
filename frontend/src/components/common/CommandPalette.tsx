@@ -58,7 +58,7 @@ export function CommandPalette() {
     }
     const timer = setTimeout(async () => {
       try {
-        const data = await api.get<SearchResult[]>(`/api/v1/search?q=${encodeURIComponent(query)}&limit=5`);
+        const data = await api.get<SearchResult[]>(`/api/v1/search/unified?q=${encodeURIComponent(query)}&limit=5`);
         if (!Array.isArray(data)) {
           console.error("[CommandPalette] expected array from /api/v1/search, got:", data);
           setResults([]);
@@ -89,17 +89,20 @@ export function CommandPalette() {
     [navigate]
   );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, allItems.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && allItems[activeIndex]) {
-      handleSelect(allItems[activeIndex].path);
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(i + 1, allItems.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter" && allItems[activeIndex]) {
+        handleSelect(allItems[activeIndex].path);
+      }
+    },
+    [allItems, activeIndex, handleSelect]
+  );
 
   if (!open) return null;
 

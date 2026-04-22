@@ -78,7 +78,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: () => api.del("/api/v1/auth/me"),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["currentUser"] });
+      qc.clear();
       window.location.href = "/login";
     },
   });

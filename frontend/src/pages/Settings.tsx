@@ -75,6 +75,7 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [tagThreshold, setTagThreshold] = useState<number | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -137,6 +138,14 @@ export default function Settings() {
       api.patch("/api/v1/settings", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
   });
+
+  useEffect(() => {
+    if (tagThreshold === null) return;
+    const timer = setTimeout(() => {
+      updateSettings.mutate({ tag_confidence_threshold: tagThreshold });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [tagThreshold, updateSettings]);
 
   function handleThemeChange(value: Theme) {
     setTheme(value);
@@ -404,12 +413,8 @@ export default function Settings() {
                 min={0}
                 max={1}
                 step={0.05}
-                value={settings?.tag_confidence_threshold ?? 0.7}
-                onChange={(e) =>
-                  updateSettings.mutate({
-                    tag_confidence_threshold: parseFloat(e.target.value),
-                  })
-                }
+                value={tagThreshold ?? settings?.tag_confidence_threshold ?? 0.7}
+                onChange={(e) => setTagThreshold(parseFloat(e.target.value))}
                 className="w-full accent-sky-600 cursor-pointer"
               />
             </div>

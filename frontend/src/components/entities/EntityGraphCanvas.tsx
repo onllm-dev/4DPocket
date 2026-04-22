@@ -7,6 +7,7 @@ import ReactFlow, {
   useNodesState,
   type Edge,
   type Node,
+  type NodeProps,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +35,42 @@ const TYPE_BORDER: Record<string, string> = {
   other: "#9ca3af",
 };
 
+interface EntityNodeData {
+  name: string;
+  size: number;
+  bg: string;
+  border: string;
+  fontSize: number;
+  hasSynthesis: boolean;
+}
+
+function EntityNode({ data }: NodeProps<EntityNodeData>) {
+  return (
+    <div
+      style={{
+        width: data.size,
+        height: data.size,
+        borderRadius: "50%",
+        background: data.bg,
+        border: `2px solid ${data.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: data.fontSize,
+        color: "#111",
+        textAlign: "center",
+        padding: 6,
+        lineHeight: 1.1,
+        boxShadow: data.hasSynthesis ? "0 0 0 3px rgba(14,165,233,0.25)" : undefined,
+      }}
+    >
+      <span style={{ pointerEvents: "none" }}>{data.name}</span>
+    </div>
+  );
+}
+
+const NODE_TYPES = { entity: EntityNode };
+
 function buildLayout(data: EntityGraphResponse): { nodes: Node[]; edges: Edge[] } {
   if (!data.nodes.length) return { nodes: [], edges: [] };
 
@@ -48,36 +85,20 @@ function buildLayout(data: EntityGraphResponse): { nodes: Node[]; edges: Edge[] 
     const size = Math.max(40, Math.min(120, 36 + Math.log2(e.item_count + 1) * 12));
     return {
       id: e.id,
+      type: "entity",
       position: {
         x: radius * Math.cos(angle) + radius,
         y: radius * Math.sin(angle) + radius,
       },
       data: {
-        label: (
-          <div
-            style={{
-              width: size,
-              height: size,
-              borderRadius: "50%",
-              background: bg,
-              border: `2px solid ${border}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: Math.max(9, Math.min(13, 9 + Math.log2(e.item_count + 1))),
-              color: "#111",
-              textAlign: "center",
-              padding: 6,
-              lineHeight: 1.1,
-              boxShadow: e.has_synthesis ? "0 0 0 3px rgba(14,165,233,0.25)" : undefined,
-            }}
-          >
-            <span style={{ pointerEvents: "none" }}>{e.name}</span>
-          </div>
-        ),
-      },
+        name: e.name,
+        size,
+        bg,
+        border,
+        fontSize: Math.max(9, Math.min(13, 9 + Math.log2(e.item_count + 1))),
+        hasSynthesis: e.has_synthesis,
+      } satisfies EntityNodeData,
       style: { background: "transparent", border: "none", padding: 0, width: size, height: size },
-      type: "default",
     };
   });
 
@@ -122,6 +143,7 @@ export function EntityGraphCanvas({ data }: { data: EntityGraphResponse }) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={NODE_TYPES}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={(_evt, n) => navigate(`/entities/${n.id}`)}

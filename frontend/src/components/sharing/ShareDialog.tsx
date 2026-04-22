@@ -28,6 +28,7 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   const [role, setRole] = useState<"viewer" | "editor">("viewer");
   const [publicLink, setPublicLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const qc = useQueryClient();
 
@@ -66,11 +67,17 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
     });
   };
 
-  const copyLink = () => {
+  const copyLink = async () => {
     if (publicLink) {
-      navigator.clipboard.writeText(publicLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(publicLink);
+        setCopied(true);
+        setCopyError(false);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        setCopyError(true);
+        setTimeout(() => setCopyError(false), 2000);
+      }
     }
   };
 
@@ -142,7 +149,13 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
                 onClick={copyLink}
                 className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition-all"
               >
-                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : copyError ? (
+                  <X className="w-4 h-4 text-red-500" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-500" />
+                )}
               </button>
             </div>
           ) : (

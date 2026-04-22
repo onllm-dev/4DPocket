@@ -64,7 +64,7 @@ function PlatformMeta({ platform, metadata }: { platform: string; metadata?: Rec
     const stars = metadata.stars ?? metadata.stargazers_count;
     const forks = metadata.forks ?? metadata.forks_count;
     const lang = metadata.language;
-    if (!stars && !lang) return null;
+    if (stars == null && lang == null) return null;
     return (
       <div className="flex items-center gap-2.5 text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
         {lang ? <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">{String(lang)}</span> : null}
@@ -78,7 +78,7 @@ function PlatformMeta({ platform, metadata }: { platform: string; metadata?: Rec
     const score = metadata.score ?? metadata.upvotes;
     const comments = metadata.num_comments ?? metadata.comment_count;
     const subreddit = metadata.subreddit;
-    if (!score && !subreddit) return null;
+    if (score == null && subreddit == null) return null;
     return (
       <div className="flex items-center gap-2.5 text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
         {subreddit ? <span className="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded">r/{String(subreddit)}</span> : null}

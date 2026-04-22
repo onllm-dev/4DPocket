@@ -40,7 +40,7 @@ export default function TagDetail() {
   const { id } = useParams<{ id: string }>();
   const tagId = id ?? "";
 
-  const { data: tags } = useQuery<TagInfo[]>({
+  const { data: tags, isLoading: isTagsLoading } = useQuery<TagInfo[]>({
     queryKey: ["tags"],
     queryFn: () => api.get("/api/v1/tags"),
   });
@@ -62,10 +62,28 @@ export default function TagDetail() {
     (s) => s.tag_a.id === tagId || s.tag_b.id === tagId
   ).map((s) => s.tag_a.id === tagId ? s.tag_b : s.tag_a) ?? [];
 
-  if (isLoading) {
+  if (isLoading || isTagsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-pulse text-sky-600 text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!tag) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 animate-fade-in">
+        <Link
+          to="/tags"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          All Tags
+        </Link>
+        <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-500 dark:text-gray-400">
+          <Hash className="w-10 h-10 opacity-30" />
+          <p className="text-sm">Tag not found.</p>
+        </div>
       </div>
     );
   }
