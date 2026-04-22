@@ -5,6 +5,7 @@ Requires: pgvector extension installed in PostgreSQL, pgvector Python package.
 """
 
 import logging
+import threading
 import uuid
 
 from fourdpocket.search.base import VectorHit
@@ -12,6 +13,7 @@ from fourdpocket.search.base import VectorHit
 logger = logging.getLogger(__name__)
 
 _initialized = False
+_initialized_lock = threading.Lock()
 _embedding_dim: int | None = None
 
 
@@ -64,6 +66,10 @@ class PgVectorBackend:
         """Check if pgvector extension is available."""
         if self._available is not None:
             return self._available
+        with threading.Lock():
+            # Double-checked locking
+            if self._available is not None:
+                return self._available
         try:
             from sqlmodel import Session
 
@@ -95,58 +101,59 @@ class PgVectorBackend:
         If the column exists with a different dimension, drops and recreates it.
         """
         global _initialized
-        if _initialized:
-            return
-        try:
-            from sqlalchemy import text
-            from sqlmodel import Session
+        with _initialized_lock:
+            if _initialized:
+                return
+            try:
+                from sqlalchemy import text
+                from sqlmodel import Session
 
-            from fourdpocket.db.session import get_engine
+                from fourdpocket.db.session import get_engine
 
-            dim = _detect_embedding_dim()
-            engine = get_engine()
-            with Session(engine) as db:
-                db.exec(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                dim = _detect_embedding_dim()
+                engine = get_engine()
+                with Session(engine) as db:
+                    db.exec(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
-                # Check if column exists and its current dimension
-                row = db.exec(text(
-                    "SELECT atttypmod FROM pg_attribute "
-                    "WHERE attrelid = 'item_chunks'::regclass "
-                    "AND attname = 'embedding'"
-                )).first()
+                    # Check if column exists and its current dimension
+                    row = db.exec(text(
+                        "SELECT atttypmod FROM pg_attribute "
+                        "WHERE attrelid = 'item_chunks'::regclass "
+                        "AND attname = 'embedding'"
+                    )).first()
 
-                if row is not None:
-                    current_dim = row[0]
-                    if current_dim != dim:
-                        logger.warning(
-                            "pgvector dimension mismatch: column has %d, need %d. "
-                            "Recreating column (existing embeddings will be lost).",
-                            current_dim, dim,
-                        )
-                        db.exec(text("DROP INDEX IF EXISTS idx_chunks_embedding"))
+                    if row is not None:
+                        current_dim = row[0]
+                        if current_dim != dim:
+                            logger.warning(
+                                "pgvector dimension mismatch: column has %d, need %d. "
+                                "Recreating column (existing embeddings will be lost).",
+                                current_dim, dim,
+                            )
+                            db.exec(text("DROP INDEX IF EXISTS idx_chunks_embedding"))
+                            db.exec(text(
+                                "ALTER TABLE item_chunks DROP COLUMN embedding"
+                            ))
+                            db.exec(text(
+                                f"ALTER TABLE item_chunks ADD COLUMN "
+                                f"embedding vector({dim})"
+                            ))
+                    else:
                         db.exec(text(
-                            "ALTER TABLE item_chunks DROP COLUMN embedding"
-                        ))
-                        db.exec(text(
-                            f"ALTER TABLE item_chunks ADD COLUMN "
+                            f"ALTER TABLE item_chunks ADD COLUMN IF NOT EXISTS "
                             f"embedding vector({dim})"
                         ))
-                else:
-                    db.exec(text(
-                        f"ALTER TABLE item_chunks ADD COLUMN IF NOT EXISTS "
-                        f"embedding vector({dim})"
-                    ))
 
-                # Create HNSW index if not exists
-                db.exec(text(
-                    "CREATE INDEX IF NOT EXISTS idx_chunks_embedding "
-                    "ON item_chunks USING hnsw (embedding vector_cosine_ops) "
-                    "WITH (m = 16, ef_construction = 64)"
-                ))
-                db.commit()
-            _initialized = True
-        except Exception as e:
-            logger.warning("pgvector column setup failed: %s", e)
+                    # Create HNSW index if not exists
+                    db.exec(text(
+                        "CREATE INDEX IF NOT EXISTS idx_chunks_embedding "
+                        "ON item_chunks USING hnsw (embedding vector_cosine_ops) "
+                        "WITH (m = 16, ef_construction = 64)"
+                    ))
+                    db.commit()
+                _initialized = True
+            except Exception as e:
+                logger.warning("pgvector column setup failed: %s", e)
 
     def upsert_item(
         self,

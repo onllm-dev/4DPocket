@@ -46,14 +46,18 @@ class OpenAICompatibleProvider:
         base_url = config["base_url"]
 
         if provider == "ollama":
-            base_url = f"{settings.ai.ollama_url}/v1"
+            base_url = f"{settings.ai.ollama_url.rstrip('/')}/v1"
             api_key = "ollama"
             self._model = settings.ai.ollama_model
         elif provider == "groq":
             api_key = ov.get("groq_api_key") or settings.ai.groq_api_key
+            if not api_key:
+                raise RuntimeError("groq chat provider requires api_key")
             self._model = config["default_model"]
         elif provider == "nvidia":
             api_key = ov.get("nvidia_api_key") or settings.ai.nvidia_api_key
+            if not api_key:
+                raise RuntimeError("nvidia chat provider requires api_key")
             self._model = config["default_model"]
         elif provider == "custom":
             base_url = ov.get("custom_base_url") or settings.ai.custom_base_url
@@ -115,8 +119,11 @@ class OpenAICompatibleProvider:
             # Anthropic returns content as array of blocks
             content_blocks = data.get("content", [])
             return "".join(b.get("text", "") for b in content_blocks if b.get("type") == "text")
+        except httpx.HTTPStatusError as e:
+            logger.warning("Anthropic call failed: status=%s", e.response.status_code)
+            return ""
         except Exception as e:
-            logger.warning("Anthropic API call failed (%s): %s", self._provider, e)
+            logger.warning("Anthropic API call failed (%s): %s", self._provider, type(e).__name__)
             return ""
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:

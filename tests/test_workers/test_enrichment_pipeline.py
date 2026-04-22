@@ -387,3 +387,73 @@ class TestRunStage:
             assert stage.status == "failed"
         finally:
             ep_module.STAGE_HANDLERS["tagged"] = original_handler
+
+
+class TestMaxAttemptsGuard:
+    """Regression tests for _mark_running max_attempts enforcement."""
+
+    def test_mark_running_returns_false_when_max_attempts_exceeded(
+        self, db: Session, enrich_user_p1, monkeypatch
+    ):
+        """Regression: stages exceeding max_attempts were retried indefinitely.
+
+        Root cause: _mark_running incremented attempts unconditionally.
+        Fixed by checking attempts >= max_attempts before proceeding.
+        """
+        from fourdpocket.workers.enrichment_pipeline import (
+            _get_or_create_stage,
+            _mark_running,
+        )
+
+        item = KnowledgeItem(
+            user_id=enrich_user_p1.id,
+            title="Max Attempts Test",
+            content="Content",
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+
+        # Simulate a stage that has already hit max attempts (default 5)
+        stage = _get_or_create_stage(db, item.id, "tagged")
+        stage.attempts = 5
+        db.add(stage)
+        db.commit()
+
+        result = _mark_running(db, item.id, "tagged")
+
+        assert result is False, "_mark_running should return False when max_attempts exceeded"
+        db.expire(stage)
+        refreshed = db.get(EnrichmentStage, {"item_id": item.id, "stage": "tagged"})
+        assert refreshed.status == "failed"
+
+    def test_mark_running_returns_true_below_max_attempts(
+        self, db: Session, enrich_user_p1, monkeypatch
+    ):
+        """_mark_running returns True and increments when under the limit."""
+        from fourdpocket.workers.enrichment_pipeline import (
+            _get_or_create_stage,
+            _mark_running,
+        )
+
+        item = KnowledgeItem(
+            user_id=enrich_user_p1.id,
+            title="Below Max Attempts",
+            content="Content",
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+
+        _get_or_create_stage(db, item.id, "summarized")
+        result = _mark_running(db, item.id, "summarized")
+
+        assert result is True
+        stage = db.exec(
+            select(EnrichmentStage).where(
+                EnrichmentStage.item_id == item.id,
+                EnrichmentStage.stage == "summarized",
+            )
+        ).first()
+        assert stage.status == "running"
+        assert stage.attempts == 1

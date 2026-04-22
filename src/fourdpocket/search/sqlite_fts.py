@@ -324,7 +324,7 @@ def _fts_search(
     needs_join = bool(is_favorite is not None or is_archived is not None or after or before)
 
     if needs_join:
-        joins.append("JOIN knowledge_items ki ON ki.id = CAST(fts.item_id AS TEXT)")
+        joins.append("JOIN knowledge_items ki ON ki.id = fts.item_id")
 
     if is_favorite is not None:
         where_items.append("ki.is_favorite = :is_favorite")
@@ -342,7 +342,7 @@ def _fts_search(
     # Tag filter: join through item_tags → tags
     if tags:
         joins.append(
-            "JOIN item_tags it ON it.item_id = CAST(fts.item_id AS TEXT)"
+            "JOIN item_tags it ON it.item_id = fts.item_id"
             " JOIN tags t ON t.id = it.tag_id"
         )
         tag_placeholders = ", ".join(f":tag_{i}" for i in range(len(tags)))
@@ -625,7 +625,7 @@ def search_chunks(
     )
 
     if needs_join:
-        joins.append("JOIN knowledge_items ki ON ki.id = CAST(cfts.item_id AS TEXT)")
+        joins.append("JOIN knowledge_items ki ON ki.id = cfts.item_id")
 
     if item_type:
         where_items.append("ki.item_type = :item_type")
@@ -648,7 +648,7 @@ def search_chunks(
 
     if tags:
         joins.append(
-            "JOIN item_tags it ON it.item_id = CAST(cfts.item_id AS TEXT)"
+            "JOIN item_tags it ON it.item_id = cfts.item_id"
             " JOIN tags t ON t.id = it.tag_id"
         )
         tag_placeholders = ", ".join(f":tag_{i}" for i in range(len(tags)))
@@ -672,8 +672,8 @@ def search_chunks(
         ORDER BY cfts.rank
         LIMIT :raw_limit
     """
-    # Fetch more than needed to allow rollup
-    params["raw_limit"] = limit * 5
+    # Fetch enough rows to cover the offset+limit after rollup deduplication.
+    params["raw_limit"] = (offset + limit) * 5
 
     try:
         result = db.exec(text(sql), params=params)

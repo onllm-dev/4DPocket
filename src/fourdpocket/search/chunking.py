@@ -141,6 +141,7 @@ def chunk_text(
             sent_tokens = 0
             sent_start = para_start
 
+            sent_cursor = 0  # tracks position within para_text for correct offsets
             for sent in sentences:
                 sent_tok = _estimate_tokens(sent)
                 if sent_tok > target_tokens:
@@ -151,7 +152,9 @@ def chunk_text(
                     words = sent.split()
                     word_buf: list[str] = []
                     word_tok = 0
-                    ws = para_start + para_text.find(sent)
+                    found = para_text.find(sent, sent_cursor)
+                    ws = para_start + (found if found >= 0 else 0)
+                    sent_cursor = found + len(sent) if found >= 0 else sent_cursor
                     for w in words:
                         wt = _estimate_tokens(w)
                         if word_tok + wt > target_tokens and word_buf:
@@ -188,12 +191,20 @@ def chunk_text(
                     else:
                         sent_parts = []
                         sent_tokens = 0
-                    sent_start = para_start + para_text.find(sent)
+                    found_s = para_text.find(sent, sent_cursor)
+                    sent_start = para_start + (found_s if found_s >= 0 else 0)
+                    sent_cursor = found_s + len(sent) if found_s >= 0 else sent_cursor
                     sent_parts.append(sent)
                     sent_tokens += sent_tok
                 else:
                     if not sent_parts:
-                        sent_start = para_start + para_text.find(sent)
+                        found_s = para_text.find(sent, sent_cursor)
+                        sent_start = para_start + (found_s if found_s >= 0 else 0)
+                        sent_cursor = found_s + len(sent) if found_s >= 0 else sent_cursor
+                    else:
+                        found_s = para_text.find(sent, sent_cursor)
+                        if found_s >= 0:
+                            sent_cursor = found_s + len(sent)
                     sent_parts.append(sent)
                     sent_tokens += sent_tok
 

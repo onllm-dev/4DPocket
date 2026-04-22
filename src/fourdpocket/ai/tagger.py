@@ -7,7 +7,9 @@ import uuid
 from sqlmodel import Session, select
 
 from fourdpocket.ai.factory import get_chat_provider
+from fourdpocket.ai.llm_cache import get_cached_response, store_cached_response
 from fourdpocket.ai.sanitizer import sanitize_for_prompt
+from fourdpocket.ai.tag_slug import normalize_tag_slug
 from fourdpocket.config import get_settings
 from fourdpocket.models.tag import ItemTag, Tag
 
@@ -39,16 +41,14 @@ Output: {"tags": [{"name": "sourdough", "confidence": 0.97}, {"name": "bread", "
 
 
 def _slugify_tag(name: str) -> str:
-    slug = name.lower().strip()[:100]  # Cap tag length to prevent DoS
-    slug = re.sub(r"[^\w\s/-]", "", slug)
-    slug = re.sub(r"[\s]+", "-", slug)
-    return slug
+    return normalize_tag_slug(name)
 
 
 def generate_tags(
     title: str,
     content: str | None,
     description: str | None,
+    db: Session | None = None,
 ) -> list[dict]:
     """Generate tags from content using AI. Returns list of {name, confidence}."""
     text_parts = []
@@ -63,7 +63,14 @@ def generate_tags(
         return []
 
     chat = get_chat_provider()
+    model_name = getattr(chat, "_model", "")
     analysis_text = "\n".join(text_parts)
+
+    if db is not None:
+        cached = get_cached_response(db, analysis_text, "tagging", model_name, json_mode=True)
+        if cached is not None:
+            return cached.get("tags", [])
+
     prompt = (
         f"{TAGGING_FEW_SHOT}\n\n"
         "Now tag the following user-provided content. Only output tags based on the actual topic"
@@ -72,7 +79,12 @@ def generate_tags(
     )
 
     result = chat.generate_json(prompt, system_prompt=TAGGING_SYSTEM_PROMPT)
-    return result.get("tags", [])
+    tags = result.get("tags", [])
+
+    if db is not None and tags:
+        store_cached_response(db, analysis_text, "tagging", {"tags": tags}, model_name, json_mode=True)
+
+    return tags
 
 
 def auto_tag_item(
@@ -91,11 +103,13 @@ def auto_tag_item(
     if not settings.ai.auto_tag:
         return []
 
-    raw_tags = generate_tags(title, content, description)
+    raw_tags = generate_tags(title, content, description, db=db)
 
     if not raw_tags:
         logger.debug("No tags generated for item %s", item_id)
         return []
+
+    raw_tags = raw_tags[:10]
 
     applied_tags = []
     auto_threshold = settings.ai.tag_confidence_threshold
@@ -121,7 +135,7 @@ def auto_tag_item(
             continue
 
         slug = _slugify_tag(tag_name)
-        if not slug:
+        if not slug or slug == "content-filtered":
             continue
         auto_applied = confidence >= auto_threshold
 
@@ -182,11 +196,13 @@ def auto_tag_note(
     if not settings.ai.auto_tag:
         return []
 
-    raw_tags = generate_tags(title, content, None)
+    raw_tags = generate_tags(title, content, None, db=db)
 
     if not raw_tags:
         logger.debug("No tags generated for note %s", note_id)
         return []
+
+    raw_tags = raw_tags[:10]
 
     applied_tags = []
     auto_threshold = settings.ai.tag_confidence_threshold
@@ -211,7 +227,7 @@ def auto_tag_note(
             continue
 
         slug = _slugify_tag(tag_name)
-        if not slug:
+        if not slug or slug == "content-filtered":
             continue
         auto_applied = confidence >= auto_threshold
 

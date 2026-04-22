@@ -2,7 +2,6 @@
 
 from fourdpocket.ai.base import (
     ChatProvider,
-    EmbeddingProvider,
     NoOpChatProvider,
 )
 

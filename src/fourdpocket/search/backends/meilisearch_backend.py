@@ -183,12 +183,23 @@ class MeilisearchKeywordBackend:
         """Search the items index directly."""
         index = client.index("knowledge_items")
 
-        # Build filter string with ALL filter fields
+        # Build filter string with ALL filter fields.
+        # Validate item_type/source_platform against allowlists and escape quotes
+        # to prevent filter injection.
+        from fourdpocket.models.base import ItemType
+
+        def _safe_filter_value(value: str) -> str:
+            """Escape double-quotes for Meilisearch filter string interpolation."""
+            return value.replace('"', '\\"')
+
         filter_parts = [f'user_id = "{str(user_id)}"']
         if filters.item_type:
-            filter_parts.append(f'item_type = "{filters.item_type}"')
+            # Allowlist: must be a valid ItemType value
+            valid_types = {t.value for t in ItemType}
+            if filters.item_type in valid_types:
+                filter_parts.append(f'item_type = "{_safe_filter_value(filters.item_type)}"')
         if filters.source_platform:
-            filter_parts.append(f'source_platform = "{filters.source_platform}"')
+            filter_parts.append(f'source_platform = "{_safe_filter_value(filters.source_platform)}"')
         if filters.is_favorite is not None:
             filter_parts.append(
                 f"is_favorite = {'true' if filters.is_favorite else 'false'}"
@@ -244,9 +255,12 @@ class MeilisearchKeywordBackend:
         ).all()
         item_map = {str(i.id): i for i in items}
 
-        # Build tag lookup if needed
-        tag_items: set[str] = set()
+        # Build tag lookup if needed — require ALL requested tags (AND semantics).
+        # tag_items_all: set of item_ids that have ALL requested tags.
+        tag_items_all: set[str] = set()
         if filters.tags:
+            from collections import Counter
+
             tag_rows = db.exec(
                 select(ItemTag.item_id)
                 .join(Tag, Tag.id == ItemTag.tag_id)
@@ -256,7 +270,11 @@ class MeilisearchKeywordBackend:
                     ItemTag.item_id.in_(item_ids),
                 )
             ).all()
-            tag_items = {str(r) for r in tag_rows}
+            # Count how many of the requested tags each item has; keep only those
+            # with a count equal to the number of requested tags (i.e. ALL tags).
+            tag_count = Counter(str(r) for r in tag_rows)
+            required = len(filters.tags)
+            tag_items_all = {iid for iid, cnt in tag_count.items() if cnt >= required}
 
         from datetime import datetime, timezone
 
@@ -280,7 +298,7 @@ class MeilisearchKeywordBackend:
             if not item:
                 continue
 
-            if filters.tags and hit.item_id not in tag_items:
+            if filters.tags and hit.item_id not in tag_items_all:
                 continue
             if after_dt and item.created_at:
                 item_dt = item.created_at if item.created_at.tzinfo else item.created_at.replace(tzinfo=timezone.utc)

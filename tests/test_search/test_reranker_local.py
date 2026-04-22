@@ -80,13 +80,13 @@ class TestLocalReranker:
         assert result[1][0] == 1  # index of doc2 (score 0.8)
 
     def test_local_reranker_rerank_model_not_loaded(self):
-        """rerank returns None when model failed to load, signaling caller to skip."""
+        """rerank returns [] when model failed to load, signaling caller to skip reranking."""
         reranker = LocalReranker()
         reranker._model = None
         reranker._load_failed = True
 
         result = reranker.rerank("query", ["doc1"], top_k=1)
-        assert result is None
+        assert result == []
 
     def test_local_reranker_rerank_empty_docs(self):
         """rerank with empty docs list returns empty list."""

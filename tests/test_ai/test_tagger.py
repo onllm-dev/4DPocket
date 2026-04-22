@@ -409,3 +409,65 @@ def test_slugify_tag_caps_length(monkeypatch):
     long_name = "x" * 200
     result = tagger._slugify_tag(long_name)
     assert len(result) == 100
+
+
+# ─── Regression: max tag count + content-filtered slug ───────────────────────
+
+
+def test_auto_tag_item_max_10_tags(db, monkeypatch):
+    """Regression: auto_tag_item must cap at 10 tags even when LLM returns more.
+
+    Root cause: no upper-bound check on raw_tags before the loop.
+    Fixed in tagger.py auto_tag_item with raw_tags = raw_tags[:10].
+    """
+    user = _user(db, email="max10@test.com")
+    item = _item(db, user.id, "Max Tags Item")
+
+    many_tags = [{"name": f"tag-{i}", "confidence": 0.9} for i in range(20)]
+    fake = _FakeChat({"tags": many_tags})
+    monkeypatch.setattr(tagger, "get_chat_provider", lambda: fake)
+
+    result = tagger.auto_tag_item(
+        item_id=item.id,
+        user_id=user.id,
+        title=item.title,
+        content=item.content,
+        description=None,
+        db=db,
+    )
+
+    assert len(result) <= 10, f"Expected at most 10 tags, got {len(result)}"
+
+
+def test_auto_tag_item_skips_content_filtered_slug(db, monkeypatch):
+    """Regression: tags whose slug resolves to 'content-filtered' are skipped.
+
+    Root cause: sanitizer replaces injected text with 'content-filtered' and
+    _slugify_tag('content-filtered') == 'content-filtered' which would pollute
+    the tag namespace.
+    Fixed in tagger.py with: if slug == 'content-filtered': continue.
+    """
+    user = _user(db, email="cfslug@test.com")
+    item = _item(db, user.id, "Content Filtered Slug")
+
+    # LLM returns "content-filtered" as a tag name (attacker-controlled or sanitizer artifact)
+    fake = _FakeChat({
+        "tags": [
+            {"name": "content-filtered", "confidence": 0.9},
+            {"name": "python", "confidence": 0.9},
+        ]
+    })
+    monkeypatch.setattr(tagger, "get_chat_provider", lambda: fake)
+
+    result = tagger.auto_tag_item(
+        item_id=item.id,
+        user_id=user.id,
+        title=item.title,
+        content=item.content,
+        description=None,
+        db=db,
+    )
+
+    names = {r["name"] for r in result}
+    assert "content-filtered" not in names, "content-filtered must be skipped"
+    assert "python" in names

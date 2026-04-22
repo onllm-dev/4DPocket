@@ -189,3 +189,54 @@ def test_store_serializes_list(db):
     result = llm_cache.get_cached_response(db, content, cache_type, "")
 
     assert result == ["tag1", "tag2", "tag3"]
+
+
+# ─── Regression: hash includes temperature + json_mode ───────────────────────
+
+
+def test_hash_differs_by_temperature():
+    """Regression: same text/type/model but different temperature → different hash.
+
+    Root cause: temperature was not included in the hash key.
+    Fixed in llm_cache.py _hash_content.
+    """
+    h1 = llm_cache._hash_content("hello", "summary", "gpt-4", temperature=0.0)
+    h2 = llm_cache._hash_content("hello", "summary", "gpt-4", temperature=0.7)
+    assert h1 != h2
+
+
+def test_hash_differs_by_json_mode():
+    """Regression: same text/type/model but different json_mode → different hash.
+
+    Fixed in llm_cache.py _hash_content.
+    """
+    h1 = llm_cache._hash_content("hello", "summary", "gpt-4", json_mode=False)
+    h2 = llm_cache._hash_content("hello", "summary", "gpt-4", json_mode=True)
+    assert h1 != h2
+
+
+def test_hash_differs_by_prompt_template_version():
+    """Regression: bumping _PROMPT_TEMPLATE_VERSION invalidates all cache entries.
+
+    Fixed in llm_cache.py _hash_content.
+    """
+    h1 = llm_cache._hash_content("hello", "tagging", "gpt-4", prompt_template_version="v1")
+    h2 = llm_cache._hash_content("hello", "tagging", "gpt-4", prompt_template_version="v2")
+    assert h1 != h2
+
+
+def test_get_cached_respects_json_mode(db):
+    """Cache entries keyed with json_mode=True are distinct from json_mode=False."""
+    content = "json mode isolation test"
+    cache_type = "tagging"
+    model = "llama3"
+
+    llm_cache.store_cached_response(db, content, cache_type, {"a": 1}, model, json_mode=False)
+
+    # Different json_mode → cache miss
+    result = llm_cache.get_cached_response(db, content, cache_type, model, json_mode=True)
+    assert result is None
+
+    # Correct json_mode → hit
+    hit = llm_cache.get_cached_response(db, content, cache_type, model, json_mode=False)
+    assert hit == {"a": 1}

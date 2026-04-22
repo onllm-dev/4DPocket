@@ -14,6 +14,14 @@ class NvidiaEmbeddingProvider:
         settings = get_settings()
         self._api_key = settings.ai.nvidia_api_key
         self._use_nvidia = bool(self._api_key) and settings.ai.embedding_provider == "nvidia"
+        if self._use_nvidia:
+            from openai import OpenAI
+            self._client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=self._api_key,
+            )
+        else:
+            self._client = None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
@@ -32,15 +40,8 @@ class NvidiaEmbeddingProvider:
 
     def _embed_nvidia(self, texts: list[str]) -> list[list[float]]:
         """Use NVIDIA API for embeddings."""
-        from openai import OpenAI
-
-        client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
-            api_key=self._api_key,
-        )
-
         # NVIDIA supports batch embedding via OpenAI-compatible endpoint
-        response = client.embeddings.create(
+        response = self._client.embeddings.create(
             model="nvidia/nv-embed-v1",
             input=texts,
             encoding_format="float",

@@ -35,13 +35,13 @@ _STOPWORDS = frozenset({
 
 
 def _tokenize(query: str) -> list[str]:
-    """Lowercase, strip, filter stopwords and short tokens."""
+    """Lowercase, strip, filter stopwords and short tokens (min length 3)."""
     if not query:
         return []
     tokens = []
     for raw in query.split():
         t = raw.strip().lower().strip(".,;:!?\"'()[]{}")
-        if len(t) >= 2 and t not in _STOPWORDS:
+        if len(t) >= 3 and t not in _STOPWORDS:
             tokens.append(t)
     return tokens
 
@@ -51,7 +51,7 @@ def graph_anchored_hits(
     query: str,
     user_id: uuid.UUID,
     k: int = 50,
-    hop_decay: float = 0.5,
+    hop_decay: float | None = None,
 ) -> list[GraphHit]:
     """Rank items via entity + 1-hop relation lookup.
 
@@ -60,8 +60,15 @@ def graph_anchored_hits(
         query: free-text query
         user_id: user scope
         k: max items to return
-        hop_decay: neighbor score multiplier (0.0-1.0)
+        hop_decay: neighbor score multiplier (0.0-1.0); reads from settings if None
     """
+    if hop_decay is None:
+        try:
+            from fourdpocket.config import get_settings
+            hop_decay = get_settings().search.graph_ranker_hop_decay
+        except Exception:
+            hop_decay = 0.5
+
     tokens = _tokenize(query)
     if not tokens:
         return []
@@ -73,7 +80,7 @@ def graph_anchored_hits(
             select(Entity).where(
                 Entity.user_id == user_id,
                 or_(*name_clauses),
-            )
+            ).limit(200)
         ).all()
 
         alias_clauses = [EntityAlias.alias.ilike(f"%{t}%") for t in tokens]
@@ -81,6 +88,7 @@ def graph_anchored_hits(
             select(EntityAlias)
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .where(Entity.user_id == user_id, or_(*alias_clauses))
+            .limit(200)
         ).all()
         alias_entity_ids = {a.entity_id for a in aliases}
         seed_by_alias = []
@@ -100,16 +108,17 @@ def graph_anchored_hits(
             return []
 
         seed_ids = set(seed_map.keys())
+        seed_ids_list = list(seed_ids)
 
-        # 2. 1-hop neighbors via EntityRelation
+        # 2. 1-hop neighbors via EntityRelation.
         rels = db.exec(
             select(EntityRelation).where(
                 EntityRelation.user_id == user_id,
                 or_(
-                    EntityRelation.source_id.in_(seed_ids),
-                    EntityRelation.target_id.in_(seed_ids),
+                    EntityRelation.source_id.in_(seed_ids_list),
+                    EntityRelation.target_id.in_(seed_ids_list),
                 ),
-            )
+            ).limit(1000)
         ).all()
 
         # entity_id -> effective score contribution (1.0 for seed, w*hop_decay for neighbor)
@@ -121,10 +130,17 @@ def graph_anchored_hits(
             if contribution > entity_weight.get(neighbor_id, 0.0):
                 entity_weight[neighbor_id] = contribution
 
-        # 3. Gather items via ItemEntity for all involved entities
+        # 3. Gather items via ItemEntity for all involved entities — user-scoped via join
+        from fourdpocket.models.item import KnowledgeItem
+
         all_entity_ids = list(entity_weight.keys())
         item_links = db.exec(
-            select(ItemEntity).where(ItemEntity.entity_id.in_(all_entity_ids))
+            select(ItemEntity)
+            .join(KnowledgeItem, KnowledgeItem.id == ItemEntity.item_id)
+            .where(
+                ItemEntity.entity_id.in_(all_entity_ids),
+                KnowledgeItem.user_id == user_id,
+            )
         ).all()
 
         # 4. Sum scores per item

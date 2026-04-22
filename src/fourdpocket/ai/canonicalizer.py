@@ -57,20 +57,36 @@ def canonicalize_entity(
     When a match is found, merges the new description into the existing one.
     Returns the canonical Entity.
     """
-    # Tier 1: Exact alias match
+    # Tier 1: Case-insensitive alias match
     alias_row = db.exec(
         select(EntityAlias)
         .join(Entity, Entity.id == EntityAlias.entity_id)
         .where(
             Entity.user_id == user_id,
             Entity.entity_type == entity_type,
-            EntityAlias.alias == name,
+            func.lower(EntityAlias.alias) == name.lower(),
         )
     ).first()
 
     if alias_row:
         entity = db.get(Entity, alias_row.entity_id)
         if entity:
+            # Add the exact surface form as an alias if it's a new casing variant
+            if alias_row.alias != name:
+                existing_exact = db.exec(
+                    select(EntityAlias).where(
+                        EntityAlias.entity_id == entity.id,
+                        EntityAlias.alias == name,
+                    )
+                ).first()
+                if not existing_exact:
+                    new_alias = EntityAlias(
+                        entity_id=entity.id,
+                        alias=name,
+                        source="extraction",
+                    )
+                    db.add(new_alias)
+                    db.flush()
             # Merge description if new info available
             if description:
                 merged = _merge_descriptions(entity.description or "", description)
@@ -131,7 +147,9 @@ def canonicalize_entity(
                         db.flush()
                 return candidate
 
-    # Tier 3: Create new entity
+    # Tier 3: Create new entity (guard against concurrent insert race)
+    import sqlalchemy.exc
+
     now = datetime.now(timezone.utc)
     entity = Entity(
         user_id=user_id,
@@ -143,7 +161,21 @@ def canonicalize_entity(
         updated_at=now,
     )
     db.add(entity)
-    db.flush()
+    try:
+        db.flush()
+    except sqlalchemy.exc.IntegrityError:
+        db.rollback()
+        # Another concurrent request created the same entity; re-query and return it.
+        existing = db.exec(
+            select(Entity).where(
+                Entity.user_id == user_id,
+                Entity.entity_type == entity_type,
+                Entity.canonical_name == name,
+            )
+        ).first()
+        if existing:
+            return existing
+        raise
 
     # Add the name as the first alias
     alias = EntityAlias(

@@ -195,11 +195,11 @@ class SearchService:
                 candidates = merged[:candidate_pool]
 
                 # Fetch texts for reranking
-                texts = self._fetch_texts(db, [r.item_id for r in candidates])
+                texts = self._fetch_texts(db, [r.item_id for r in candidates], user_id=user_id)
                 if texts:
                     reranked = self._reranker.rerank(query, texts, rerank_top_k)
-                    # None means model failed to load — skip reranking, keep RRF order
-                    if reranked is not None:
+                    # Empty list means model failed to load — skip reranking, keep RRF order
+                    if reranked:
                         reranked_results = []
                         for idx, score in reranked:
                             if idx < len(candidates):
@@ -271,8 +271,17 @@ class SearchService:
 
         return results
 
-    def _fetch_texts(self, db: Session, item_ids: list[str]) -> list[str]:
-        """Fetch item content for reranking."""
+    def _fetch_texts(
+        self,
+        db: Session,
+        item_ids: list[str],
+        user_id: uuid.UUID | None = None,
+    ) -> list[str]:
+        """Fetch item content for reranking.
+
+        ``user_id`` is used as a defense-in-depth filter so a stale reranker
+        candidate list can never expose another user's content.
+        """
         if not item_ids:
             return []
         try:
@@ -280,11 +289,12 @@ class SearchService:
 
             from fourdpocket.models.item import KnowledgeItem
 
-            items = db.exec(
-                select(KnowledgeItem).where(
-                    KnowledgeItem.id.in_([uuid.UUID(iid) for iid in item_ids])
-                )
-            ).all()
+            stmt = select(KnowledgeItem).where(
+                KnowledgeItem.id.in_([uuid.UUID(iid) for iid in item_ids])
+            )
+            if user_id is not None:
+                stmt = stmt.where(KnowledgeItem.user_id == user_id)
+            items = db.exec(stmt).all()
             item_map = {str(item.id): item for item in items}
 
             texts = []

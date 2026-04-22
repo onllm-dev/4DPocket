@@ -64,8 +64,15 @@ def _get_or_create_stage(db: Session, item_id: uuid.UUID, stage: str) -> Enrichm
     return row
 
 
-def _mark_running(db: Session, item_id: uuid.UUID, stage: str) -> None:
+def _mark_running(db: Session, item_id: uuid.UUID, stage: str) -> bool:
+    """Mark stage as running. Returns False (and marks failed) when max_attempts exceeded."""
+    from fourdpocket.config import get_settings
+
     row = _get_or_create_stage(db, item_id, stage)
+    max_attempts = get_settings().enrichment.max_attempts
+    if row.attempts >= max_attempts:
+        _mark_failed(db, item_id, stage, f"max_attempts ({max_attempts}) exceeded")
+        return False
     row.status = "running"
     row.attempts += 1
     row.started_at = _now()
@@ -73,6 +80,7 @@ def _mark_running(db: Session, item_id: uuid.UUID, stage: str) -> None:
     row.last_error = None
     db.add(row)
     db.commit()
+    return True
 
 
 def _mark_done(db: Session, item_id: uuid.UUID, stage: str) -> None:
@@ -312,7 +320,6 @@ def handle_embedding(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> Non
 def handle_tagging(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
     """Auto-tag item using AI, plus attach a domain tag for generic items."""
     from fourdpocket.ai.domain_tagger import attach_domain_tag
-    from fourdpocket.ai.sanitizer import sanitize_for_prompt
     from fourdpocket.ai.tagger import auto_tag_item
     from fourdpocket.models.item import KnowledgeItem
 
@@ -320,12 +327,13 @@ def handle_tagging(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
     if not item:
         return
 
+    # Sanitization happens inside generate_tags (tagger is the security boundary)
     tags = auto_tag_item(
         item_id=item.id,
         user_id=user_id,
-        title=sanitize_for_prompt(item.title or "", max_length=2000),
-        content=sanitize_for_prompt(item.content or "", max_length=4000),
-        description=sanitize_for_prompt(item.description or "", max_length=1000),
+        title=item.title or "",
+        content=item.content or "",
+        description=item.description or "",
         db=db,
     )
 
@@ -617,7 +625,8 @@ def run_enrichment_stage(item_id: str, user_id: str, stage: str) -> dict:
         if not _deps_satisfied(db, iid, stage):
             return {"status": "deps_not_met", "stage": stage}
 
-        _mark_running(db, iid, stage)
+        if not _mark_running(db, iid, stage):
+            return {"status": "failed", "stage": stage, "reason": "max_attempts exceeded"}
         try:
             handler = STAGE_HANDLERS.get(stage)
             if handler is None:

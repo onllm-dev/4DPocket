@@ -44,13 +44,16 @@ class LocalReranker:
     ) -> list[tuple[int, float]]:
         self._load()
         if self._model is None:
-            # Return None to signal caller should skip reranking entirely
-            return None
+            # Return empty list — caller already handles empty as "skip reranking"
+            return []
 
         if not docs:
             return []
 
-        pairs = [(query, doc) for doc in docs]
+        # Truncate inputs to ~500 tokens (≈2000 chars) to avoid OOM with long docs
+        _max_chars = 2000
+        truncated_query = query[:_max_chars]
+        pairs = [(truncated_query, doc[:_max_chars]) for doc in docs]
         scores = self._model.predict(pairs)
         ranked = sorted(enumerate(scores), key=lambda x: -x[1])
         return [(int(idx), float(score)) for idx, score in ranked[:top_k]]

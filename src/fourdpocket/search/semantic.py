@@ -1,12 +1,14 @@
 """Semantic search using ChromaDB for vector storage."""
 
 import logging
+import threading
 import uuid
 
 logger = logging.getLogger(__name__)
 
 _client = None
 _collection_cache: dict[str, object] = {}
+_collection_cache_lock = threading.Lock()
 
 
 def _get_client():
@@ -28,13 +30,14 @@ def _get_client():
 
 def _get_collection(user_id: uuid.UUID):
     collection_name = f"u_{str(user_id).replace('-', '')}"
-    if collection_name not in _collection_cache:
-        client = _get_client()
-        _collection_cache[collection_name] = client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection_cache[collection_name]
+    with _collection_cache_lock:
+        if collection_name not in _collection_cache:
+            client = _get_client()
+            _collection_cache[collection_name] = client.get_or_create_collection(
+                name=collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
+        return _collection_cache[collection_name]
 
 
 def add_embedding(

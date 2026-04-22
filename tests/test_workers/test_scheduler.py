@@ -236,3 +236,64 @@ class TestReprocessPendingItems:
         reprocess_pending_items.call_local()
 
         assert call_count == 0, "Item without URL should not be enqueued"
+
+
+class TestCleanupStaleTasks:
+    """Regression tests for cleanup_stale_tasks implementation."""
+
+    def test_cleanup_resets_stale_running_stages(self, db: Session, enrich_user, monkeypatch):
+        """Regression: cleanup_stale_tasks was a stub. Now resets running stages stuck >15min.
+
+        Root cause: cleanup_stale_tasks had a pass body with no implementation.
+        Fixed in scheduler.py.
+        """
+        from datetime import timedelta
+
+        import fourdpocket.db.session as db_module
+        from fourdpocket.models.enrichment import EnrichmentStage
+
+        item_id = enrich_user.id  # re-use a valid UUID
+        stale_stage = EnrichmentStage(
+            item_id=item_id,
+            stage="tagged",
+            status="running",
+            attempts=1,
+            updated_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        )
+        db.add(stale_stage)
+        db.commit()
+
+        monkeypatch.setattr(db_module, "_engine", db.get_bind())
+        cleanup_stale_tasks.call_local()
+
+        db.expire(stale_stage)
+        refreshed = db.get(EnrichmentStage, {"item_id": item_id, "stage": "tagged"})
+        assert refreshed is not None
+        assert refreshed.status == "pending"
+        assert refreshed.last_error is None
+
+    def test_cleanup_does_not_reset_fresh_running_stages(self, db: Session, enrich_user, monkeypatch):
+        """Stages running for <15 minutes are left untouched by cleanup."""
+        from datetime import timedelta
+
+        import fourdpocket.db.session as db_module
+        from fourdpocket.models.enrichment import EnrichmentStage
+
+        item_id = enrich_user.id
+        fresh_stage = EnrichmentStage(
+            item_id=item_id,
+            stage="summarized",
+            status="running",
+            attempts=1,
+            updated_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        )
+        db.add(fresh_stage)
+        db.commit()
+
+        monkeypatch.setattr(db_module, "_engine", db.get_bind())
+        cleanup_stale_tasks.call_local()
+
+        db.expire(fresh_stage)
+        refreshed = db.get(EnrichmentStage, {"item_id": item_id, "stage": "summarized"})
+        assert refreshed is not None
+        assert refreshed.status == "running"

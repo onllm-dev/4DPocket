@@ -17,9 +17,32 @@ logger = logging.getLogger(__name__)
 
 @huey.periodic_task(crontab(hour="*/6"))
 def cleanup_stale_tasks():
-    """Clean up orphaned task data. Runs every 6 hours."""
+    """Reset enrichment stages stuck in 'running' for more than 15 minutes."""
+    from datetime import timedelta
+
+    from fourdpocket.db.session import get_engine
+    from fourdpocket.models.enrichment import EnrichmentStage
+
     logger.info("Running stale task cleanup")
-    # Phase 2: implement cleanup logic
+    engine = get_engine()
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+    with Session(engine) as db:
+        stale = db.exec(
+            select(EnrichmentStage).where(
+                EnrichmentStage.status == "running",
+                EnrichmentStage.updated_at < stale_cutoff,
+            )
+        ).all()
+        reset_count = 0
+        for row in stale:
+            row.status = "pending"
+            row.last_error = None
+            row.updated_at = datetime.now(timezone.utc)
+            db.add(row)
+            reset_count += 1
+        if reset_count:
+            db.commit()
+            logger.info("Reset %d stale running stages to pending", reset_count)
 
 
 @huey.periodic_task(crontab(minute="*/15"))

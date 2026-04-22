@@ -296,7 +296,7 @@ def _build_prompt(
 
     parts.append("\nKey mentions (most-salient first):")
     for i, c in enumerate(contexts, start=1):
-        title = c.get("source_title") or ""
+        title = sanitize_for_prompt(c.get("source_title") or "", max_length=120)
         parts.append(
             f"{i}. [{title}] {c['context']}"
         )

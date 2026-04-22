@@ -374,3 +374,100 @@ class TestParseJSON:
 
         result = _parse_json("")
         assert result == {}
+
+
+class TestRegressionFixes:
+    """Regression tests for wave-3 group-5 bug fixes."""
+
+    def test_ollama_base_url_strips_trailing_slash(self, monkeypatch):
+        """Regression: ollama_url with trailing slash must not produce double slash.
+
+        Root cause: base_url was built as f"{ollama_url}/v1" without rstrip('/').
+        Fixed in openai_compatible.py:49.
+        """
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("ollama", ollama_url="http://localhost:11434/", ollama_model="llama3.2"),
+        )
+
+        with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai_cls:
+            from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
+            OpenAICompatibleProvider(provider="ollama")
+            call_kwargs = mock_openai_cls.call_args.kwargs
+            assert "//v1" not in call_kwargs["base_url"]
+            assert call_kwargs["base_url"].endswith("/v1")
+
+    def test_groq_blank_api_key_raises_runtime_error(self, monkeypatch):
+        """Regression: groq provider with no api_key must raise at init, not silently fail.
+
+        Root cause: blank api_key would create an unusable client with no error.
+        Fixed in openai_compatible.py groq branch.
+        """
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("groq", groq_api_key=""),
+        )
+
+        from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
+        with pytest.raises(RuntimeError, match="groq chat provider requires api_key"):
+            OpenAICompatibleProvider(provider="groq")
+
+    def test_nvidia_blank_api_key_raises_runtime_error(self, monkeypatch):
+        """Regression: nvidia provider with no api_key must raise at init.
+
+        Fixed in openai_compatible.py nvidia branch.
+        """
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings("nvidia", nvidia_api_key=""),
+        )
+
+        from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
+        with pytest.raises(RuntimeError, match="nvidia chat provider requires api_key"):
+            OpenAICompatibleProvider(provider="nvidia")
+
+    def test_anthropic_http_status_error_does_not_leak_api_key(self, monkeypatch):
+        """Regression: HTTPStatusError repr includes request headers with x-api-key.
+
+        Root cause: broad except caught httpx.HTTPStatusError and logged `e` which
+        includes request headers. Fixed to only log status_code.
+        """
+        import httpx
+
+        monkeypatch.setattr(
+            "fourdpocket.ai.openai_compatible.get_settings",
+            lambda: _make_settings(
+                "custom",
+                custom_base_url="https://api.anthropic.com",
+                custom_api_key="sk-secret-key",
+                custom_model="claude-3",
+                custom_api_type="anthropic",
+            ),
+        )
+
+        fake_request = httpx.Request("POST", "https://api.anthropic.com/messages")
+        fake_response = httpx.Response(401, request=fake_request)
+        status_error = httpx.HTTPStatusError("401", request=fake_request, response=fake_response)
+
+        log_messages = []
+
+        import logging
+
+        class CapturingHandler(logging.Handler):
+            def emit(self, record):
+                log_messages.append(self.format(record))
+
+        handler = CapturingHandler()
+        logger = logging.getLogger("fourdpocket.ai.openai_compatible")
+        logger.addHandler(handler)
+        logger.setLevel(logging.WARNING)
+
+        with patch("httpx.post", side_effect=status_error):
+            from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
+            provider = OpenAICompatibleProvider(provider="custom")
+            result = provider.generate("Test")
+
+        logger.removeHandler(handler)
+        assert result == ""
+        for msg in log_messages:
+            assert "sk-secret-key" not in msg

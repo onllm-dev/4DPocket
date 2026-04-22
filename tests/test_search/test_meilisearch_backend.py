@@ -1,4 +1,13 @@
-"""Tests for MeilisearchKeywordBackend — mocked meilisearch.Client."""
+"""Tests for MeilisearchKeywordBackend — mocked meilisearch.Client.
+
+Patch path rationale: MeilisearchKeywordBackend (backends/meilisearch_backend.py)
+lazily imports `_get_client` and `init_meilisearch` from the top-level module
+`fourdpocket.search.meilisearch_backend` inside method bodies. Patching at
+`fourdpocket.search.meilisearch_backend._get_client` is therefore correct — the
+lazy import resolves the name at call time, not at module load time. If the
+import is ever hoisted to the top of backends/meilisearch_backend.py, the patch
+target must change to `fourdpocket.search.backends.meilisearch_backend._get_client`.
+"""
 
 import uuid
 from unittest.mock import MagicMock, patch
@@ -114,7 +123,7 @@ class TestMeilisearchKeywordBackend:
             db=db,
             query="test",
             user_id=user_id,
-            filters=SearchFilters(item_type="article"),
+            filters=SearchFilters(item_type="url"),
             limit=20,
             offset=0,
         )
@@ -122,7 +131,7 @@ class TestMeilisearchKeywordBackend:
         args, kwargs = mock_index.search.call_args
         # Options passed as positional second arg dict
         filter_str = args[1].get("filter", "") if len(args) > 1 else ""
-        assert 'item_type = "article"' in filter_str
+        assert 'item_type = "url"' in filter_str
         assert f'user_id = "{str(user_id)}"' in filter_str
 
     @patch("fourdpocket.search.meilisearch_backend._get_client")
@@ -335,14 +344,14 @@ class TestMeilisearchKeywordBackend:
             db=db,
             query="test",
             user_id=user_id,
-            filters=SearchFilters(item_type="article", source_platform="web", is_favorite=False),
+            filters=SearchFilters(item_type="url", source_platform="web", is_favorite=False),
             limit=20,
             offset=0,
         )
 
         args, kwargs = mock_index.search.call_args
         filter_str = args[1].get("filter", "") if len(args) > 1 else ""
-        assert 'item_type = "article"' in filter_str
+        assert 'item_type = "url"' in filter_str
         assert 'source_platform = "web"' in filter_str
         assert "is_favorite = false" in filter_str
         # All joined by AND

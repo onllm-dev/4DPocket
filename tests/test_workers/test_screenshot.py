@@ -1,7 +1,6 @@
 """Tests for the screenshot capture background task."""
 
 import uuid
-from unittest.mock import MagicMock
 
 import pytest
 from sqlmodel import Session
@@ -192,16 +191,21 @@ class TestCaptureScreenshot:
         from fourdpocket.workers.screenshot import _is_safe_screenshot_url
         assert _is_safe_screenshot_url("http://example.com/screenshot.png") is False
 
-    @pytest.mark.skip(reason="flaky in full suite — async mock cleanup issue")
     def test_capture_screenshot_success_via_mock(self, monkeypatch):
-        """Playwright returns PNG bytes → success (mocked async chain)."""
-        # Mock asyncio.run to return PNG bytes directly, bypassing async chain
-        monkeypatch.setattr("asyncio.run", lambda coro: b"\x89PNG\r\n\x1a\n" + b"fake_png_data")
-        monkeypatch.setattr("fourdpocket.storage.local.LocalStorage.save_file", lambda *a, **kw: "screenshots/uuid.png")
-        monkeypatch.setattr("fourdpocket.workers.screenshot._update_item_screenshot", lambda *a, **kw: None)
+        """Playwright returns PNG bytes → success (mocked async chain).
 
-        from fourdpocket.workers.screenshot import capture_screenshot
-        result = capture_screenshot.call_local(
+        monkeypatch.setattr restores asyncio.run after the test, so this is
+        safe in parallel runs (no cleanup leak unlike unittest.mock.patch).
+        """
+        import asyncio
+
+        import fourdpocket.workers.screenshot as ss_module
+
+        monkeypatch.setattr(asyncio, "run", lambda coro: b"\x89PNG\r\n\x1a\n" + b"fake_png_data")
+        monkeypatch.setattr("fourdpocket.storage.local.LocalStorage.save_file", lambda *a, **kw: "screenshots/uuid.png")
+        monkeypatch.setattr(ss_module, "_update_item_screenshot", lambda *a, **kw: None)
+
+        result = ss_module.capture_screenshot.call_local(
             str(uuid.uuid4()),
             "https://example.com/page",
             str(uuid.uuid4()),
@@ -209,30 +213,19 @@ class TestCaptureScreenshot:
         assert result["status"] == "success"
         assert "path" in result
 
-    @pytest.mark.skip(reason="flaky in full suite — async mock cleanup issue")
     def test_capture_screenshot_size_exceeded_via_mock(self, monkeypatch):
-        """PNG > 10MB → error status (mocked async chain)."""
-        async def mock_awaitable(obj):
-            return obj
+        """PNG > 10MB → error status (mocked async chain).
+
+        monkeypatch.setattr restores asyncio.run after the test.
+        """
+        import asyncio
+
+        import fourdpocket.workers.screenshot as ss_module
 
         large_png = b"\x89PNG\r\n\x1a\n" + b"x" * (11 * 1024 * 1024)
-        mock_page = MagicMock()
-        mock_page.screenshot.return_value = large_png
+        monkeypatch.setattr(asyncio, "run", lambda coro: large_png)
 
-        mock_browser = MagicMock()
-        mock_browser.__aenter__ = mock_awaitable
-        mock_browser.__aexit__ = mock_awaitable
-        mock_browser.new_page.return_value = mock_page
-
-        mock_playwright = MagicMock()
-        mock_playwright.__aenter__ = mock_awaitable
-        mock_playwright.__aexit__ = mock_awaitable
-        mock_playwright.chromium.launch.return_value = mock_browser
-
-        monkeypatch.setattr("playwright.async_api.async_playwright", lambda: mock_playwright)
-
-        from fourdpocket.workers.screenshot import capture_screenshot
-        result = capture_screenshot.call_local(
+        result = ss_module.capture_screenshot.call_local(
             str(uuid.uuid4()),
             "https://example.com/large-page",
             str(uuid.uuid4()),

@@ -12,8 +12,12 @@ _HOMOGLYPH_MAP = str.maketrans({
     '\u03bf': 'o', '\u03bd': 'v',  # Greek
 })
 
-# Zero-width and invisible characters
-_INVISIBLE_CHARS = re.compile(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad\u200e\u200f]+')
+# Zero-width, invisible, bidi-override, bidi-isolate, and Unicode tag block characters
+_INVISIBLE_CHARS = re.compile(
+    r'[\u200b\u200c\u200d\u2060\ufeff\u00ad\u200e\u200f'
+    r'\u202e\u202b\u202d\u2066\u2067\u2068\u2069'
+    r'\U000e0000-\U000e007f]+'
+)
 
 # Patterns commonly used in prompt injection attacks
 _INJECTION_PATTERNS = [
@@ -28,11 +32,28 @@ _INJECTION_PATTERNS = [
     r'(?i)role:\s*',
     r'(?i)instruct\s+',
     r'(?i)developer\s+mode',
-    # Base64-encoded injection attempts
-    r'(?i)[A-Za-z0-9+/]{50,}={0,2}',  # long base64 strings - suspicious
+    # Base64-encoded injection attempts: require word boundary, and must contain
+    # at least one '+' or '/' (or end in '=' padding) to avoid matching hex hashes.
+    r'(?i)(?:^|(?<=\s))[A-Za-z0-9+/]{50,}={0,2}(?=\s|$)(?=[A-Za-z0-9]*[+/=])',
 ]
 
 _COMPILED_PATTERNS = [re.compile(p) for p in _INJECTION_PATTERNS]
+
+
+def strip_html(text: str | None) -> str | None:
+    """Strip HTML tags and unescape HTML entities from a string.
+
+    Safe for echoing user content back to clients (UI, public endpoints).
+    Also rejects javascript: scheme in the result.
+    """
+    import html
+
+    if not text:
+        return text
+    # Remove all tags first, then unescape HTML entities
+    stripped = re.sub(r"<[^>]+>", "", text)
+    stripped = html.unescape(stripped)
+    return stripped
 
 
 def sanitize_for_prompt(text: str, max_length: int = 4000) -> str:

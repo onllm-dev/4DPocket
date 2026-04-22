@@ -15,8 +15,10 @@ if (_project_root / "pyproject.toml").exists():
         sys.path.insert(0, str(_src_path))
 
 # Import all task modules so Huey can discover them
-from fourdpocket.workers import huey  # noqa: F401
-from fourdpocket.workers.ai_enrichment import enrich_item  # noqa: F401
+from fourdpocket.workers import (
+    ai_enrichment,  # noqa: F401 — kept for backward compat
+    huey,  # noqa: F401
+)
 from fourdpocket.workers.archiver import archive_page  # noqa: F401
 from fourdpocket.workers.enrichment_pipeline import (  # noqa: F401
     enrich_item_v2,

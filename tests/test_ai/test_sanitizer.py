@@ -192,3 +192,50 @@ class TestSanitizerMixedPayloads:
         """Base64-encoded injection keywords must trigger full block."""
         result = sanitize_for_prompt("SW5zdHJ1Y3Rpb25zIGlnbm9yZWQ=")
         assert result == "[content filtered]"
+
+
+class TestRegressionBidiAndTagBlock:
+    """Regression tests for wave-3 group-5 sanitizer fixes."""
+
+    @pytest.mark.security
+    @pytest.mark.parametrize("char,name", [
+        ("\u202e", "RTLO (U+202E)"),
+        ("\u202b", "RTLE (U+202B)"),
+        ("\u202d", "LRO (U+202D)"),
+        ("\u2066", "LRI (U+2066)"),
+        ("\u2067", "RLI (U+2067)"),
+        ("\u2068", "FSI (U+2068)"),
+        ("\u2069", "PDI (U+2069)"),
+    ])
+    def test_bidi_override_chars_stripped(self, char, name):
+        """Regression: bidi override/isolate chars must be stripped.
+
+        Root cause: _INVISIBLE_CHARS did not include U+202E, U+202B, U+202D,
+        U+2066-U+2069. Fixed in sanitizer.py.
+        """
+        result = sanitize_for_prompt(f"hello{char}world")
+        assert char not in result, f"{name} still present in output"
+        assert "helloworld" in result
+
+    @pytest.mark.security
+    def test_unicode_tag_block_stripped(self):
+        """Regression: Unicode tag block chars (U+E0000-U+E007F) must be stripped.
+
+        Fixed in sanitizer.py by extending _INVISIBLE_CHARS range.
+        """
+        # U+E0041 is TAG LATIN CAPITAL LETTER A
+        tag_char = "\U000e0041"
+        result = sanitize_for_prompt(f"hello{tag_char}world")
+        assert tag_char not in result
+        assert "helloworld" in result
+
+    @pytest.mark.security
+    def test_base64_regex_does_not_match_hex_sha256(self):
+        """Regression: the old base64 pattern matched 64-char hex hashes (false positive).
+
+        Root cause: r'[A-Za-z0-9+/]{50,}={0,2}' matches pure hex strings.
+        Fixed by requiring '+' or '/' or '=' in the match.
+        """
+        sha256 = "a3f1b2e4d5c6a7b8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2"
+        result = sanitize_for_prompt(sha256)
+        assert result == sha256, f"SHA-256 hex hash was incorrectly filtered: {result!r}"

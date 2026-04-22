@@ -74,6 +74,13 @@ def get_chat_provider(overrides: dict | None = None):
     settings = get_settings()
     provider_name = overrides.get("chat_provider") or settings.ai.chat_provider
 
+    _valid_providers = {"ollama", "groq", "nvidia", "custom", "noop"}
+    if isinstance(provider_name, str) and provider_name and provider_name not in _valid_providers:
+        raise ValueError(
+            f"Unknown chat provider {provider_name!r}. "
+            f"Must be one of: {sorted(_valid_providers)}"
+        )
+
     if provider_name in ("ollama", "groq", "nvidia", "custom"):
         try:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider

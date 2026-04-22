@@ -349,32 +349,40 @@ class TestExtractionPipelineErrorPropagation:
 class TestRuntimeErrorRetry:
     """Tests for RuntimeError inner Exception handler in pipeline."""
 
-    @pytest.mark.skip(reason="flaky in full suite — async mock cleanup issue")
     def test_pipeline_runtime_error_inner_exception(self, engine, monkeypatch):
         """RuntimeError retry that also fails returns a failed ProcessorResult."""
-        call_count = [0]
+        # Ensure a fresh event loop — a sibling test in this module closes its
+        # loop deliberately, which leaves the worker in a no-current-loop
+        # state under xdist. Install a new loop so `pipeline.run` can call
+        # asyncio.get_event_loop() successfully.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            call_count = [0]
 
-        def mock_process(url, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                raise RuntimeError("first failure")
-            raise Exception("second failure")
+            def mock_process(url, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    raise RuntimeError("first failure")
+                raise Exception("second failure")
 
-        mock_proc = MagicMock()
-        mock_proc.process = mock_process
+            mock_proc = MagicMock()
+            mock_proc.process = mock_process
 
-        pipeline = ExtractionPipeline()
-        user_id = uuid.uuid4()
+            pipeline = ExtractionPipeline()
+            user_id = uuid.uuid4()
 
-        with Session(engine) as db:
-            with _patch_match_processor(mock_proc):
-                item = pipeline.run(
-                    url="https://example.com/page",
-                    user_id=user_id,
-                    db=db,
-                    search_indexer=None,
-                )
-            # The pipeline should catch the second Exception and create a failed item
-            assert item is not None
-            assert "_processing_error" in item.item_metadata
-            assert "second failure" in item.item_metadata["_processing_error"] or "Exception" in item.item_metadata["_processing_error"]
+            with Session(engine) as db:
+                with _patch_match_processor(mock_proc):
+                    item = pipeline.run(
+                        url="https://example.com/page",
+                        user_id=user_id,
+                        db=db,
+                        search_indexer=None,
+                    )
+                # The pipeline should catch the second Exception and create a failed item
+                assert item is not None
+                assert "_processing_error" in item.item_metadata
+                assert "second failure" in item.item_metadata["_processing_error"] or "Exception" in item.item_metadata["_processing_error"]
+        finally:
+            loop.close()
