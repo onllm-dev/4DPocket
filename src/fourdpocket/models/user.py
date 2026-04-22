@@ -93,3 +93,20 @@ class UserUpdate(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
+    username: str | None = None
+    email: EmailStr | None = None
+
+    @field_validator("username")
+    @classmethod
+    def username_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if "@" in v:
+            raise ValueError("Username cannot contain '@'")
+        if len(v) < 2:
+            raise ValueError("Username must be at least 2 characters")
+        if len(v) > 30:
+            raise ValueError("Username must be at most 30 characters")
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, underscores, dots, and hyphens")
+        return v

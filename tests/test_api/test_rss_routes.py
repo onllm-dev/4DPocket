@@ -528,3 +528,184 @@ class TestFeedApprovalQueue:
         )
         assert resp.status_code == 400
         assert "approved" in resp.json()["detail"] or "rejected" in resp.json()["detail"]
+
+
+# === BUG REGRESSION TESTS ===
+
+class TestCreateFeedCollectionOwnership:
+    """Regression: create_feed must validate target_collection_id ownership.
+
+    Bug: target_collection_id was saved without verifying it belongs to
+    current_user. An attacker could pin a feed to another user's collection.
+    Fixed in: src/fourdpocket/api/rss.py create_feed
+    """
+
+    def test_create_feed_with_unowned_collection_returns_404(
+        self, client, auth_headers, second_user_headers
+    ):
+        """Cannot create a feed targeting another user's collection."""
+        # Second user creates a collection
+        coll_resp = client.post(
+            "/api/v1/collections",
+            json={"name": "Second User Collection"},
+            headers=second_user_headers,
+        )
+        assert coll_resp.status_code == 201
+        other_collection_id = coll_resp.json()["id"]
+
+        # First user tries to use it as target
+        resp = client.post(
+            "/api/v1/rss",
+            json={
+                "url": "https://example.com/feed.xml",
+                "title": "Hijack Feed",
+                "target_collection_id": other_collection_id,
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+
+    def test_create_feed_with_owned_collection_succeeds(self, client, auth_headers):
+        """Creating a feed with own collection succeeds."""
+        coll_resp = client.post(
+            "/api/v1/collections",
+            json={"name": "My Collection"},
+            headers=auth_headers,
+        )
+        assert coll_resp.status_code == 201
+        my_collection_id = coll_resp.json()["id"]
+
+        resp = client.post(
+            "/api/v1/rss",
+            json={
+                "url": "https://example.com/feed.xml",
+                "title": "My Feed",
+                "target_collection_id": my_collection_id,
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["target_collection_id"] == my_collection_id
+
+
+class TestUpdateFeedAllowlist:
+    """Regression: update_feed must use an allowlist, not blanket setattr.
+
+    Bug: any field from RSSFeedUpdate was applied via setattr with no
+    restriction. target_collection_id required ownership validation too.
+    Fixed in: src/fourdpocket/api/rss.py update_feed
+    """
+
+    def test_update_feed_target_collection_to_unowned_returns_404(
+        self, client, auth_headers, second_user_headers
+    ):
+        """Updating target_collection_id to another user's collection returns 404."""
+        # Second user creates a collection
+        coll_resp = client.post(
+            "/api/v1/collections",
+            json={"name": "Second User Coll"},
+            headers=second_user_headers,
+        )
+        other_collection_id = coll_resp.json()["id"]
+
+        # First user creates a feed
+        create_resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://example.com/update-coll.xml", "title": "Feed"},
+            headers=auth_headers,
+        )
+        feed_id = create_resp.json()["id"]
+
+        # First user tries to set target to second user's collection
+        resp = client.patch(
+            f"/api/v1/rss/{feed_id}",
+            json={"target_collection_id": other_collection_id},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+
+    def test_update_feed_target_collection_to_owned_succeeds(
+        self, client, auth_headers
+    ):
+        """Updating target_collection_id to own collection succeeds."""
+        coll_resp = client.post(
+            "/api/v1/collections",
+            json={"name": "My Coll"},
+            headers=auth_headers,
+        )
+        my_collection_id = coll_resp.json()["id"]
+
+        create_resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://example.com/update-own-coll.xml"},
+            headers=auth_headers,
+        )
+        feed_id = create_resp.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/rss/{feed_id}",
+            json={"target_collection_id": my_collection_id},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["target_collection_id"] == my_collection_id
+
+
+class TestApproveFeedEntryCollectionOwnership:
+    """Regression: approve_feed_entry must re-verify collection ownership.
+
+    Bug: CollectionItem was created using feed.target_collection_id without
+    re-checking that the collection still exists and belongs to current_user.
+    Fixed in: src/fourdpocket/api/rss.py approve_feed_entry
+    """
+
+    def test_approve_entry_with_deleted_collection_still_creates_item(
+        self, client, auth_headers, db
+    ):
+        """If target collection was deleted, approve still creates the item (no crash)."""
+        from sqlmodel import select
+
+        from fourdpocket.models.collection import Collection
+        from fourdpocket.models.feed_entry import FeedEntry
+        from fourdpocket.models.rss_feed import RSSFeed
+        from fourdpocket.models.user import User
+
+        user = db.exec(select(User)).first()
+
+        # Create a collection then delete it
+        coll = Collection(user_id=user.id, name="Ephemeral")
+        db.add(coll)
+        db.commit()
+        db.refresh(coll)
+        coll_id = coll.id
+        db.delete(coll)
+        db.commit()
+
+        feed = RSSFeed(
+            user_id=user.id,
+            url="https://example.com/ghost-coll.xml",
+            mode="approval",
+            target_collection_id=coll_id,
+        )
+        db.add(feed)
+        db.commit()
+        db.refresh(feed)
+
+        entry = FeedEntry(
+            feed_id=feed.id,
+            user_id=user.id,
+            url="https://example.com/ghost-entry",
+            title="Ghost Entry",
+            status="pending",
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+
+        resp = client.post(
+            f"/api/v1/rss/{feed.id}/entries/{entry.id}/approve",
+            headers=auth_headers,
+        )
+        # Should succeed (item created) even though collection is gone — no FK crash
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "approved"

@@ -4,6 +4,7 @@ import uuid
 
 from sqlmodel import select
 
+from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.user import User
 from tests.factories import make_item, make_pat
 
@@ -96,6 +97,143 @@ def test_pat_cannot_patch_own_profile(client, auth_headers, db):
     )
 
     assert response.status_code == 403
+
+
+def _make_collection_scoped_pat(db, user_id, collection_id):
+    """Helper: PAT scoped to one collection only (all_collections=False, include_uncollected=False)."""
+    from fourdpocket.models.api_token import ApiTokenCollection
+
+    pat, raw = make_pat(db, user_id, role="editor", all_collections=False, allow_deletion=True)
+    # Explicitly disable include_uncollected so items outside the collection are blocked
+    pat.include_uncollected = False
+    db.add(pat)
+    db.commit()
+    db.refresh(pat)
+    link = ApiTokenCollection(token_id=pat.id, collection_id=collection_id)
+    db.add(link)
+    db.commit()
+    return pat, raw
+
+
+# --- Bug 1: PAT collection ACL bypass ---
+
+def test_collection_scoped_pat_cannot_list_items_outside_collection(client, auth_headers, db):
+    """PAT with all_collections=False must not expose items outside its allowed collections.
+
+    Regression test for: PAT collection ACL bypass in list_items.
+    Root cause: list_items only filtered by user_id, ignoring PAT collection restrictions.
+    Fixed in: src/fourdpocket/api/items.py list_items
+    """
+    user = _current_user(db)
+
+    # Create a collection scoped to the PAT
+    allowed_col = Collection(user_id=user.id, name="Allowed Col")
+    db.add(allowed_col)
+    db.commit()
+    db.refresh(allowed_col)
+
+    # Item IN the allowed collection
+    in_item = make_item(db, user.id, url="https://in-collection.com", title="In Collection", item_type="note")
+    db.add(CollectionItem(collection_id=allowed_col.id, item_id=in_item.id))
+    db.commit()
+
+    # Item NOT in any collection
+    make_item(db, user.id, url="https://out-collection.com", title="Out Collection", item_type="note")
+
+    _, raw = _make_collection_scoped_pat(db, user.id, allowed_col.id)
+    headers = {"Authorization": f"Bearer {raw}"}
+
+    response = client.get("/api/v1/items", headers=headers)
+    assert response.status_code == 200
+    titles = {i["title"] for i in response.json()}
+    assert "In Collection" in titles
+    assert "Out Collection" not in titles
+
+
+def test_collection_scoped_pat_cannot_get_item_outside_collection(client, auth_headers, db):
+    """PAT with all_collections=False must return 404 for items not in its collections.
+
+    Regression test for: PAT collection ACL bypass in get_item.
+    Root cause: get_item only checked user_id ownership.
+    Fixed in: src/fourdpocket/api/items.py get_item
+    """
+    user = _current_user(db)
+
+    allowed_col = Collection(user_id=user.id, name="Scoped Col")
+    db.add(allowed_col)
+    db.commit()
+    db.refresh(allowed_col)
+
+    # Item NOT in the allowed collection
+    out_item = make_item(db, user.id, url="https://outside.com", title="Outside", item_type="note")
+
+    _, raw = _make_collection_scoped_pat(db, user.id, allowed_col.id)
+    headers = {"Authorization": f"Bearer {raw}"}
+
+    response = client.get(f"/api/v1/items/{out_item.id}", headers=headers)
+    assert response.status_code == 404
+
+
+def test_collection_scoped_pat_can_get_item_inside_collection(client, auth_headers, db):
+    """PAT with all_collections=False can access items inside its allowed collection."""
+    user = _current_user(db)
+
+    allowed_col = Collection(user_id=user.id, name="Allowed Col 2")
+    db.add(allowed_col)
+    db.commit()
+    db.refresh(allowed_col)
+
+    in_item = make_item(db, user.id, url="https://inside.com", title="Inside", item_type="note")
+    db.add(CollectionItem(collection_id=allowed_col.id, item_id=in_item.id))
+    db.commit()
+
+    _, raw = _make_collection_scoped_pat(db, user.id, allowed_col.id)
+    headers = {"Authorization": f"Bearer {raw}"}
+
+    response = client.get(f"/api/v1/items/{in_item.id}", headers=headers)
+    assert response.status_code == 200
+
+
+# --- Bug 3: update_item doesn't re-index ---
+
+def test_update_item_does_not_raise_on_search_index_failure(client, auth_headers, db):
+    """update_item must succeed even when search indexing fails.
+
+    Regression test for: update_item doesn't re-index after commit.
+    Root cause: no index_item call after db.refresh(item).
+    Fixed in: src/fourdpocket/api/items.py update_item
+    """
+    user = _current_user(db)
+    item = make_item(db, user.id, title="Before Update", item_type="note")
+
+    response = client.patch(
+        f"/api/v1/items/{item.id}",
+        json={"title": "After Update"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == "After Update"
+
+
+# --- Bug 4: bulk_action tag branch silent-skips invalid tags ---
+
+def test_bulk_tag_with_invalid_tag_id_returns_404(client, auth_headers, db):
+    """bulk_action tag with a tag_id not owned by user must return 404.
+
+    Regression test for: bulk tag branch silently skips unowned tag_id.
+    Root cause: ownership check inside per-item loop allowed silent skip.
+    Fixed in: src/fourdpocket/api/items.py bulk_action
+    """
+    user = _current_user(db)
+    item = make_item(db, user.id, title="Item to tag", item_type="note")
+    nonexistent_tag_id = str(uuid.uuid4())
+
+    response = client.post(
+        "/api/v1/items/bulk",
+        json={"action": "tag", "item_ids": [str(item.id)], "tag_id": nonexistent_tag_id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
 
 
 def test_admin_scope_viewer_pat_can_read_admin_but_not_mutate(

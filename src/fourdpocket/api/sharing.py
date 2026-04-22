@@ -25,6 +25,19 @@ router = APIRouter(prefix="/shares", tags=["sharing"])
 # --- Schemas ---
 
 
+class PublicItemResponse(BaseModel):
+    id: str
+    title: str | None
+    url: str | None
+    description: str | None
+    content: str | None
+    summary: str | None
+    source_platform: str | None
+    created_at: str | None
+    tags: list[str]
+    owner_display_name: str
+
+
 class ShareCreate(BaseModel):
     share_type: ShareType
     item_id: uuid.UUID | None = None
@@ -345,12 +358,14 @@ def share_history(
 public_router = APIRouter(prefix="/public", tags=["sharing"])
 
 
-@public_router.get("/{token}")
+@public_router.get("/{token}", response_model=PublicItemResponse)
 def get_public_share(
     token: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
+    import re as _re
+
     from fourdpocket.api.rate_limit import check_rate_limit, record_attempt
 
     client_ip = request.client.host if request.client else "unknown"
@@ -373,21 +388,21 @@ def get_public_share(
     tag_ids = [tl.tag_id for tl in tag_links]
     tags = db.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
     owner = db.get(User, item.user_id)
-    import re as _re
+
     def _strip_html(text: str | None) -> str | None:
         if not text:
             return text
         return _re.sub(r"<[^>]+>", "", text)
 
-    return {
-        "id": str(item.id),
-        "title": _strip_html(item.title),
-        "url": item.url,
-        "description": _strip_html(item.description),
-        "content": _strip_html(item.content),
-        "summary": _strip_html(item.summary),
-        "source_platform": item.source_platform,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
-        "tags": [t.name for t in tags],
-        "owner_display_name": owner.display_name or owner.username if owner else "Unknown",
-    }
+    return PublicItemResponse(
+        id=str(item.id),
+        title=_strip_html(item.title),
+        url=item.url,
+        description=_strip_html(item.description),
+        content=_strip_html(item.content),
+        summary=_strip_html(item.summary),
+        source_platform=item.source_platform,
+        created_at=item.created_at.isoformat() if item.created_at else None,
+        tags=[t.name for t in tags],
+        owner_display_name=(owner.display_name or owner.username) if owner else "Unknown",
+    )

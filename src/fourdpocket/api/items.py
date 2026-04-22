@@ -11,12 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Session, col, select
-from sqlmodel import delete as sql_delete
 
 from fourdpocket.api.api_token_utils import require_deletion
 from fourdpocket.api.deps import (
     get_current_pat,
     get_current_user,
+    get_current_user_pat_aware,
     get_db,
     require_pat_deletion,
     require_pat_editor,
@@ -144,7 +144,7 @@ def create_item(
         ).first()
         if existing:
             raise HTTPException(
-                409,
+                status.HTTP_409_CONFLICT,
                 detail="You already saved this URL",
             )
 
@@ -199,7 +199,7 @@ def create_item(
 @router.get("", response_model=list[ItemRead])
 def list_items(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
     item_type: ItemType | None = None,
@@ -210,7 +210,16 @@ def list_items(
     sort_by: str = Query(default="created_at", pattern="^(created_at|title|updated_at)$"),
     sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
 ):
+    current_user, pat = auth
     query = select(KnowledgeItem).where(KnowledgeItem.user_id == current_user.id)
+
+    # PAT collection ACL: restrict to allowed item ids when token is collection-scoped
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+
+        allowed = token_allowed_item_ids(db, pat, current_user.id)
+        if allowed is not None:
+            query = query.where(KnowledgeItem.id.in_(allowed))
 
     if item_type is not None:
         query = query.where(KnowledgeItem.item_type == item_type)
@@ -393,11 +402,19 @@ def get_queue_stats(
 def get_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
 ):
+    current_user, pat = auth
     item = db.get(KnowledgeItem, item_id)
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    # PAT collection ACL: 404 (not 403) when item is outside the token's allowed collections
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_can_access_item
+
+        if not token_can_access_item(db, pat, item_id, current_user.id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # Attach enrichment summary so the detail page can show the same badge
     from fourdpocket.workers.enrichment_summary import batch_enrichment_summary
@@ -458,6 +475,15 @@ def update_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    # Re-index with updated content
+    try:
+        from fourdpocket.search import get_search_service
+
+        get_search_service().index_item(db, item)
+    except Exception as e:
+        logger.warning("Search re-index failed for item %s after update: %s", item.id, e)
+
     return item
 
 
@@ -782,31 +808,31 @@ def bulk_action(
     if data.action == BulkAction.delete and pat is not None:
         require_deletion(pat)
 
+    # Bug 4: validate tag ownership once before the loop to avoid silent skips
+    if data.action == BulkAction.tag and data.tag_id is not None:
+        _tag_check = db.get(Tag, data.tag_id)
+        if not _tag_check or _tag_check.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+
     processed = 0
     for iid in data.item_ids:
         item = db.get(KnowledgeItem, iid)
         if not item or item.user_id != current_user.id:
             continue
 
+        # Bug 1: PAT collection ACL — skip items the token cannot access
+        if pat is not None:
+            from fourdpocket.api.api_token_utils import token_can_access_item
+
+            if not token_can_access_item(db, pat, iid, current_user.id):
+                continue
+
         if data.action == "archive":
             item.is_archived = True
             db.add(item)
         elif data.action == "delete":
-            from fourdpocket.models.enrichment import EnrichmentStage as _ES
-            from fourdpocket.models.entity import ItemEntity as _IE
-            from fourdpocket.models.entity_relation import RelationEvidence as _RE
-            from fourdpocket.models.item_chunk import ItemChunk as _IC
-            db.exec(sql_delete(_RE).where(_RE.item_id == item.id))
-            db.exec(sql_delete(_IE).where(_IE.item_id == item.id))
-            db.exec(sql_delete(_ES).where(_ES.item_id == item.id))
-            db.exec(sql_delete(_IC).where(_IC.item_id == item.id))
-            db.exec(sql_delete(ItemTag).where(ItemTag.item_id == item.id))
-            try:
-                from fourdpocket.search import get_search_service
-                get_search_service().delete_item(db, item.id, current_user.id)
-            except Exception:
-                pass
-            db.delete(item)
+            # Bug 2: use cascade_delete_item to include Share/ShareRecipient/CollectionItem
+            cascade_delete_item(db, item)
         elif data.action == "favorite":
             item.is_favorite = True
             db.add(item)
@@ -844,7 +870,13 @@ def bulk_action(
         processed += 1
 
     db.commit()
-    return {"processed": processed, "total": len(data.item_ids)}
+    total = len(data.item_ids)
+    if processed == 0 and total > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No items were processed: items not found, not owned by you, or denied by token ACL.",
+        )
+    return {"processed": processed, "total": total}
 
 
 @router.post("/{item_id}/download-video")
@@ -983,6 +1015,33 @@ def media_proxy(
     if resp_ct in ct_ext_map:
         ext = ct_ext_map[resp_ct]
         filename = f"{item_id}_{url_hash}.{ext}"
+
+    # Magic-byte validation: if Content-Type claims a binary image format,
+    # confirm the response body starts with the expected magic bytes so
+    # content-type spoofing cannot smuggle non-image data through the proxy.
+    _magic_checks: dict[str, bytes] = {
+        "jpg": b"\xff\xd8\xff",
+        "png": b"\x89PNG",
+        "gif": b"GIF8",
+        "ico": b"\x00\x00\x01\x00",
+        # WebP: first 4 bytes "RIFF" and bytes 8-11 "WEBP"
+        "webp": b"RIFF",
+    }
+    if ext in _magic_checks:
+        _prefix = resp.content[:12] if len(resp.content) >= 12 else resp.content
+        _magic_ok = _prefix.startswith(_magic_checks[ext])
+        if _magic_ok and ext == "webp":
+            _magic_ok = len(resp.content) >= 12 and resp.content[8:12] == b"WEBP"
+        if not _magic_ok:
+            logger.warning(
+                "Media proxy: Content-Type claims %s but magic bytes do not match for %s",
+                resp_ct,
+                url,
+            )
+            raise HTTPException(
+                status_code=415,
+                detail="Response content does not match declared media type.",
+            )
 
     # Save to local storage
     path = storage.save_file(uid, "media", filename, resp.content)

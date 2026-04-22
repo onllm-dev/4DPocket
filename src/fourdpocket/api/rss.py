@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
+from fourdpocket.models.collection import Collection, CollectionItem
 from fourdpocket.models.feed_entry import FeedEntry, FeedEntryRead
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.rss_feed import RSSFeed
@@ -30,7 +31,7 @@ class RSSFeedCreate(BaseModel):
 class RSSFeedUpdate(BaseModel):
     title: str | None = None
     category: str | None = None
-    target_collection_id: str | None = None
+    target_collection_id: uuid.UUID | None = None
     poll_interval: int | None = None
     is_active: bool | None = None
 
@@ -48,6 +49,19 @@ def _is_safe_feed_url(url: str) -> bool:
     return is_safe_url(url)
 
 
+def _validate_collection_ownership(
+    db: Session, collection_id: uuid.UUID | None, user_id: uuid.UUID
+) -> None:
+    """Raise 404 if collection_id is set but does not belong to user_id."""
+    if collection_id is None:
+        return
+    col = db.exec(
+        select(Collection).where(Collection.id == collection_id, Collection.user_id == user_id)
+    ).first()
+    if not col:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+
 @router.post("", status_code=201)
 def create_feed(
     body: RSSFeedCreate,
@@ -57,6 +71,7 @@ def create_feed(
 ):
     if not _is_safe_feed_url(body.url):
         raise HTTPException(status_code=400, detail="Feed URL targets a blocked network")
+    _validate_collection_ownership(db, body.target_collection_id, current_user.id)
 
     feed = RSSFeed(
         user_id=current_user.id,
@@ -75,6 +90,9 @@ def create_feed(
     return feed
 
 
+_UPDATE_FEED_ALLOWLIST = {"title", "category", "poll_interval", "is_active", "target_collection_id"}
+
+
 @router.patch("/{feed_id}")
 def update_feed(
     feed_id: uuid.UUID,
@@ -86,7 +104,10 @@ def update_feed(
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k in _UPDATE_FEED_ALLOWLIST}
+    if "target_collection_id" in updates:
+        _validate_collection_ownership(db, updates["target_collection_id"], current_user.id)
+    for field, value in updates.items():
         setattr(feed, field, value)
     db.commit()
     db.refresh(feed)
@@ -104,7 +125,6 @@ def delete_feed(
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
     # Cascade: remove feed entries
-    from fourdpocket.models.feed_entry import FeedEntry
     for entry in db.exec(select(FeedEntry).where(FeedEntry.feed_id == feed_id)).all():
         db.delete(entry)
     db.delete(feed)
@@ -185,16 +205,21 @@ def approve_feed_entry(
     )
     db.add(item)
 
-    # Add to target collection if set
+    # Add to target collection if set — re-verify ownership in case collection changed since feed creation
     if feed.target_collection_id:
-        from fourdpocket.models.collection import CollectionItem
-
-        link = CollectionItem(
-            collection_id=feed.target_collection_id,
-            item_id=item.id,
-            position=0,
-        )
-        db.add(link)
+        col = db.exec(
+            select(Collection).where(
+                Collection.id == feed.target_collection_id,
+                Collection.user_id == current_user.id,
+            )
+        ).first()
+        if col:
+            link = CollectionItem(
+                collection_id=feed.target_collection_id,
+                item_id=item.id,
+                position=0,
+            )
+            db.add(link)
 
     entry.status = "approved"
     db.add(entry)
