@@ -7,10 +7,14 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 import fourdpocket.models  # noqa: F401 - register all models
+from fourdpocket.config import get_settings
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override the placeholder URL from alembic.ini with the real one from settings.
+config.set_main_option("sqlalchemy.url", get_settings().database.url)
 
 target_metadata = SQLModel.metadata
 

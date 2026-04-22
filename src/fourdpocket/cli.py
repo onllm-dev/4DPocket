@@ -690,11 +690,28 @@ def cmd_db(args):
 
     elif args.db_command == "reset":
         _warn("This will DESTROY ALL DATA in the database.")
+
+        # Safety: refuse to drop while server or worker are running.
         if not args.yes:
+            running = []
+            for svc_name in ("server", "worker"):
+                if _is_running(svc_name):
+                    running.append(svc_name)
+            if running:
+                _error(
+                    f"The following service(s) are still running: {', '.join(running)}. "
+                    "Stop them first (4dpocket stop) or pass --yes to override."
+                )
+                return
+
             confirm = input("  Type 'yes' to confirm: ").strip()
             if confirm != "yes":
                 print("  Cancelled.")
                 return
+
+        # Clear any cached engine before dropping so SQLite file locks are released.
+        from fourdpocket.db.session import reset_engine
+        reset_engine()
 
         if db_url.startswith("postgresql"):
             _info("Resetting PostgreSQL database...")
@@ -719,7 +736,8 @@ def cmd_db(args):
             for suffix in ["", "-journal", "-shm", "-wal"]:
                 Path(db_path + suffix).unlink(missing_ok=True)
 
-        from fourdpocket.db.session import init_db
+        from fourdpocket.db.session import init_db, reset_engine
+        reset_engine()  # clear cached connection after drop
         init_db()
         _success("Database reset and reinitialized.")
 

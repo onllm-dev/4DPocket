@@ -6,6 +6,8 @@ mkdir -p /data
 
 case "${1}" in
   server)
+    echo "Running database migrations..."
+    uv run alembic upgrade head || { echo "migration failed"; exit 1; }
     echo "Starting 4DPocket server on port ${FDP_SERVER__PORT:-4040}..."
     exec uvicorn fourdpocket.main:app \
       --host "${FDP_SERVER__HOST:-0.0.0.0}" \
@@ -14,8 +16,7 @@ case "${1}" in
     ;;
   worker)
     echo "Starting Huey background worker..."
-    exec python -m huey.bin.huey_consumer \
-      fourdpocket.workers.huey \
+    exec python -m fourdpocket.workers.huey_worker \
       --workers "${HUEY_WORKERS:-2}" \
       --worker-type thread
     ;;
