@@ -143,9 +143,17 @@ def search_highlights(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Search within highlights text and notes."""
-    query = select(Highlight).where(
-        Highlight.user_id == current_user.id,
-        (Highlight.text.contains(q)) | (Highlight.note.contains(q)),
-    ).limit(limit).offset(offset)
+    """Search within highlights text and notes.
+
+    Uses tokenized LIKE: splits query on whitespace and ANDs each token so that
+    multi-word queries and partial matches (e.g. "server" matching "servers") work.
+    TODO: replace with FTS5 virtual table (highlights_fts) for full parity with notes search.
+    """
+    tokens = q.split()
+    filters = [Highlight.user_id == current_user.id]
+    for token in tokens:
+        filters.append(
+            (Highlight.text.contains(token)) | (Highlight.note.contains(token))
+        )
+    query = select(Highlight).where(*filters).limit(limit).offset(offset)
     return db.exec(query).all()

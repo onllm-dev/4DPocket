@@ -1,8 +1,9 @@
 """Database-backed rate limiting — shared across workers, works with SQLite & PostgreSQL."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete as sa_delete
 from sqlmodel import Session, select
 
 from fourdpocket.models.rate_limit import RateLimitEntry
@@ -18,17 +19,15 @@ def _now() -> datetime:
 
 def _evict_stale(db: Session, action: str) -> None:
     """Remove stale entries to prevent unbounded table growth."""
-    cutoff = _now().timestamp() - _EVICT_AGE_SECS
-    stale = db.exec(
-        select(RateLimitEntry).where(
+    cutoff = _now() - timedelta(seconds=_EVICT_AGE_SECS)
+    db.exec(
+        sa_delete(RateLimitEntry).where(
             RateLimitEntry.action == action,
             RateLimitEntry.locked_until == None,  # noqa: E711
             RateLimitEntry.attempts <= 0,
+            RateLimitEntry.last_attempt < cutoff,
         )
-    ).all()
-    for entry in stale:
-        if entry.last_attempt.timestamp() < cutoff:
-            db.delete(entry)
+    )
     db.flush()
 
 
