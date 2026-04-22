@@ -225,12 +225,23 @@ def synthesize_entity(entity_id: uuid.UUID, db: Session) -> dict[str, Any] | Non
         select(EntityAlias.alias).where(EntityAlias.entity_id == entity.id)
     ).all()
 
-    cache_key = _evidence_hash(entity, contexts, rels)
-    cached = get_cached_response(db, cache_key, "synthesis")
+    # Build a deterministic raw-text cache key from entity id + evidence ids.
+    # Pass this directly to get_cached_response so _hash_content does the
+    # single, correct hash — avoids the double-hash collision risk.
+    cache_text = json.dumps(
+        {
+            "entity_id": str(entity.id),
+            "context_ids": [c["source_item_id"] for c in contexts],
+            "relation_hints": [r["entity_name"] for r in rels],
+        },
+        sort_keys=True,
+    )
+    chat = get_chat_provider()
+    model_name = getattr(chat, "_model", "") or settings.ai.ollama_model
+    cached = get_cached_response(db, cache_text, "synthesis", model_name)
     result_payload = cached if isinstance(cached, dict) else None
 
     if result_payload is None:
-        chat = get_chat_provider()
         prompt = _build_prompt(entity, list(aliases), contexts, rels)
         try:
             raw = chat.generate_json(prompt, system_prompt=SYSTEM_PROMPT)
@@ -242,7 +253,7 @@ def synthesize_entity(entity_id: uuid.UUID, db: Session) -> dict[str, Any] | Non
         if result_payload is None:
             return None
 
-        store_cached_response(db, cache_key, "synthesis", result_payload)
+        store_cached_response(db, cache_text, "synthesis", result_payload, model_name)
 
     now = datetime.now(timezone.utc)
     result_payload = {
@@ -274,7 +285,8 @@ def _build_prompt(
         f"Type: {entity.entity_type}",
     ]
     if aliases:
-        parts.append(f"Aliases: {', '.join(aliases[:10])}")
+        sanitized_aliases = [sanitize_for_prompt(a, max_length=100) for a in aliases[:10]]
+        parts.append(f"Aliases: {', '.join(sanitized_aliases)}")
     if entity.description:
         parts.append(
             "Existing description: "

@@ -135,8 +135,9 @@ def touch_last_used(db: Session, token: ApiToken) -> None:
     db.add(token)
     try:
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        logger.warning("Failed to touch PAT last_used_at: %s", exc)
 
 
 def compute_expiry(days: int | None) -> datetime | None:

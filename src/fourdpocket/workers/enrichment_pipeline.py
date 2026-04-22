@@ -4,6 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+import sqlalchemy.exc
 from sqlmodel import Session, select
 
 from fourdpocket.models.enrichment import EnrichmentStage
@@ -42,15 +43,24 @@ def _get_or_create_stage(db: Session, item_id: uuid.UUID, stage: str) -> Enrichm
         )
     ).first()
     if row is None:
-        row = EnrichmentStage(
-            item_id=item_id,
-            stage=stage,
-            status="pending",
-            updated_at=_now(),
-        )
-        db.add(row)
-        db.commit()
-        db.refresh(row)
+        try:
+            row = EnrichmentStage(
+                item_id=item_id,
+                stage=stage,
+                status="pending",
+                updated_at=_now(),
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+        except sqlalchemy.exc.IntegrityError:
+            db.rollback()
+            row = db.exec(
+                select(EnrichmentStage).where(
+                    EnrichmentStage.item_id == item_id,
+                    EnrichmentStage.stage == stage,
+                )
+            ).first()
     return row
 
 
@@ -359,14 +369,18 @@ def handle_entity_extraction(db: Session, item_id: uuid.UUID, user_id: uuid.UUID
         return
 
     from fourdpocket.ai.extractor import extract_entities
+    from fourdpocket.ai.factory import get_chat_provider as _get_chat
     from fourdpocket.ai.llm_cache import get_cached_response, store_cached_response
     from fourdpocket.models.item_chunk import ItemChunk
+
+    _chat = _get_chat()
+    _model_name = getattr(_chat, "_model", "") or settings.ai.ollama_model
 
     def _extract_with_cache(text: str):
         """Extract entities, using LLM cache when available."""
         from fourdpocket.ai.extractor import ExtractionResult
 
-        cached = get_cached_response(db, text, "extraction")
+        cached = get_cached_response(db, text, "extraction", _model_name)
         if cached:
             from fourdpocket.ai.extractor import _parse_entities, _parse_relations
             entities = _parse_entities(
@@ -399,7 +413,7 @@ def handle_entity_extraction(db: Session, item_id: uuid.UUID, user_id: uuid.UUID
                      "keywords": r.keywords, "description": r.description}
                     for r in result.relations
                 ],
-            })
+            }, _model_name)
 
         return result
 
@@ -486,14 +500,23 @@ def _store_extraction(db, item_id, user_id, chunk_id, result):
         ).first()
 
         if existing_rel:
-            existing_rel.weight += 1.0
-            existing_rel.item_count += 1
-            if ext_rel.keywords:
-                existing_kw = set((existing_rel.keywords or "").split(", "))
-                new_kw = set(ext_rel.keywords.split(", "))
-                existing_rel.keywords = ", ".join(existing_kw | new_kw)
-            db.add(existing_rel)
             rel_id = existing_rel.id
+            # Only increment counters if this item has not contributed evidence
+            # before (i.e. this is a first-time enrichment, not a replay).
+            already_evidenced = db.exec(
+                select(RelationEvidence).where(
+                    RelationEvidence.relation_id == rel_id,
+                    RelationEvidence.item_id == item_id,
+                )
+            ).first()
+            if not already_evidenced:
+                existing_rel.weight += 1.0
+                existing_rel.item_count += 1
+                if ext_rel.keywords:
+                    existing_kw = set((existing_rel.keywords or "").split(", "))
+                    new_kw = set(ext_rel.keywords.split(", "))
+                    existing_rel.keywords = ", ".join(existing_kw | new_kw)
+                db.add(existing_rel)
         else:
             rel = EntityRelation(
                 user_id=user_id,
@@ -508,14 +531,14 @@ def _store_extraction(db, item_id, user_id, chunk_id, result):
             db.flush()
             rel_id = rel.id
 
-        # Add evidence
-        existing_ev = db.exec(
+        # Add evidence (idempotent — composite PK prevents duplicates)
+        already_evidenced = db.exec(
             select(RelationEvidence).where(
                 RelationEvidence.relation_id == rel_id,
                 RelationEvidence.item_id == item_id,
             )
         ).first()
-        if not existing_ev:
+        if not already_evidenced:
             ev = RelationEvidence(
                 relation_id=rel_id,
                 item_id=item_id,

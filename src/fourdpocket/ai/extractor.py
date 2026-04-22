@@ -195,8 +195,8 @@ def extract_entities(
     relations = _parse_relations(result.get("relations", []), entity_names, max_relations)
     base_result = ExtractionResult(entities=entities, relations=relations)
 
-    # Gleaning pass: ask LLM to find what it missed
-    if enable_gleaning and entities:
+    # Gleaning pass: ask LLM to find what it missed (run even on empty first pass)
+    if enable_gleaning:
         try:
             initial_json = result  # reuse the raw JSON for context
             gleaning_context = (
