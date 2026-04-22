@@ -9,36 +9,42 @@ setStorageAdapter({
   remove: (keys) => chrome.storage.local.remove(keys),
 });
 
+function must<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`popup: missing DOM element #${id}`);
+  return el as T;
+}
+
 // State elements
 const states = {
-  notConnected: document.getElementById("state-not-connected")!,
-  notLoggedIn: document.getElementById("state-not-logged-in")!,
-  loading: document.getElementById("state-loading")!,
-  ready: document.getElementById("state-ready")!,
-  saving: document.getElementById("state-saving")!,
-  saved: document.getElementById("state-saved")!,
-  alreadySaved: document.getElementById("state-already-saved")!,
-  error: document.getElementById("state-error")!,
+  notConnected: must("state-not-connected"),
+  notLoggedIn: must("state-not-logged-in"),
+  loading: must("state-loading"),
+  ready: must("state-ready"),
+  saving: must("state-saving"),
+  saved: must("state-saved"),
+  alreadySaved: must("state-already-saved"),
+  error: must("state-error"),
 };
 
-const footer = document.getElementById("footer")!;
-const footerUsername = document.getElementById("footer-username")!;
+const footer = must("footer");
+const footerUsername = must("footer-username");
 
 // Interactive elements
-const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
-const retryBtn = document.getElementById("retry-btn") as HTMLButtonElement;
-const viewSavedBtn = document.getElementById("view-saved-btn") as HTMLButtonElement;
-const viewExistingBtn = document.getElementById("view-existing-btn") as HTMLButtonElement;
-const openOptionsConnect = document.getElementById("open-options-connect") as HTMLButtonElement;
-const openOptionsLogin = document.getElementById("open-options-login") as HTMLButtonElement;
-const openSettings = document.getElementById("open-settings") as HTMLButtonElement;
+const saveBtn = must<HTMLButtonElement>("save-btn");
+const retryBtn = must<HTMLButtonElement>("retry-btn");
+const viewSavedBtn = must<HTMLButtonElement>("view-saved-btn");
+const viewExistingBtn = must<HTMLButtonElement>("view-existing-btn");
+const openOptionsConnect = must<HTMLButtonElement>("open-options-connect");
+const openOptionsLogin = must<HTMLButtonElement>("open-options-login");
+const openSettings = must<HTMLButtonElement>("open-settings");
 
 // Display elements
-const pageTitle = document.getElementById("page-title")!;
-const pageUrl = document.getElementById("page-url")!;
-const savedSubtitle = document.getElementById("saved-subtitle")!;
-const alreadySavedTitle = document.getElementById("already-saved-title")!;
-const errorDetail = document.getElementById("error-detail")!;
+const pageTitle = must("page-title");
+const pageUrl = must("page-url");
+const savedSubtitle = must("saved-subtitle");
+const alreadySavedTitle = must("already-saved-title");
+const errorDetail = must("error-detail");
 
 // Current tab info
 let currentTab: { url: string; title: string } = { url: "", title: "" };
@@ -82,6 +88,8 @@ viewExistingBtn.addEventListener("click", () => {
 });
 
 async function doSave() {
+  if (saveBtn.disabled) return;
+  saveBtn.disabled = true;
   showState("saving");
 
   try {
@@ -99,10 +107,13 @@ async function doSave() {
   } catch (err) {
     errorDetail.textContent = err instanceof Error ? err.message : "An unexpected error occurred";
     showState("error");
+  } finally {
+    saveBtn.disabled = false;
   }
 }
 
 async function init() {
+  saveBtn.disabled = true;
   showState("loading");
 
   // 1. Check server URL configured
@@ -156,7 +167,11 @@ async function init() {
     // If check fails, just show ready state - user can still try to save
   }
 
+  saveBtn.disabled = false;
   showState("ready");
 }
 
-init();
+init().catch((err) => {
+  errorDetail.textContent = err instanceof Error ? err.message : "An unexpected error occurred";
+  showState("error");
+});

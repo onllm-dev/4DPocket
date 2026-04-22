@@ -221,7 +221,12 @@ export default defineContentScript({
                 showResult(btn, false);
                 return;
               }
-              showResult(btn, response?.status === "success");
+              if (!response || typeof response !== "object" || !("status" in response)) {
+                console.warn("[4dp] unexpected response", response);
+                showResult(btn, false);
+                return;
+              }
+              showResult(btn, response.status === "success");
             }
           );
         });

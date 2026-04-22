@@ -80,6 +80,9 @@ export default defineBackground(() => {
         () => sendResponse({ status: "error", message: "Failed to save highlight" })
       );
       return true; // Keep message channel open for async response
+    } else {
+      sendResponse({ status: "error", message: `unknown message type: ${message?.type}` });
+      return false;
     }
   });
 
@@ -153,8 +156,11 @@ export default defineBackground(() => {
       } else {
         chrome.action.setBadgeText({ text: "", tabId });
       }
-    } catch {
-      // Silently ignore - badge is a nice-to-have
+    } catch (err) {
+      // Network error / 5xx / auth error — log and show "?" with gray
+      console.warn("[4dp] badge update failed", err);
+      chrome.action.setBadgeText({ text: "?", tabId });
+      chrome.action.setBadgeBackgroundColor({ color: "#6b7280", tabId });
     }
   }
 
