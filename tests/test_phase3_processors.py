@@ -95,6 +95,7 @@ MEDIUM_PAYLOAD = {
 def test_medium_json_endpoint_emits_typed_sections():
     import sys
     from unittest.mock import patch
+
     from fourdpocket.processors.medium import MediumProcessor
 
     proc = MediumProcessor()

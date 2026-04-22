@@ -3,13 +3,13 @@
 from sqlmodel import Session
 
 from fourdpocket.models.api_token import ApiToken
+from fourdpocket.models.base import UserRole
 from fourdpocket.models.collection import Collection
 from fourdpocket.models.enrichment import EnrichmentStage
 from fourdpocket.models.entity import Entity
 from fourdpocket.models.item import KnowledgeItem as Item
 from fourdpocket.models.item_chunk import ItemChunk
 from fourdpocket.models.tag import Tag
-from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User
 
 

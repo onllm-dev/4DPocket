@@ -166,7 +166,6 @@ class TestImportJSON:
 
     def test_import_json_invalid_format_returns_error(self, client, auth_headers):
         # Create a separate TestClient with raise_server_exceptions=False to catch 500
-        from starlette.testclient import TestClient
         from fourdpocket.main import app
 
         error_client = TestClient(app, raise_server_exceptions=False)

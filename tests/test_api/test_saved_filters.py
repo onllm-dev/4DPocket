@@ -1,7 +1,6 @@
 """CRUD tests for saved-filter endpoints."""
 
 
-import pytest
 
 
 def test_create_filter(client, auth_headers):

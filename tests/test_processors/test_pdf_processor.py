@@ -71,8 +71,6 @@ class TestPyMuPdf4llm:
 
     def test_process_pymupdf4llm_success(self, monkeypatch):
         """pymupdf4llm returns markdown → sections per page."""
-        import pymupdf as pymupdf_mock
-        import pymupdf4llm as pymupdf4llm_mock
 
         # Minimal fake PDF bytes (magic number for a valid PDF is just enough to be parsed)
         fake_pdf = b"%PDF-1.4\ndummy content"
