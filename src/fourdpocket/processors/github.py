@@ -23,7 +23,12 @@ import re
 
 import httpx
 
-from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
+from fourdpocket.processors.base import (
+    BaseProcessor,
+    ProcessorResult,
+    ProcessorStatus,
+    _is_safe_url,
+)
 from fourdpocket.processors.registry import register_processor
 from fourdpocket.processors.sections import Section
 
@@ -162,6 +167,8 @@ class GitHubProcessor(BaseProcessor):
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
         headers = self._headers()
 
+        if not _is_safe_url(api_url):
+            raise ValueError("URL blocked: targets internal network")
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.get(api_url, headers=headers)
             r.raise_for_status()
@@ -237,6 +244,8 @@ class GitHubProcessor(BaseProcessor):
         api_url = f"https://api.github.com/repos/{owner}/{repo}/issues/{number}"
         headers = self._headers()
 
+        if not _is_safe_url(api_url):
+            raise ValueError("URL blocked: targets internal network")
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.get(api_url, headers=headers)
             r.raise_for_status()
@@ -346,6 +355,8 @@ class GitHubProcessor(BaseProcessor):
         api_url = f"https://api.github.com/gists/{gist_id}"
         headers = self._headers()
 
+        if not _is_safe_url(api_url):
+            raise ValueError("URL blocked: targets internal network")
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.get(api_url, headers=headers)
             r.raise_for_status()

@@ -23,6 +23,7 @@ dependencies = [
     "mcp>=1.12",
     "tldextract>=5.1.0",
     "trafilatura>=1.12.0",
+    "defusedxml>=0.7.0",
 ]
 
 [project.scripts]

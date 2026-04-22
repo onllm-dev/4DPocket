@@ -22,7 +22,12 @@ from html import unescape
 
 import httpx
 
-from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
+from fourdpocket.processors.base import (
+    BaseProcessor,
+    ProcessorResult,
+    ProcessorStatus,
+    _is_safe_url,
+)
 from fourdpocket.processors.registry import register_processor
 from fourdpocket.processors.sections import Section
 
@@ -110,9 +115,20 @@ class RedditProcessor(BaseProcessor):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            r = await client.get(json_url, headers=headers)
-            r.raise_for_status()
+        if not _is_safe_url(json_url):
+            raise ValueError("URL blocked: targets internal network")
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+            current_url = json_url
+            for _ in range(6):
+                r = await client.get(current_url, headers=headers)
+                if r.is_redirect:
+                    location = r.headers.get("location", "")
+                    if not location or not _is_safe_url(location):
+                        raise ValueError("Redirect blocked: targets internal network")
+                    current_url = location
+                else:
+                    r.raise_for_status()
+                    break
         return r.json(), str(r.url)
 
     async def process(self, url: str, **kwargs) -> ProcessorResult:

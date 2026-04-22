@@ -77,7 +77,11 @@ def _try_internal_api(url: str) -> dict | None:
     try:
         from curl_cffi import requests as cffi_requests
 
+        from fourdpocket.processors.base import _is_safe_url
+
         api_url = f"https://medium.com/_/api/posts/{post_id}"
+        if not _is_safe_url(api_url):
+            return None
         resp = cffi_requests.get(api_url, impersonate="chrome", headers={
             "Accept": "application/json",
             "Referer": "https://medium.com/",
@@ -250,15 +254,9 @@ class MediumProcessor(BaseProcessor):
                 )
 
         # ─── Path 2: HTML + trafilatura/readability fallback ───
-        # Use Chrome UA — Medium aggressively blocks bot-like UAs.
+        # Use _fetch_url (SSRF-checked, per-hop redirect guard).
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(url, headers={
-                    "User-Agent": _CHROME_UA,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.5",
-                })
-                response.raise_for_status()
+            response = await self._fetch_url(url, timeout=15)
         except httpx.HTTPStatusError as e:
             return ProcessorResult(
                 title=url, source_platform="medium",

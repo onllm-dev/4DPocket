@@ -556,3 +556,61 @@ class TestRssFeedDedup:
         assert count2 == 0
         entries = db.exec(select(FeedEntry).where(FeedEntry.feed_id == feed.id)).all()
         assert len(entries) == 1
+
+
+# === SECURITY REGRESSION TESTS ===
+
+class TestXxeProtection:
+    """Regression: rss_worker must use defusedxml to prevent XXE attacks.
+
+    Bug: xml.etree.ElementTree.fromstring on untrusted RSS XML is vulnerable
+    to XXE (XML External Entity) attacks. defusedxml disables entity expansion.
+    Root cause: stdlib ET processes external entities by default.
+    Fixed in: src/fourdpocket/workers/rss_worker.py — import defusedxml.ElementTree.
+    """
+
+    def test_xxe_entity_expansion_blocked(self, db: "Session", engine, monkeypatch):
+        """XXE payload in RSS XML must not cause file disclosure or SSRF.
+
+        defusedxml raises DefusedXmlException (or parses safely without expansion)
+        for DOCTYPE/ENTITY declarations. The feed worker must not crash with an
+        unhandled exception — it should return 0 (error path) rather than
+        exposing file contents.
+        """
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        user = _make_rss_user(db)
+        feed = _make_rss_feed(db, user)
+
+        # Classic XXE payload that would disclose /etc/passwd with stdlib ET
+        xxe_xml = """<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>&xxe;</title>
+      <link>https://example.com/article1</link>
+    </item>
+  </channel>
+</rss>"""
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = xxe_xml
+        mock_resp.headers = {"content-type": "application/rss+xml"}
+        mock_resp.is_redirect = False
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.get") as mock_get:
+            mock_get.return_value = mock_resp
+            # defusedxml raises on DOCTYPE; fetch_rss_feed catches it and returns 0
+            count = fetch_rss_feed(feed, db)
+
+        # Must not have created an item with /etc/passwd contents
+        items = db.exec(select(KnowledgeItem)).all()
+        assert len(items) == 0
+        # Count is 0 because parsing failed safely
+        assert count == 0

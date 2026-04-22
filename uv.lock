@@ -14,6 +14,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "bcrypt" },
+    { name = "defusedxml" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -95,6 +96,7 @@ requires-dist = [
     { name = "bcrypt", specifier = ">=4.0.0" },
     { name = "chromadb", marker = "extra == 'semantic'", specifier = ">=0.5.0" },
     { name = "curl-cffi", marker = "extra == 'processors'", specifier = ">=0.7.0" },
+    { name = "defusedxml", specifier = ">=0.7.0" },
     { name = "email-validator", specifier = ">=2.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "gallery-dl", marker = "extra == 'processors'", specifier = ">=1.27.0" },

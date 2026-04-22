@@ -18,7 +18,12 @@ import re
 
 import httpx
 
-from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
+from fourdpocket.processors.base import (
+    BaseProcessor,
+    ProcessorResult,
+    ProcessorStatus,
+    _is_safe_url,
+)
 from fourdpocket.processors.registry import register_processor
 from fourdpocket.processors.sections import Section, make_section_id
 
@@ -42,9 +47,12 @@ class ThreadsProcessor(BaseProcessor):
     priority = 8
 
     async def _fetch_with_browser_ua(self, url: str) -> str | None:
+        if not _is_safe_url(url):
+            logger.debug("Threads fetch blocked (SSRF): %s", url)
+            return None
         try:
             async with httpx.AsyncClient(
-                timeout=15, follow_redirects=True,
+                timeout=15, follow_redirects=False,
                 headers={
                     "User-Agent": _CHROME_UA,
                     "Accept": (
@@ -54,9 +62,19 @@ class ThreadsProcessor(BaseProcessor):
                     "Accept-Language": "en-US,en;q=0.5",
                 },
             ) as client:
-                r = await client.get(url)
-                r.raise_for_status()
-                return r.text
+                current_url = url
+                for _ in range(6):
+                    r = await client.get(current_url)
+                    if r.is_redirect:
+                        location = r.headers.get("location", "")
+                        if not location or not _is_safe_url(location):
+                            logger.debug("Threads redirect blocked (SSRF): %s", location)
+                            return None
+                        current_url = location
+                    else:
+                        r.raise_for_status()
+                        return r.text
+                return None
         except Exception as e:
             logger.debug("Threads fetch %s failed: %s", url, e)
             return None

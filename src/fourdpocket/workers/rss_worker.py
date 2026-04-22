@@ -118,7 +118,7 @@ def _parse_json_feed(feed: RSSFeed, content: str, db: Session) -> int:
 def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
     """Fetch new entries from an RSS feed. Returns count of new items."""
     try:
-        import xml.etree.ElementTree as ET
+        import defusedxml.ElementTree as ET  # noqa: N817
 
         if not is_safe_url(feed.url):
             logger.warning("SSRF blocked: RSS feed URL %s targets internal network", feed.url)
@@ -236,5 +236,12 @@ def fetch_rss_feed(feed: RSSFeed, db: Session) -> int:
         logger.error("Failed to fetch RSS feed %s: %s", feed.url, e)
         feed.last_error = str(e)[:500]
         feed.error_count = (feed.error_count or 0) + 1
+        if feed.error_count >= 5:
+            feed.is_active = False
+            logger.warning(
+                "Feed %s deactivated after %d consecutive errors",
+                feed.url,
+                feed.error_count,
+            )
         db.commit()
         return 0

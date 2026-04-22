@@ -32,21 +32,13 @@ def _extract_pub_and_slug(url: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _try_substack_api(pub: str, slug: str) -> dict | None:
-    api_url = f"https://{pub}.substack.com/api/v1/posts/{slug}"
-    try:
-        r = httpx.get(
-            api_url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; 4dpocket/0.2)",
-                "Accept": "application/json",
-            },
-            timeout=15, follow_redirects=True,
-        )
-        if r.status_code == 200:
+def _parse_substack_api_response(r: "httpx.Response") -> dict | None:
+    """Parse a successful Substack API HTTP response into a data dict."""
+    if r.status_code == 200:
+        try:
             return r.json()
-    except Exception as e:
-        logger.debug("Substack API failed for %s/%s: %s", pub, slug, e)
+        except Exception:
+            return None
     return None
 
 
@@ -116,7 +108,12 @@ class SubstackProcessor(BaseProcessor):
         # ─── Path 1: Substack API ───
         api_data: dict | None = None
         if pub and slug:
-            api_data = _try_substack_api(pub, slug)
+            api_url = f"https://{pub}.substack.com/api/v1/posts/{slug}"
+            try:
+                api_resp = await self._fetch_url(api_url, timeout=15)
+                api_data = _parse_substack_api_response(api_resp)
+            except Exception as e:
+                logger.debug("Substack API failed for %s/%s: %s", pub, slug, e)
 
         if api_data:
             title = api_data.get("title") or url
