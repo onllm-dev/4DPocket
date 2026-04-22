@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock* hatch_build.py ./
-RUN uv sync --no-dev --all-extras --frozen 2>/dev/null || uv sync --no-dev --all-extras
+RUN uv sync --no-dev --all-extras --frozen
 
 COPY src/ ./src/
 

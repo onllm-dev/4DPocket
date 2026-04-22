@@ -56,6 +56,21 @@ export async function apiRequest(
     ...(options.headers as Record<string, string>),
   };
   if (token) {
+    let parsed: URL;
+    try {
+      parsed = new URL(serverUrl);
+    } catch {
+      throw new Error("Server URL is invalid");
+    }
+    const isLocalhost =
+      parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    if (parsed.protocol !== "https:" && !isLocalhost) {
+      console.warn(
+        "[4dp] Refusing to send Authorization header over plain HTTP to a non-localhost server.",
+        serverUrl
+      );
+      throw new SessionExpiredError();
+    }
     headers["Authorization"] = `Bearer ${token}`;
   }
 

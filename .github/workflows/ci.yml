@@ -95,6 +95,7 @@ jobs:
           docker run -d --name 4dp-smoke -p 4040:4040 \
             -e FDP_DATABASE__URL=sqlite:////data/4dpocket.db \
             -e FDP_AUTH__MODE=single \
+            -e FDP_AUTH__SECRET_KEY=ci-test-secret \
             4dpocket:ci
 
           # Wait for health
@@ -105,6 +106,11 @@ jobs:
             fi
             sleep 1
           done
+          if [ "$i" = "30" ]; then
+            echo "Container never became healthy"
+            docker logs 4dp-smoke
+            exit 1
+          fi
 
           # Validate SPA root serves index.html
           STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4040/)

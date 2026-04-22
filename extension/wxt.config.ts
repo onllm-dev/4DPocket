@@ -7,7 +7,7 @@ export default defineConfig({
     name: "4DPocket",
     description: "Save anything to your AI-powered knowledge base",
     permissions: ["activeTab", "tabs", "contextMenus", "storage", "sidePanel"],
-    host_permissions: ["<all_urls>"],
+    host_permissions: ["http://*/*", "https://*/*"],
     icons: {
       16: "icon/16.png",
       32: "icon/32.png",

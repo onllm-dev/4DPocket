@@ -139,9 +139,14 @@ export default defineBackground(() => {
 
   // --- Feature 4: Auto-detect already saved (badge on navigation) ---
 
+  // Track tabs that currently show a transient "?" badge so we can clear it
+  // on the next successful update rather than leaving it indefinitely.
+  const transientBadgeTabs = new Set<number>();
+
   async function updateBadgeForTab(tabId: number, url: string) {
     if (!url.startsWith("http")) {
       chrome.action.setBadgeText({ text: "", tabId });
+      transientBadgeTabs.delete(tabId);
       return;
     }
 
@@ -150,6 +155,8 @@ export default defineBackground(() => {
       if (!serverUrl || !token) return;
 
       const result = await checkUrl(url);
+      // Success path — clear any lingering "?" badge first
+      transientBadgeTabs.delete(tabId);
       if (result.exists) {
         chrome.action.setBadgeText({ text: "\u2713", tabId });
         chrome.action.setBadgeBackgroundColor({ color: "#16a34a", tabId });
@@ -157,8 +164,10 @@ export default defineBackground(() => {
         chrome.action.setBadgeText({ text: "", tabId });
       }
     } catch (err) {
-      // Network error / 5xx / auth error — log and show "?" with gray
+      // Network error / 5xx / auth error — log and show "?" with gray.
+      // Mark this tab so the badge is cleared on the next success.
       console.warn("[4dp] badge update failed", err);
+      transientBadgeTabs.add(tabId);
       chrome.action.setBadgeText({ text: "?", tabId });
       chrome.action.setBadgeBackgroundColor({ color: "#6b7280", tabId });
     }

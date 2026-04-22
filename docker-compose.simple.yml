@@ -11,12 +11,14 @@ services:
       - FDP_SEARCH__BACKEND=sqlite
       - FDP_AUTH__MODE=${AUTH_MODE:-single}
       - FDP_AI__CHAT_PROVIDER=${AI_CHAT_PROVIDER:-ollama}
-      - FDP_AI__OLLAMA_URL=${OLLAMA_URL:-http://host.gateway.docker.internal:11434}
+      - FDP_AI__OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
       - FDP_AI__GROQ_API_KEY=${GROQ_API_KEY:-}
       - FDP_STORAGE__BASE_PATH=/data
       - FDP_SERVER__SECURE_COOKIES=false
     volumes:
       - 4dp-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
 volumes:

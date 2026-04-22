@@ -306,13 +306,13 @@ start_backend() {
     fi
 
     local pid=$!
-    echo "$pid" > "$BACKEND_PID_FILE"
     sleep 2
 
     if kill -0 "$pid" 2>/dev/null; then
+        echo "$pid" > "$BACKEND_PID_FILE"
         step "Backend started (PID: $pid, port: $port)"
     else
-        fail "Backend failed to start"
+        fail "Backend failed to start (port in use or missing command)"
         echo -e "    ${DIM}Check: tail -f $BACKEND_LOG${NC}"
         return 1
     fi
@@ -405,13 +405,13 @@ start_worker() {
         > "$WORKER_LOG" 2>&1 &
 
     local pid=$!
-    echo "$pid" > "$WORKER_PID_FILE"
     sleep 2
 
     if kill -0 "$pid" 2>/dev/null; then
+        echo "$pid" > "$WORKER_PID_FILE"
         step "Worker started (PID: $pid, ${HUEY_WORKERS:-2} threads)"
     else
-        fail "Worker failed to start"
+        fail "Worker failed to start (port in use or missing command)"
         echo -e "    ${DIM}Check: tail -f $WORKER_LOG${NC}"
         return 1
     fi

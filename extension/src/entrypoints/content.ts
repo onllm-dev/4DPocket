@@ -1,5 +1,5 @@
 export default defineContentScript({
-  matches: ["<all_urls>"],
+  matches: ["http://*/*", "https://*/*"],
   runAt: "document_idle",
 
   main() {
