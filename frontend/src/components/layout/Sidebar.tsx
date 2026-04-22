@@ -197,7 +197,7 @@ export function Sidebar() {
           </div>
         ) : null}
         <button
-          onClick={logout}
+          onClick={() => logout.mutate()}
           className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 cursor-pointer w-full min-h-[44px] ${
             collapsed ? "justify-center" : ""
           }`}

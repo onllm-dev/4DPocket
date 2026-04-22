@@ -49,7 +49,7 @@ interface SearchConfig {
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading: currentUserLoading } = useCurrentUser();
 
   // All hooks called unconditionally before any returns (React rules of hooks)
   const qc = useQueryClient();
@@ -119,6 +119,15 @@ export default function Admin() {
       api.patch("/api/v1/admin/search-settings", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "search-settings"] }),
   });
+
+  // Show nothing while the current user is still being fetched
+  if (currentUserLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+      </div>
+    );
+  }
 
   // Role guard: redirect non-admins
   if (currentUser && currentUser.role !== "admin") {

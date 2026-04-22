@@ -43,12 +43,13 @@ export function useRegister() {
 
 export function useLogout() {
   const qc = useQueryClient();
-  return () => {
-    api.logout().finally(() => {
+  return useMutation({
+    mutationFn: () => api.logout(),
+    onSuccess: () => {
       qc.clear();
       window.location.href = "/login";
-    });
-  };
+    },
+  });
 }
 
 export function useUpdateProfile() {
@@ -73,7 +74,12 @@ export function useChangePassword() {
 }
 
 export function useDeleteAccount() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.del("/api/v1/auth/me"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["currentUser"] });
+      window.location.href = "/login";
+    },
   });
 }

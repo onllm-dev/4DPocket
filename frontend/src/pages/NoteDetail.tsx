@@ -28,7 +28,7 @@ export default function NoteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const noteId = id ?? "";
-  const { data: note, isLoading } = useNote(noteId);
+  const { data: note, isLoading, isError } = useNote(noteId);
   const { data: tags } = useNoteTags(noteId);
   const updateNote = useUpdateNote();
   const deleteNote = useDeleteNote();
@@ -58,10 +58,12 @@ export default function NoteDetail() {
     );
   }
 
-  if (!note) {
+  if (isError || !note) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-gray-400">Note not found</p>
+        <p className="text-gray-500 dark:text-gray-400">
+          Note not found or you don&apos;t have access.
+        </p>
         <Link to="/notes" className="text-sky-600 hover:underline mt-2 inline-block">
           Back to Notes
         </Link>

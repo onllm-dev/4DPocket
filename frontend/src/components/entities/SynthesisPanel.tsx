@@ -90,6 +90,18 @@ export function SynthesisPanel({
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 mb-3">
+          <p className="text-[11px] text-red-600 dark:text-red-400 flex-1">{error}</p>
+          <button
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="text-[11px] text-sky-600 dark:text-sky-400 hover:underline cursor-pointer disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      )}
       <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed mb-4">
         {synthesis.summary}
       </p>

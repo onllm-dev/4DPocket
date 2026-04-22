@@ -49,6 +49,7 @@ export default function CollectionDetail() {
     media: Array<{ type: string; url: string; role: string }>;
     is_favorite: boolean;
     created_at: string;
+    item_metadata?: Record<string, unknown> | null;
   }>>({
     queryKey: ["collection", id, "items"],
     queryFn: () => api.get(`/api/v1/collections/${id}/items`),

@@ -70,6 +70,7 @@ export default function Settings() {
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [profileDirty, setProfileDirty] = useState(false);
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
@@ -83,8 +84,16 @@ export default function Settings() {
       setBio(currentUser.bio || "");
       setUsername(currentUser.username || "");
       setEmail(currentUser.email || "");
+      setProfileDirty(false);
     }
   }, [currentUser]);
+
+  function handleSaveProfile() {
+    updateProfile.mutate(
+      { username, email, display_name: displayName, bio },
+      { onSuccess: () => setProfileDirty(false) }
+    );
+  }
 
   function handlePasswordChange() {
     setPasswordError("");
@@ -115,8 +124,7 @@ export default function Settings() {
     if (deleteConfirm !== "DELETE") return;
     deleteAccount.mutate(undefined, {
       onSuccess: () => {
-        logout();
-        navigate("/login");
+        logout.mutate();
       },
     });
   }
@@ -164,8 +172,7 @@ export default function Settings() {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onBlur={() => { if (username && username !== (currentUser?.username || "")) updateProfile.mutate({ username }); }}
+                onChange={(e) => { setUsername(e.target.value); setProfileDirty(true); }}
                 placeholder="username"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
               />
@@ -175,8 +182,7 @@ export default function Settings() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={() => { if (email && email !== (currentUser?.email || "")) updateProfile.mutate({ email }); }}
+                onChange={(e) => { setEmail(e.target.value); setProfileDirty(true); }}
                 placeholder="you@example.com"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
               />
@@ -186,8 +192,7 @@ export default function Settings() {
               <input
                 type="text"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                onBlur={() => { if (displayName !== (currentUser?.display_name || "")) updateProfile.mutate({ display_name: displayName }); }}
+                onChange={(e) => { setDisplayName(e.target.value); setProfileDirty(true); }}
                 placeholder="Your name"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
               />
@@ -196,17 +201,26 @@ export default function Settings() {
               <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Bio</label>
               <textarea
                 value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                onBlur={() => { if (bio !== (currentUser?.bio || "")) updateProfile.mutate({ bio }); }}
+                onChange={(e) => { setBio(e.target.value); setProfileDirty(true); }}
                 placeholder="A short bio..."
                 rows={2}
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"
               />
             </div>
+            <button
+              onClick={handleSaveProfile}
+              disabled={!profileDirty || updateProfile.isPending}
+              className="px-4 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {updateProfile.isPending ? "Saving..." : "Save profile"}
+            </button>
             {updateProfile.isError && (
               <p className="text-xs text-red-500">
                 {updateProfile.error instanceof Error ? updateProfile.error.message : "Failed to save profile"}
               </p>
+            )}
+            {!updateProfile.isError && updateProfile.isSuccess && !profileDirty && (
+              <p className="text-xs text-green-500">Profile saved</p>
             )}
           </div>
         </div>

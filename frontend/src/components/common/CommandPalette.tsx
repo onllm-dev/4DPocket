@@ -58,8 +58,13 @@ export function CommandPalette() {
     }
     const timer = setTimeout(async () => {
       try {
-        const data = await api.get<{ items: SearchResult[] }>(`/api/v1/search?q=${encodeURIComponent(query)}&limit=5`);
-        setResults(Array.isArray(data) ? data : data.items || []);
+        const data = await api.get<SearchResult[]>(`/api/v1/search?q=${encodeURIComponent(query)}&limit=5`);
+        if (!Array.isArray(data)) {
+          console.error("[CommandPalette] expected array from /api/v1/search, got:", data);
+          setResults([]);
+          return;
+        }
+        setResults(data);
       } catch {
         setResults([]);
       }

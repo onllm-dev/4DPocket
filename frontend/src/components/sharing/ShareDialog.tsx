@@ -28,15 +28,20 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   const [role, setRole] = useState<"viewer" | "editor">("viewer");
   const [publicLink, setPublicLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const createShare = useMutation<ShareResponse, Error, SharePayload>({
     mutationFn: (data: SharePayload) => api.post<ShareResponse>("/api/v1/shares", data),
     onSuccess: (data: ShareResponse) => {
+      setShareError(null);
       if (data.public_token) {
         setPublicLink(`${window.location.origin}/public/${data.public_token}`);
       }
       qc.invalidateQueries({ queryKey: ["shares"] });
+    },
+    onError: (err: Error) => {
+      setShareError(err.message || "Failed to create share. Please try again.");
     },
   });
 
@@ -107,6 +112,9 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
               <option value="editor">Editor</option>
             </select>
           </div>
+          {shareError && (
+            <p className="mt-2 text-xs text-red-500 dark:text-red-400">{shareError}</p>
+          )}
           <button
             onClick={handleShareWithUser}
             disabled={!email.trim() || createShare.isPending}

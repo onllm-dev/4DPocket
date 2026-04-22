@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { BookmarkForm } from "@/components/bookmark/BookmarkForm";
 import { useCreateItem } from "@/hooks/use-items";
 
 export default function AddItem() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const createItem = useCreateItem();
   const [shareState, setShareState] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -91,6 +92,7 @@ export default function AddItem() {
 
       <div className="flex items-center justify-center min-h-[50vh]">
         <BookmarkForm
+          key={location.pathname}
           onCreated={(item) => navigate(`/item/${item.id}`)}
           onClose={() => navigate(-1)}
         />

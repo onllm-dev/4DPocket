@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Highlighter, Trash2, Search } from "lucide-react";
+import { Highlighter, Trash2, Search, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { timeAgo } from "@/lib/utils";
@@ -61,7 +61,7 @@ export default function Highlights() {
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
           />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
           {COLORS.map((c) => (
             <button
               key={c}
@@ -69,6 +69,15 @@ export default function Highlights() {
               className={`w-8 h-8 rounded-lg border-2 transition-all cursor-pointer ${COLOR_MAP[c]} ${filterColor === c ? "ring-2 ring-sky-500 ring-offset-1 dark:ring-offset-gray-950" : ""}`}
             />
           ))}
+          {filterColor !== null && (
+            <button
+              onClick={() => setFilterColor(null)}
+              className="ml-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+              aria-label="Clear color filter"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
