@@ -7,7 +7,9 @@ mkdir -p /data
 case "${1}" in
   server)
     echo "Running database migrations..."
-    uv run alembic upgrade head 2>&1 || { echo "migration failed"; exit 1; }
+    # The runtime image does not include `uv`; the venv's alembic binary is
+    # already on PATH via /app/.venv/bin (set in the Dockerfile).
+    alembic upgrade head 2>&1 || { echo "ERROR: alembic upgrade head failed — see above"; exit 1; }
     echo "Starting 4DPocket server on port ${FDP_SERVER__PORT:-4040}..."
     exec uvicorn fourdpocket.main:app \
       --host "${FDP_SERVER__HOST:-0.0.0.0}" \
