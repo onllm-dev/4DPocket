@@ -5,7 +5,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
-from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
+from fourdpocket.api.deps import (
+    get_current_user,
+    get_current_user_pat_aware,
+    get_db,
+    require_pat_editor,
+)
 from fourdpocket.models.entity import Entity, EntityAlias, ItemEntity
 from fourdpocket.models.entity_relation import EntityRelation
 from fourdpocket.models.item import ItemRead, KnowledgeItem
@@ -201,11 +206,13 @@ def regenerate_synthesis(
 def get_entity_items(
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
     """Get items that mention this entity."""
+    current_user, pat = auth
+
     entity = db.get(Entity, entity_id)
     if not entity or entity.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -222,6 +229,12 @@ def get_entity_items(
     if not item_ids:
         return []
 
+    # Resolve PAT item-level ACL
+    allowed_item_ids = None
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed_item_ids = token_allowed_item_ids(db, pat, current_user.id)
+
     items = db.exec(
         select(KnowledgeItem).where(
             KnowledgeItem.id.in_(item_ids),
@@ -230,6 +243,8 @@ def get_entity_items(
     ).all()
 
     item_map = {item.id: item for item in items}
+    if allowed_item_ids is not None:
+        item_map = {k: v for k, v in item_map.items() if k in allowed_item_ids}
     salience_map = {ie.item_id: ie.salience for ie in item_links}
 
     return [

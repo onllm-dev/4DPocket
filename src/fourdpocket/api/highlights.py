@@ -1,17 +1,19 @@
 """Highlights & annotations endpoints."""
 
-import re
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from fourdpocket.ai.sanitizer import strip_html
 from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.highlight import Highlight
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.note import Note
 from fourdpocket.models.user import User
+from fourdpocket.sharing.permissions import can_view_item
 
 router = APIRouter(prefix="/highlights", tags=["highlights"])
 
@@ -24,7 +26,7 @@ class HighlightCreate(BaseModel):
     note_id: uuid.UUID | None = None
     text: str
     note: str | None = None
-    color: str = "yellow"
+    color: Literal["yellow", "green", "blue", "red", "purple"] = "yellow"
     position: dict | None = None
 
     model_config = {"extra": "forbid"}
@@ -40,11 +42,16 @@ class HighlightCreate(BaseModel):
                     raise ValueError(f"position key '{key}' not allowed")
                 if not isinstance(self.position[key], (int, float)):
                     raise ValueError(f"position['{key}'] must be a number")
+            if "start" in self.position and self.position["start"] < 0:
+                raise ValueError("position['start'] must be >= 0")
+            if "start" in self.position and "end" in self.position:
+                if self.position["start"] > self.position["end"]:
+                    raise ValueError("position['start'] must be <= position['end']")
 
 
 class HighlightUpdate(BaseModel):
     note: str | None = None
-    color: str | None = None
+    color: Literal["yellow", "green", "blue", "red", "purple"] | None = None
 
 
 @router.get("")
@@ -57,6 +64,8 @@ def list_highlights(
     current_user: User = Depends(get_current_user),
 ):
     """List all highlights, optionally filtered by item or note."""
+    if item_id and not can_view_item(db, current_user.id, item_id):
+        raise HTTPException(status_code=404, detail="Item not found")
     query = select(Highlight).where(Highlight.user_id == current_user.id)
     if item_id:
         query = query.where(Highlight.item_id == item_id)
@@ -83,15 +92,12 @@ def create_highlight(
         if not note or note.user_id != current_user.id:
             raise HTTPException(status_code=404, detail="Note not found")
 
-    def _strip(s):
-        return re.sub(r"<[^>]+>", "", s) if s else s
-
     highlight = Highlight(
         user_id=current_user.id,
         item_id=body.item_id,
         note_id=body.note_id,
-        text=_strip(body.text),
-        note=_strip(body.note),
+        text=strip_html(body.text),
+        note=strip_html(body.note),
         color=body.color,
         position=body.position,
     )
@@ -114,7 +120,7 @@ def update_highlight(
         raise HTTPException(status_code=404, detail="Highlight not found")
     for field, value in body.model_dump(exclude_unset=True).items():
         if field == "note" and value:
-            value = re.sub(r"<[^>]+>", "", value)
+            value = strip_html(value)
         setattr(h, field, value)
     db.commit()
     db.refresh(h)

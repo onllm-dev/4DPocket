@@ -1,6 +1,7 @@
 """Knowledge feed subscription logic."""
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlmodel import Session, col, select
 
@@ -57,19 +58,26 @@ def get_feed_items(
     if not publisher_ids:
         return []
 
-    # Items from publishers that are either public shares OR
-    # private shares with this user as recipient
+    now = datetime.now(timezone.utc)
+    # Items from publishers, accessible via either a live public share OR a
+    # private share where the subscriber is an accepted recipient. Expired
+    # shares are excluded in both branches.
     accessible_shares = select(Share.item_id).where(
         Share.owner_id.in_(publisher_ids),
         Share.item_id.is_not(None),
-    ).where(
-        (Share.public_token.is_not(None)) |  # public shares
-        (Share.id.in_(  # OR private shares this user has accepted
-            select(ShareRecipient.share_id).where(
-                ShareRecipient.user_id == subscriber_id,
-                ShareRecipient.accepted == True,  # noqa: E712
+        (Share.expires_at == None) | (Share.expires_at > now),  # noqa: E711
+        (
+            # Public shares: explicitly public and have an active token
+            ((Share.public == True) & (Share.public_token.is_not(None)))  # noqa: E712
+            |
+            # Private shares accepted by this subscriber
+            Share.id.in_(
+                select(ShareRecipient.share_id).where(
+                    ShareRecipient.user_id == subscriber_id,
+                    ShareRecipient.accepted == True,  # noqa: E712
+                )
             )
-        ))
+        ),
     )
 
     items = db.exec(

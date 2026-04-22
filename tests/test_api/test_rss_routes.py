@@ -709,3 +709,100 @@ class TestApproveFeedEntryCollectionOwnership:
         # Should succeed (item created) even though collection is gone — no FK crash
         assert resp.status_code == 200
         assert resp.json()["status"] == "approved"
+
+
+class TestDoubleApproveRace:
+    """Regression: approving an already-approved entry must return 400.
+
+    Bug: approve_feed_entry had no guard against double-approval, allowing a
+    race condition to create duplicate KnowledgeItems.
+    Fixed in: src/fourdpocket/api/rss.py approve_feed_entry
+    """
+
+    def test_approve_already_approved_entry_returns_400(self, client, auth_headers, db):
+        """Second approve of same entry returns 400, not a duplicate item."""
+        from sqlmodel import select
+
+        from fourdpocket.models.feed_entry import FeedEntry
+        from fourdpocket.models.rss_feed import RSSFeed
+        from fourdpocket.models.user import User
+
+        user = db.exec(select(User)).first()
+        feed = RSSFeed(
+            user_id=user.id,
+            url="https://example.com/double-approve.xml",
+            mode="approval",
+        )
+        db.add(feed)
+        db.commit()
+        db.refresh(feed)
+
+        entry = FeedEntry(
+            feed_id=feed.id,
+            user_id=user.id,
+            url="https://example.com/double-approve-entry",
+            title="Double Approve",
+            status="pending",
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+
+        # First approval succeeds
+        resp1 = client.post(
+            f"/api/v1/rss/{feed.id}/entries/{entry.id}/approve",
+            headers=auth_headers,
+        )
+        assert resp1.status_code == 200
+
+        # Second approval must fail with 400
+        resp2 = client.post(
+            f"/api/v1/rss/{feed.id}/entries/{entry.id}/approve",
+            headers=auth_headers,
+        )
+        assert resp2.status_code == 400
+        assert "already approved" in resp2.json()["detail"].lower()
+
+
+class TestPollIntervalMinimum:
+    """Regression: poll_interval must be at least 300 seconds (5 minutes).
+
+    Bug: RSSFeedCreate and RSSFeedUpdate accepted any integer poll_interval,
+    allowing sub-300-second values that could hammer external servers.
+    Fixed in: src/fourdpocket/api/rss.py RSSFeedCreate, RSSFeedUpdate
+    """
+
+    def test_create_feed_with_poll_interval_below_300_returns_422(self, client, auth_headers):
+        """poll_interval < 300 is rejected at creation."""
+        resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://example.com/fast-feed.xml", "poll_interval": 60},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_create_feed_with_poll_interval_300_is_accepted(self, client, auth_headers):
+        """poll_interval == 300 is the minimum allowed."""
+        resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://example.com/min-poll.xml", "poll_interval": 300},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["poll_interval"] == 300
+
+    def test_update_feed_with_poll_interval_below_300_returns_422(self, client, auth_headers):
+        """Updating poll_interval to < 300 is rejected."""
+        create_resp = client.post(
+            "/api/v1/rss",
+            json={"url": "https://example.com/update-poll.xml"},
+            headers=auth_headers,
+        )
+        feed_id = create_resp.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/rss/{feed_id}",
+            json={"poll_interval": 10},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422

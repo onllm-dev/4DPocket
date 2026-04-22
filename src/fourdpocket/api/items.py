@@ -278,18 +278,25 @@ def get_timeline(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
 ):
     """Get items grouped by date for timeline view."""
     from collections import defaultdict
     from datetime import timedelta
 
+    user, pat = auth
     since = datetime.now(timezone.utc) - timedelta(days=days)
+    query = select(KnowledgeItem).where(
+        KnowledgeItem.user_id == user.id,
+        KnowledgeItem.created_at >= since,
+    )
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed = token_allowed_item_ids(db, pat, user.id)
+        if allowed is not None:
+            query = query.where(KnowledgeItem.id.in_(allowed))
     items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == user.id,
-            KnowledgeItem.created_at >= since,
-        ).order_by(KnowledgeItem.created_at.desc()).offset(offset).limit(limit)
+        query.order_by(KnowledgeItem.created_at.desc()).offset(offset).limit(limit)
     ).all()
 
     # Group by date
@@ -312,36 +319,45 @@ def get_timeline(
 @router.get("/reading-queue")
 def get_reading_queue(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
 ):
     """Get items in reading queue (has content, not fully read)."""
-    items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == user.id,
-            KnowledgeItem.content.is_not(None),
-            KnowledgeItem.is_archived == False,  # noqa: E712
-            KnowledgeItem.reading_progress < 100,
-        ).order_by(KnowledgeItem.created_at.desc()).limit(50)
-    ).all()
+    user, pat = auth
+    query = select(KnowledgeItem).where(
+        KnowledgeItem.user_id == user.id,
+        KnowledgeItem.content.is_not(None),
+        KnowledgeItem.is_archived == False,  # noqa: E712
+        KnowledgeItem.reading_progress < 100,
+    )
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed = token_allowed_item_ids(db, pat, user.id)
+        if allowed is not None:
+            query = query.where(KnowledgeItem.id.in_(allowed))
+    items = db.exec(query.order_by(KnowledgeItem.created_at.desc()).limit(50)).all()
     return items
 
 
 @router.get("/reading-list", response_model=list[ItemRead])
 def get_reading_list(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Get items where reading_status is 'reading_list'."""
+    current_user, pat = auth
+    query = select(KnowledgeItem).where(
+        KnowledgeItem.user_id == current_user.id,
+        KnowledgeItem.reading_status == ReadingStatus.reading_list,
+    )
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed = token_allowed_item_ids(db, pat, current_user.id)
+        if allowed is not None:
+            query = query.where(KnowledgeItem.id.in_(allowed))
     items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == current_user.id,
-            KnowledgeItem.reading_status == ReadingStatus.reading_list,
-        )
-        .order_by(col(KnowledgeItem.created_at).desc())
-        .offset(offset)
-        .limit(limit)
+        query.order_by(col(KnowledgeItem.created_at).desc()).offset(offset).limit(limit)
     ).all()
     return items
 
@@ -349,19 +365,23 @@ def get_reading_list(
 @router.get("/read", response_model=list[ItemRead])
 def get_read_items(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Get items where reading_status is 'read'."""
+    current_user, pat = auth
+    query = select(KnowledgeItem).where(
+        KnowledgeItem.user_id == current_user.id,
+        KnowledgeItem.reading_status == ReadingStatus.read,
+    )
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed = token_allowed_item_ids(db, pat, current_user.id)
+        if allowed is not None:
+            query = query.where(KnowledgeItem.id.in_(allowed))
     items = db.exec(
-        select(KnowledgeItem).where(
-            KnowledgeItem.user_id == current_user.id,
-            KnowledgeItem.reading_status == ReadingStatus.read,
-        )
-        .order_by(col(KnowledgeItem.created_at).desc())
-        .offset(offset)
-        .limit(limit)
+        query.order_by(col(KnowledgeItem.created_at).desc()).offset(offset).limit(limit)
     ).all()
     return items
 
@@ -387,13 +407,14 @@ def check_url(
 @router.get("/queue-stats")
 def get_queue_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
 ):
     """Return a cheap snapshot of in-flight enrichment work for the user.
 
     Used by the UI to show "~N items ahead" hints on pending items.
     Intentionally not an ETA — queue depth alone is honest.
     """
+    current_user, _pat = auth
     from fourdpocket.workers.enrichment_summary import queue_stats
     return queue_stats(db, current_user.id)
 
@@ -506,6 +527,26 @@ def cascade_delete_item(db: Session, item: KnowledgeItem) -> None:
 
     item_id = item.id
     user_id = item.user_id
+
+    # Fix 8: delete on-disk media files before DB rows are removed
+    if item.media:
+        try:
+            from fourdpocket.config import get_settings
+            from fourdpocket.storage.local import LocalStorage
+
+            _storage = LocalStorage(base_path=get_settings().storage.base_path)
+            for _media_entry in item.media:
+                _local_path = _media_entry.get("local_path") if isinstance(_media_entry, dict) else None
+                if _local_path:
+                    try:
+                        _storage.delete_file(_local_path)
+                    except Exception as _del_err:
+                        logger.debug(
+                            "cascade_delete_item: could not delete media file %s: %s",
+                            _local_path, _del_err,
+                        )
+        except Exception as _storage_err:
+            logger.debug("cascade_delete_item: media cleanup skipped: %s", _storage_err)
 
     # Decrement tag usage counts before removing links
     for tag_link in db.exec(select(ItemTag).where(ItemTag.item_id == item_id)).all():
@@ -941,11 +982,24 @@ def media_proxy(
     Handles CORS-blocked and hotlink-protected URLs (e.g. LinkedIn).
     """
     import hashlib
+    import io
+    from urllib.parse import urljoin
+    from urllib.parse import urlparse as _urlparse
 
     import httpx
 
     from fourdpocket.config import get_settings
     from fourdpocket.storage.local import LocalStorage
+
+    # Fix 3: strict Content-Type allowlist (SVG intentionally excluded — executes JS)
+    _allowed_content_types: dict[str, str] = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+        "image/x-icon": "ico",
+    }
+    _media_proxy_size_limit = 10_485_760  # 10 MB
 
     item = db.exec(
         select(KnowledgeItem).where(
@@ -963,11 +1017,11 @@ def media_proxy(
     storage = LocalStorage(base_path=settings.storage.base_path)
     url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
     uid = item.user_id
-    # Extract extension from URL path only (not query/domain)
-    from urllib.parse import urlparse as _urlparse
+    # Fix 5: sanitise extension against allowlist before constructing filename
     _path = _urlparse(url).path
     _parts = _path.rsplit(".", 1)
-    ext = _parts[-1].lower() if len(_parts) > 1 and len(_parts[-1]) <= 5 else "bin"
+    _raw_ext = _parts[-1].lower() if len(_parts) > 1 and len(_parts[-1]) <= 5 else "bin"
+    ext = _raw_ext if _raw_ext in {"jpg", "jpeg", "png", "gif", "webp", "ico", "bin"} else "bin"
     filename = f"{item_id}_{url_hash}.{ext}"
     relative_path = f"{uid}/media/{filename}"
 
@@ -975,50 +1029,72 @@ def media_proxy(
     if storage.file_exists(relative_path):
         resolved = storage.get_absolute_path(relative_path)
         mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-                    ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
-                    ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+                    ".gif": "image/gif", ".webp": "image/webp",
+                    ".ico": "image/x-icon"}
         import mimetypes
         mime_type = mime_map.get(resolved.suffix.lower()) or mimetypes.guess_type(str(resolved))[0] or "application/octet-stream"
         return FileResponse(resolved, media_type=mime_type)
 
     # Fetch from source — validate each redirect hop for SSRF
     try:
-        headers = {
+        req_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         }
         current_fetch_url = url
         with httpx.Client(timeout=10.0, follow_redirects=False) as client:
             for _hop in range(5):
                 if not _is_safe_proxy_url(current_fetch_url):
                     raise HTTPException(status_code=400, detail="URL not allowed")
-                resp = client.get(current_fetch_url, headers=headers)
+                # Fix 2: check Content-Length before streaming
+                resp = client.get(current_fetch_url, headers=req_headers)
                 if resp.is_redirect:
-                    current_fetch_url = resp.headers.get("location", "")
-                    if not current_fetch_url:
+                    raw_location = resp.headers.get("location", "")
+                    if not raw_location:
                         raise HTTPException(status_code=502, detail="Empty redirect")
+                    # Fix 6: resolve relative redirects to absolute URLs
+                    current_fetch_url = urljoin(current_fetch_url, raw_location)
                     continue
                 resp.raise_for_status()
                 break
             else:
                 raise HTTPException(status_code=502, detail="Too many redirects")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning("Media proxy fetch failed for %s: %s", url, e)
         raise HTTPException(status_code=502, detail="Failed to fetch image")
 
-    # Detect correct extension from response content-type
-    resp_ct = resp.headers.get("content-type", "").split(";")[0].strip()
-    ct_ext_map = {
-        "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
-        "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico",
-    }
-    if resp_ct in ct_ext_map:
-        ext = ct_ext_map[resp_ct]
-        filename = f"{item_id}_{url_hash}.{ext}"
+    # Fix 2: enforce size limit — short-circuit on Content-Length header
+    _cl_header = resp.headers.get("content-length", "")
+    if _cl_header.isdigit() and int(_cl_header) > _media_proxy_size_limit:
+        raise HTTPException(status_code=413, detail="Image exceeds 10 MB size limit")
 
-    # Magic-byte validation: if Content-Type claims a binary image format,
-    # confirm the response body starts with the expected magic bytes so
-    # content-type spoofing cannot smuggle non-image data through the proxy.
+    # Fix 2: stream body with accumulator, abort at 10 MB
+    try:
+        _buf = io.BytesIO()
+        with httpx.Client(timeout=10.0) as _stream_client:
+            with _stream_client.stream("GET", current_fetch_url, headers=req_headers) as _stream_resp:
+                for _chunk in _stream_resp.iter_bytes(chunk_size=65536):
+                    _buf.write(_chunk)
+                    if _buf.tell() > _media_proxy_size_limit:
+                        raise HTTPException(status_code=413, detail="Image exceeds 10 MB size limit")
+        resp_body = _buf.getvalue()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Media proxy stream failed for %s: %s", url, e)
+        raise HTTPException(status_code=502, detail="Failed to fetch image")
+
+    # Fix 3: enforce strict Content-Type allowlist
+    resp_ct = resp.headers.get("content-type", "").split(";")[0].strip()
+    if resp_ct not in _allowed_content_types:
+        raise HTTPException(status_code=415, detail="Upstream content type not allowed")
+    ext = _allowed_content_types[resp_ct]
+    filename = f"{item_id}_{url_hash}.{ext}"
+
+    # Magic-byte validation: confirm body starts with expected magic bytes to
+    # prevent content-type spoofing smuggling non-image data through the proxy.
     _magic_checks: dict[str, bytes] = {
         "jpg": b"\xff\xd8\xff",
         "png": b"\x89PNG",
@@ -1028,10 +1104,10 @@ def media_proxy(
         "webp": b"RIFF",
     }
     if ext in _magic_checks:
-        _prefix = resp.content[:12] if len(resp.content) >= 12 else resp.content
+        _prefix = resp_body[:12] if len(resp_body) >= 12 else resp_body
         _magic_ok = _prefix.startswith(_magic_checks[ext])
         if _magic_ok and ext == "webp":
-            _magic_ok = len(resp.content) >= 12 and resp.content[8:12] == b"WEBP"
+            _magic_ok = len(resp_body) >= 12 and resp_body[8:12] == b"WEBP"
         if not _magic_ok:
             logger.warning(
                 "Media proxy: Content-Type claims %s but magic bytes do not match for %s",
@@ -1044,7 +1120,7 @@ def media_proxy(
             )
 
     # Save to local storage
-    path = storage.save_file(uid, "media", filename, resp.content)
+    path = storage.save_file(uid, "media", filename, resp_body)
 
     # Update item media with local_path
     existing_media = list(item.media) if item.media else []
@@ -1061,8 +1137,8 @@ def media_proxy(
 
     resolved = storage.get_absolute_path(path)
     mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-                ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
-                ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+                ".gif": "image/gif", ".webp": "image/webp",
+                ".ico": "image/x-icon"}
     import mimetypes as _mt
     mime_type = mime_map.get(resolved.suffix.lower()) or _mt.guess_type(str(resolved))[0] or "application/octet-stream"
     return FileResponse(resolved, media_type=mime_type)
@@ -1092,24 +1168,29 @@ def serve_media(
     settings = get_settings()
     storage = LocalStorage(base_path=settings.storage.base_path)
 
-    # Ensure path belongs to the requesting user's directory (prevent cross-user access)
-    user_prefix = str(current_user.id) + "/"
-    if not path.startswith(user_prefix):
+    # Fix 7: resolve via storage._safe_path then assert the file is under the
+    # user's scoped sub-directory (handles path-traversal with encoded slashes).
+    try:
+        resolved = storage._safe_path(path)
+    except PermissionError:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    try:
-        storage.get_file(path)  # Verify file exists
-    except FileNotFoundError:
+    base_path = storage._base.resolve()
+    user_base = base_path / str(current_user.id)
+    if not resolved.is_relative_to(user_base):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not resolved.exists():
         raise HTTPException(status_code=404, detail="Media not found")
 
-    resolved = storage.get_absolute_path(path)
+    # Fix 4: SVG dropped — executes JS; serve as octet-stream to force download
     mime_map = {
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
         ".png": "image/png",
         ".gif": "image/gif",
         ".webp": "image/webp",
-        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
         ".mp4": "video/mp4",
         ".webm": "video/webm",
         ".pdf": "application/pdf",

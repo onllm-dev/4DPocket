@@ -364,3 +364,97 @@ def test_highlight_401_without_auth(client):
     """All endpoints require authentication."""
     response = client.get("/api/v1/highlights")
     assert response.status_code == 401
+
+
+# === BUG REGRESSION TESTS ===
+
+
+def test_create_highlight_invalid_color_returns_422(client, auth_headers):
+    """color must be one of the allowed Literal values.
+
+    Regression test: color was free-form str, allowing arbitrary values.
+    Fixed in: src/fourdpocket/api/highlights.py HighlightCreate
+    """
+    item_resp = client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com"},
+        headers=auth_headers,
+    )
+    item_id = item_resp.json()["id"]
+
+    response = client.post(
+        "/api/v1/highlights",
+        json={"item_id": item_id, "text": "Colored highlight", "color": "pink"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_update_highlight_invalid_color_returns_422(client, auth_headers):
+    """color update must also be constrained to allowed Literal values.
+
+    Regression test: HighlightUpdate.color was free-form str.
+    Fixed in: src/fourdpocket/api/highlights.py HighlightUpdate
+    """
+    item_resp = client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com"},
+        headers=auth_headers,
+    )
+    item_id = item_resp.json()["id"]
+
+    create_resp = client.post(
+        "/api/v1/highlights",
+        json={"item_id": item_id, "text": "Text"},
+        headers=auth_headers,
+    )
+    highlight_id = create_resp.json()["id"]
+
+    response = client.patch(
+        f"/api/v1/highlights/{highlight_id}",
+        json={"color": "magenta"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_create_highlight_negative_start_position_returns_422(client, auth_headers):
+    """position['start'] must be >= 0.
+
+    Regression test: no validation existed for negative start values.
+    Fixed in: src/fourdpocket/api/highlights.py HighlightCreate.model_post_init
+    """
+    item_resp = client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com"},
+        headers=auth_headers,
+    )
+    item_id = item_resp.json()["id"]
+
+    response = client.post(
+        "/api/v1/highlights",
+        json={"item_id": item_id, "text": "Bad pos", "position": {"start": -1}},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_create_highlight_start_greater_than_end_returns_422(client, auth_headers):
+    """position['start'] must be <= position['end'].
+
+    Regression test: no ordering check existed.
+    Fixed in: src/fourdpocket/api/highlights.py HighlightCreate.model_post_init
+    """
+    item_resp = client.post(
+        "/api/v1/items",
+        json={"url": "https://example.com"},
+        headers=auth_headers,
+    )
+    item_id = item_resp.json()["id"]
+
+    response = client.post(
+        "/api/v1/highlights",
+        json={"item_id": item_id, "text": "Bad range", "position": {"start": 100, "end": 50}},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422

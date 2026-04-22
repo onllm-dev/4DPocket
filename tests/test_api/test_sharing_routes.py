@@ -620,6 +620,41 @@ class TestShareCreationExtras:
         assert "yourself" in resp.json()["detail"].lower()
 
 
+class TestEmailEnumeration:
+    """Regression: sharing with unknown email must not reveal registration status.
+
+    Bug: POST /shares with recipient_email for an unregistered address returned
+    HTTP 404 "User not found", disclosing whether an email is registered.
+    Fixed in: src/fourdpocket/api/sharing.py create_share_endpoint
+    """
+
+    def test_share_with_unknown_email_returns_201_not_404(self, client, auth_headers):
+        """Sharing with an unregistered email must silently succeed (201), not 404.
+
+        Regression test for email enumeration via share endpoint.
+        """
+        item_resp = client.post(
+            "/api/v1/items",
+            json={"url": "https://example.com/enum-test", "title": "Enum Test"},
+            headers=auth_headers,
+        )
+        item_id = item_resp.json()["id"]
+
+        resp = client.post(
+            "/api/v1/shares",
+            json={
+                "share_type": "item",
+                "item_id": item_id,
+                "recipient_email": "definitely-not-registered-xyz@example.com",
+            },
+            headers=auth_headers,
+        )
+        # Must NOT return 404 — that would reveal the email is not registered
+        assert resp.status_code == 201
+        # The share itself is still created (no recipient added silently)
+        assert "id" in resp.json()
+
+
 class TestShareHistoryExtras:
     """Additional share history tests."""
 

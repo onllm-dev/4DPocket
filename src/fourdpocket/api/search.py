@@ -1,18 +1,32 @@
 """Search API endpoints — unified search across items + notes with filters and hybrid mode."""
 
+import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlmodel import Session, col, func, select
 
-from fourdpocket.api.deps import get_current_user, get_db
+from fourdpocket.api.deps import get_current_user, get_current_user_pat_aware, get_db
 from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.note import Note, NoteRead
 from fourdpocket.models.user import User
 from fourdpocket.search.filters import parse_filters
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_filter_dt(value: str) -> datetime:
+    """Parse a date or datetime filter string to a timezone-aware datetime."""
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        dt = datetime.fromisoformat(value + "T00:00:00")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _search_to_items(
@@ -87,13 +101,13 @@ def _filter_only_search(
         stmt = stmt.where(KnowledgeItem.is_archived == is_archived)
     if after:
         try:
-            after_dt = datetime.fromisoformat(after)
+            after_dt = _parse_filter_dt(after)
             stmt = stmt.where(KnowledgeItem.created_at >= after_dt)
         except ValueError:
             pass  # Ignore malformed date; FTS backend does the same
     if before:
         try:
-            before_dt = datetime.fromisoformat(before)
+            before_dt = _parse_filter_dt(before)
             stmt = stmt.where(KnowledgeItem.created_at <= before_dt)
         except ValueError:
             pass  # Ignore malformed date
@@ -124,9 +138,10 @@ def _filter_only_search(
 
 @router.get("")
 def search_items(
-    q: str = Query(default=""),
+    request: Request,
+    q: str = Query(default="", max_length=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     item_type: str | None = None,
     source_platform: str | None = None,
     is_favorite: bool | None = None,
@@ -145,6 +160,8 @@ def search_items(
     Returns 400 if both q and all filters are empty/None.
     """
     from fastapi import HTTPException
+
+    current_user, pat = auth
 
     parsed = parse_filters(q)
     search_query = parsed.get("query") or ""
@@ -174,9 +191,15 @@ def search_items(
     if not search_query and not has_filters:
         raise HTTPException(status_code=400, detail="Provide a search query or at least one filter.")
 
+    # Resolve PAT item-level ACL
+    allowed_item_ids = None
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed_item_ids = token_allowed_item_ids(db, pat, current_user.id)
+
     # Filter-only path: no free-text query — do a direct SQL SELECT with filters
     if not search_query and has_filters:
-        return _filter_only_search(
+        results = _filter_only_search(
             db=db,
             current_user=current_user,
             item_type=effective_type,
@@ -189,6 +212,10 @@ def search_items(
             limit=limit,
             offset=offset,
         )
+        if allowed_item_ids is not None:
+            allowed_str = {str(i) for i in allowed_item_ids}
+            results = [r for r in results if r.get("id") and str(r["id"]) in allowed_str]
+        return results
 
     from fourdpocket.search import get_search_service
     from fourdpocket.search.base import SearchFilters
@@ -202,6 +229,7 @@ def search_items(
         tags=effective_tags or None,
         after=effective_after,
         before=effective_before,
+        allowed_item_ids=allowed_item_ids,
     )
     results = service.search(
         db, search_query, current_user.id,
@@ -215,9 +243,10 @@ def search_items(
 
 @router.get("/unified")
 def unified_search(
-    q: str = Query(..., min_length=1),
+    request: Request,
+    q: str = Query(..., min_length=1, max_length=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     item_type: str | None = None,
     source_platform: str | None = None,
     is_favorite: bool | None = None,
@@ -229,9 +258,11 @@ def unified_search(
     offset: int = Query(default=0, ge=0),
 ):
     """Unified search across items AND notes. Returns both in a single response."""
+    current_user, pat = auth
+
     # Get item results
     item_results = search_items(
-        q=q, db=db, current_user=current_user,
+        request=request, q=q, db=db, auth=auth,
         item_type=item_type, source_platform=source_platform,
         is_favorite=is_favorite, is_archived=is_archived,
         tag=tag, after=after, before=before,
@@ -264,8 +295,8 @@ def unified_search(
                 ).order_by(col(Note.created_at).desc()).limit(limit).offset(offset)
             ).all()
             note_results = [NoteRead.model_validate(n).model_dump() for n in notes]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Note search failed in unified_search: %s", exc)
 
     return {
         "items": item_results,
@@ -276,9 +307,10 @@ def unified_search(
 
 @router.get("/hybrid")
 def hybrid_search_endpoint(
-    q: str = Query(..., min_length=1),
+    request: Request,
+    q: str = Query(..., min_length=1, max_length=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     item_type: str | None = None,
     source_platform: str | None = None,
     limit: int = Query(default=20, ge=1, le=100),
@@ -287,8 +319,19 @@ def hybrid_search_endpoint(
     from fourdpocket.search import get_search_service
     from fourdpocket.search.base import SearchFilters
 
+    current_user, pat = auth
+
+    allowed_item_ids = None
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed_item_ids = token_allowed_item_ids(db, pat, current_user.id)
+
     service = get_search_service()
-    filters = SearchFilters(item_type=item_type, source_platform=source_platform)
+    filters = SearchFilters(
+        item_type=item_type,
+        source_platform=source_platform,
+        allowed_item_ids=allowed_item_ids,
+    )
     results = service.search(db, q, current_user.id, filters=filters, limit=limit)
 
     return _search_to_items(db, results, current_user)
@@ -296,12 +339,20 @@ def hybrid_search_endpoint(
 
 @router.get("/semantic", response_model=list[ItemRead])
 def semantic_search(
-    q: str = Query(..., min_length=1),
+    request: Request,
+    q: str = Query(..., min_length=1, max_length=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth: tuple = Depends(get_current_user_pat_aware),
     limit: int = Query(default=10, ge=1, le=50),
 ):
     """Semantic vector search using embeddings."""
+    current_user, pat = auth
+
+    allowed_item_ids = None
+    if pat is not None:
+        from fourdpocket.api.api_token_utils import token_allowed_item_ids
+        allowed_item_ids = token_allowed_item_ids(db, pat, current_user.id)
+
     try:
         from fourdpocket.search.semantic import search_by_text
 
@@ -316,7 +367,10 @@ def semantic_search(
             )
         ).all()
         item_map = {item.id: item for item in items}
-        return [item_map[iid] for iid in item_ids if iid in item_map]
+        filtered = [item_map[iid] for iid in item_ids if iid in item_map]
+        if allowed_item_ids is not None:
+            filtered = [i for i in filtered if i.id in allowed_item_ids]
+        return filtered
     except Exception:
         return []
 

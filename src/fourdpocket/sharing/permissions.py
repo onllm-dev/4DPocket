@@ -18,6 +18,9 @@ def can_view_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
         return False
     if item.user_id == user_id:
         return True
+    # Archived items are not visible to share recipients (owner can always see via above)
+    if item.is_archived:
+        return False
     # Check if item is shared with user (skip expired shares)
     now = datetime.now(timezone.utc)
     shared = db.exec(

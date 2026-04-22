@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
@@ -22,7 +22,7 @@ class RSSFeedCreate(BaseModel):
     title: str | None = None
     category: str | None = None
     target_collection_id: uuid.UUID | None = None
-    poll_interval: int = 3600
+    poll_interval: int = Field(default=3600, ge=300)  # minimum 5 minutes
     format: str = "rss"
     mode: str = "auto"
     filters: str | None = None
@@ -32,7 +32,7 @@ class RSSFeedUpdate(BaseModel):
     title: str | None = None
     category: str | None = None
     target_collection_id: uuid.UUID | None = None
-    poll_interval: int | None = None
+    poll_interval: int | None = Field(default=None, ge=300)  # minimum 5 minutes
     is_active: bool | None = None
 
 
@@ -121,6 +121,12 @@ def delete_feed(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_pat_editor),
 ):
+    """Delete an RSS feed subscription and its pending entries.
+
+    FeedEntry rows are cascaded on delete.
+    KnowledgeItems auto-imported from this feed in 'auto' mode are NOT cascaded —
+    they remain in the user's knowledge base after the feed is removed.
+    """
     feed = db.exec(select(RSSFeed).where(RSSFeed.id == feed_id, RSSFeed.user_id == current_user.id)).first()
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
@@ -195,6 +201,10 @@ def approve_feed_entry(
     ).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
+
+    # Guard against double-approve race condition
+    if entry.status == "approved":
+        raise HTTPException(status_code=400, detail="Entry already approved")
 
     # Create KnowledgeItem from entry
     item = KnowledgeItem(

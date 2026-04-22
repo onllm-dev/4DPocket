@@ -181,3 +181,49 @@ def test_add_comment_401_without_auth(client):
         json={"content": "Comment"},
     )
     assert response.status_code == 401
+
+
+# === BUG REGRESSION TESTS ===
+
+
+def test_item_owner_can_delete_others_comment(client, auth_headers, second_user_headers):
+    """Item owner can delete a comment left by another user on their item.
+
+    Regression test: delete_comment only checked comment.user_id == current_user.id,
+    so item owners could not moderate comments on their own items.
+    Fixed in: src/fourdpocket/api/comments.py delete_comment
+    """
+    # auth_headers user creates the item
+    item_id = _create_item(client, auth_headers, url="https://example.com/moderation")
+
+    # second_user posts a comment on that item — they need view access
+    # The item owner does the share so second_user can comment
+    share_resp = client.post(
+        "/api/v1/shares",
+        json={"share_type": "item", "item_id": item_id},
+        headers=auth_headers,
+    )
+    share_id = share_resp.json()["id"]
+    me_resp = client.get("/api/v1/auth/me", headers=second_user_headers)
+    second_user_id = me_resp.json()["id"]
+    client.post(
+        f"/api/v1/shares/{share_id}/recipients",
+        json={"user_id": second_user_id, "role": "viewer"},
+        headers=auth_headers,
+    )
+    client.post(f"/api/v1/shares/{share_id}/accept", headers=second_user_headers)
+
+    create_resp = client.post(
+        f"/api/v1/items/{item_id}/comments",
+        json={"content": "Second user comment"},
+        headers=second_user_headers,
+    )
+    assert create_resp.status_code == 201
+    comment_id = create_resp.json()["id"]
+
+    # Item owner (auth_headers) deletes the comment — must succeed
+    delete_resp = client.delete(
+        f"/api/v1/items/{item_id}/comments/{comment_id}",
+        headers=auth_headers,
+    )
+    assert delete_resp.status_code == 204

@@ -639,10 +639,7 @@ def test_media_proxy_cache_hit(client, auth_headers, db, monkeypatch):
     assert response.status_code == 200
 
 
-def test_serve_media(client, auth_headers, db, monkeypatch):
-    import tempfile
-    from pathlib import Path
-
+def test_serve_media(client, auth_headers, db, monkeypatch, tmp_path):
     from sqlmodel import select
 
     from fourdpocket.models.user import User
@@ -650,19 +647,21 @@ def test_serve_media(client, auth_headers, db, monkeypatch):
     from tests.factories import make_item
     item = make_item(db, user.id, item_type="url")
 
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-        temp_path = f.name
+    # Create a real file under a simulated user-scoped storage directory so
+    # that _safe_path resolution and is_relative_to checks both pass.
+    user_media_dir = tmp_path / str(user.id) / "media"
+    user_media_dir.mkdir(parents=True)
+    fake_file = user_media_dir / "test.jpg"
+    fake_file.write_bytes(b"\xff\xd8\xff" + b"\x00" * 10)
 
-    def fake_get_abs(self, path):
-        return Path(temp_path)
+    from fourdpocket.storage.local import LocalStorage as _RealLocalStorage
 
-    def fake_get_file(self, path):
-        pass
+    # Patch LocalStorage to use tmp_path as base so path-traversal checks pass.
+    monkeypatch.setattr(
+        "fourdpocket.storage.local.LocalStorage",
+        lambda base_path=None: _RealLocalStorage(base_path=str(tmp_path)),
+    )
 
-    monkeypatch.setattr("fourdpocket.storage.local.LocalStorage.get_absolute_path", fake_get_abs)
-    monkeypatch.setattr("fourdpocket.storage.local.LocalStorage.get_file", fake_get_file)
-
-    # Path must start with user id prefix
     user_path = f"{user.id}/media/test.jpg"
     response = client.get(f"/api/v1/items/{item.id}/media/{user_path}", headers=auth_headers)
     assert response.status_code == 200
