@@ -38,6 +38,9 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 COPY --from=frontend /app/frontend/dist /app/frontend/dist
+# alembic.ini is required at runtime — the entrypoint runs `alembic upgrade head`
+# before uvicorn, and alembic looks for alembic.ini in the working directory.
+COPY alembic.ini /app/alembic.ini
 
 # Copy entrypoint
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
