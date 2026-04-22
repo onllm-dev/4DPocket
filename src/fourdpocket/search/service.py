@@ -173,7 +173,7 @@ class SearchService:
             ("fts", keyword_hits),
             ("semantic", vector_hits),
             ("graph", graph_hits),
-        ])
+        ], k=max(fetch_size, 60))
 
         # 3b. Apply collection-level ACL by intersecting with the allow-set.
         if filters.allowed_item_ids is not None:
@@ -206,7 +206,13 @@ class SearchService:
                                 r = candidates[idx]
                                 r.score = score
                                 reranked_results.append(r)
-                        merged = reranked_results
+                            else:
+                                logger.warning(
+                                    "Reranker returned out-of-range index %d (candidates=%d)",
+                                    idx, len(candidates),
+                                )
+                        if reranked_results:
+                            merged = reranked_results
 
         # 5. Apply offset and limit
         return merged[offset:offset + limit]

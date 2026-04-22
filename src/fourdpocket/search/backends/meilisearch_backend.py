@@ -113,6 +113,74 @@ class MeilisearchKeywordBackend:
         from fourdpocket.search.meilisearch_backend import _get_client
 
         client = _get_client()
+
+        # Try chunk index first (mirrors sqlite_fts pattern), fall back to items index.
+        hits = self._search_chunks(client, query, user_id, limit)
+        if not hits:
+            hits = self._search_items(client, query, user_id, filters, limit, offset)
+
+        # Post-filter for tags, after, before (not natively supported by Meilisearch filterable attrs)
+        if filters.tags or filters.after or filters.before:
+            hits = self._post_filter(db, hits, user_id, filters)
+
+        return hits
+
+    def _search_chunks(
+        self,
+        client,
+        query: str,
+        user_id: uuid.UUID,
+        limit: int,
+    ) -> list[KeywordHit]:
+        """Search the chunks index and roll up to best chunk per item."""
+        try:
+            index = client.index("knowledge_chunks")
+            result = index.search(
+                query,
+                {
+                    "filter": f'user_id = "{str(user_id)}"',
+                    "limit": limit * 3,
+                    "attributesToHighlight": ["text", "title"],
+                    "highlightPreTag": "<mark>",
+                    "highlightPostTag": "</mark>",
+                },
+            )
+            raw_hits = result.get("hits", [])
+            if not raw_hits:
+                return []
+
+            # Roll up: keep best-ranked chunk per item_id
+            seen: dict[str, int] = {}  # item_id -> index in hits list
+            hits: list[KeywordHit] = []
+            for idx, hit in enumerate(raw_hits):
+                item_id = hit.get("item_id")
+                if not item_id:
+                    continue
+                if item_id not in seen:
+                    seen[item_id] = len(hits)
+                    hits.append(KeywordHit(
+                        item_id=item_id,
+                        rank=idx,
+                        title_snippet=hit.get("_formatted", {}).get("title", hit.get("title", "")),
+                        content_snippet=hit.get("_formatted", {}).get("text", hit.get("text", ""))[:200],
+                    ))
+                if len(hits) >= limit:
+                    break
+            return hits
+        except Exception as e:
+            logger.debug("Meilisearch chunk search failed: %s", e)
+            return []
+
+    def _search_items(
+        self,
+        client,
+        query: str,
+        user_id: uuid.UUID,
+        filters: SearchFilters,
+        limit: int,
+        offset: int,
+    ) -> list[KeywordHit]:
+        """Search the items index directly."""
         index = client.index("knowledge_items")
 
         # Build filter string with ALL filter fields
@@ -144,7 +212,7 @@ class MeilisearchKeywordBackend:
             },
         )
 
-        hits = [
+        return [
             KeywordHit(
                 item_id=hit["id"],
                 rank=idx,
@@ -153,12 +221,6 @@ class MeilisearchKeywordBackend:
             )
             for idx, hit in enumerate(result.get("hits", []))
         ]
-
-        # Post-filter for tags, after, before (not natively supported by Meilisearch filterable attrs)
-        if filters.tags or filters.after or filters.before:
-            hits = self._post_filter(db, hits, user_id, filters)
-
-        return hits
 
     def _post_filter(
         self,
@@ -196,6 +258,22 @@ class MeilisearchKeywordBackend:
             ).all()
             tag_items = {str(r) for r in tag_rows}
 
+        from datetime import datetime, timezone
+
+        def _parse_filter_dt(value: str) -> datetime:
+            """Parse a date or datetime filter string to a timezone-aware datetime."""
+            try:
+                dt = datetime.fromisoformat(value)
+            except ValueError:
+                # Fallback: treat as date-only (YYYY-MM-DD)
+                dt = datetime.fromisoformat(value + "T00:00:00")
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        after_dt = _parse_filter_dt(filters.after) if filters.after else None
+        before_dt = _parse_filter_dt(filters.before) if filters.before else None
+
         filtered = []
         for hit in hits:
             item = item_map.get(hit.item_id)
@@ -204,11 +282,13 @@ class MeilisearchKeywordBackend:
 
             if filters.tags and hit.item_id not in tag_items:
                 continue
-            if filters.after and item.created_at:
-                if item.created_at.isoformat()[:len(filters.after)] < filters.after:
+            if after_dt and item.created_at:
+                item_dt = item.created_at if item.created_at.tzinfo else item.created_at.replace(tzinfo=timezone.utc)
+                if item_dt < after_dt:
                     continue
-            if filters.before and item.created_at:
-                if item.created_at.isoformat()[:len(filters.before)] > filters.before:
+            if before_dt and item.created_at:
+                item_dt = item.created_at if item.created_at.tzinfo else item.created_at.replace(tzinfo=timezone.utc)
+                if item_dt > before_dt:
                     continue
 
             filtered.append(hit)

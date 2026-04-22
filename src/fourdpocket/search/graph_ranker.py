@@ -78,7 +78,9 @@ def graph_anchored_hits(
 
         alias_clauses = [EntityAlias.alias.ilike(f"%{t}%") for t in tokens]
         aliases = db.exec(
-            select(EntityAlias).where(or_(*alias_clauses))
+            select(EntityAlias)
+            .join(Entity, Entity.id == EntityAlias.entity_id)
+            .where(Entity.user_id == user_id, or_(*alias_clauses))
         ).all()
         alias_entity_ids = {a.entity_id for a in aliases}
         seed_by_alias = []

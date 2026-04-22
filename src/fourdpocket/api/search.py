@@ -1,6 +1,7 @@
 """Search API endpoints — unified search across items + notes with filters and hybrid mode."""
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, col, func, select
@@ -55,9 +56,75 @@ def _search_to_items(
     return response
 
 
+def _filter_only_search(
+    db: Session,
+    current_user: User,
+    item_type: str | None,
+    source_platform: str | None,
+    is_favorite: bool | None,
+    is_archived: bool | None,
+    tags: list[str] | None,
+    after: str | None,
+    before: str | None,
+    limit: int,
+    offset: int,
+) -> list[dict]:
+    """Direct SQL SELECT for filter-only queries (no free-text search term).
+
+    Returns items matching all provided filters ordered by created_at DESC,
+    paginated by limit/offset. Response shape is identical to normal search
+    results (ItemRead fields + title_snippet=None, content_snippet=None).
+    """
+    stmt = select(KnowledgeItem).where(KnowledgeItem.user_id == current_user.id)
+
+    if item_type:
+        stmt = stmt.where(KnowledgeItem.item_type == item_type)
+    if source_platform:
+        stmt = stmt.where(KnowledgeItem.source_platform == source_platform)
+    if is_favorite is not None:
+        stmt = stmt.where(KnowledgeItem.is_favorite == is_favorite)
+    if is_archived is not None:
+        stmt = stmt.where(KnowledgeItem.is_archived == is_archived)
+    if after:
+        try:
+            after_dt = datetime.fromisoformat(after)
+            stmt = stmt.where(KnowledgeItem.created_at >= after_dt)
+        except ValueError:
+            pass  # Ignore malformed date; FTS backend does the same
+    if before:
+        try:
+            before_dt = datetime.fromisoformat(before)
+            stmt = stmt.where(KnowledgeItem.created_at <= before_dt)
+        except ValueError:
+            pass  # Ignore malformed date
+    if tags:
+        from fourdpocket.models.tag import ItemTag, Tag
+
+        # Require the item to have ALL requested tags (one subquery per tag)
+        for tag_name in tags:
+            tagged_ids = select(ItemTag.item_id).join(
+                Tag, Tag.id == ItemTag.tag_id
+            ).where(
+                Tag.user_id == current_user.id,
+                Tag.slug == tag_name,
+            )
+            stmt = stmt.where(KnowledgeItem.id.in_(tagged_ids))
+
+    stmt = stmt.order_by(col(KnowledgeItem.created_at).desc()).offset(offset).limit(limit)
+    items = db.exec(stmt).all()
+
+    result = []
+    for item in items:
+        item_dict = ItemRead.model_validate(item).model_dump()
+        item_dict["title_snippet"] = None
+        item_dict["content_snippet"] = None
+        result.append(item_dict)
+    return result
+
+
 @router.get("")
 def search_items(
-    q: str = Query(..., min_length=1),
+    q: str = Query(default=""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     item_type: str | None = None,
@@ -73,12 +140,14 @@ def search_items(
     """Full-text search across knowledge items with filter pushdown and fuzzy fallback.
 
     Supports inline filter syntax: `docker tag:devops is:favorite after:2024-01`
+    Filter-only queries (empty q with at least one filter) are also accepted and
+    perform a direct SQL SELECT ordered by created_at DESC.
+    Returns 400 if both q and all filters are empty/None.
     """
+    from fastapi import HTTPException
+
     parsed = parse_filters(q)
     search_query = parsed.get("query") or ""
-    # If only filters remain (no free text), use original q only if no filters were parsed
-    if not search_query and len(parsed) <= 1:
-        search_query = q
 
     effective_type = item_type or parsed.get("item_type")
     effective_platform = source_platform or parsed.get("source_platform")
@@ -89,6 +158,37 @@ def search_items(
         effective_tags.append(tag)
     effective_after = after or parsed.get("after")
     effective_before = before or parsed.get("before")
+
+    # Determine whether any filter is active
+    has_filters = any([
+        effective_type,
+        effective_platform,
+        effective_favorite is not None,
+        effective_archived is not None,
+        effective_tags,
+        effective_after,
+        effective_before,
+    ])
+
+    # Require at least a query term or one filter
+    if not search_query and not has_filters:
+        raise HTTPException(status_code=400, detail="Provide a search query or at least one filter.")
+
+    # Filter-only path: no free-text query — do a direct SQL SELECT with filters
+    if not search_query and has_filters:
+        return _filter_only_search(
+            db=db,
+            current_user=current_user,
+            item_type=effective_type,
+            source_platform=effective_platform,
+            is_favorite=effective_favorite,
+            is_archived=effective_archived,
+            tags=effective_tags or None,
+            after=effective_after,
+            before=effective_before,
+            limit=limit,
+            offset=offset,
+        )
 
     from fourdpocket.search import get_search_service
     from fourdpocket.search.base import SearchFilters

@@ -99,9 +99,9 @@ class TestSearchRoundtrip:
             headers=auth_headers,
         )
 
-        # Empty query should return 422 (min_length=1)
+        # Empty query with no filters should return 400 (both q and filters absent)
         search_resp = client.get("/api/v1/search?q=", headers=auth_headers)
-        assert search_resp.status_code == 422
+        assert search_resp.status_code == 400
 
     def test_search_special_characters_handled(self, client, auth_headers):
         """Queries with special characters should not cause errors."""

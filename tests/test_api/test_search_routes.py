@@ -34,15 +34,15 @@ class TestSearchItems:
         assert len(results) >= 1
         assert any(r["id"] == item_id for r in results)
 
-    def test_search_empty_query_returns_422(self, client, auth_headers):
-        """An empty query string is rejected (min_length=1)."""
+    def test_search_empty_query_no_filters_returns_400(self, client, auth_headers):
+        """An empty query with no filters returns 400 (both q and filters are absent)."""
         response = client.get("/api/v1/search?q=", headers=auth_headers)
-        assert response.status_code == 422
+        assert response.status_code == 400
 
-    def test_search_no_query_returns_422(self, client, auth_headers):
-        """Query parameter is required."""
+    def test_search_no_query_no_filters_returns_400(self, client, auth_headers):
+        """No query parameter and no filters returns 400."""
         response = client.get("/api/v1/search", headers=auth_headers)
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_search_user_scoping(self, client, auth_headers, second_user_headers, db: Session):
         """User A's search never returns User B's items."""
@@ -266,6 +266,75 @@ class TestGetSearchFilters:
         """Filters endpoint requires authentication."""
         response = client.get("/api/v1/search/filters")
         assert response.status_code == 401
+
+
+class TestFilterOnlySearch:
+    """Regression tests for filter-only search (empty q with filters).
+
+    Bug: filter-only queries like ?q=type:youtube returned [] because the
+    endpoint required min_length=1 and service.search() returned nothing for
+    an empty keyword query.  Fixed by adding a direct SQL SELECT branch.
+    """
+
+    def test_filter_only_by_item_type_inline_syntax(self, client, auth_headers, db: Session):
+        """?q=type:note returns note-type items without a free-text query."""
+        note_id = client.post(
+            "/api/v1/items",
+            json={"title": "My Note", "content": "some note content", "item_type": "note"},
+            headers=auth_headers,
+        ).json()["id"]
+        url_id = _seed_item(client, auth_headers, url="https://filter-test.com", title="URL Item", content="url content")
+
+        for iid in (note_id, url_id):
+            item = db.get(KnowledgeItem, uuid.UUID(iid))
+            index_item(db, item)
+
+        response = client.get("/api/v1/search?q=type:note", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        assert len(results) >= 1
+        assert all(r["item_type"] == "note" for r in results)
+        assert any(r["id"] == note_id for r in results)
+        assert all(r["id"] != url_id for r in results)
+
+    def test_filter_only_by_query_param(self, client, auth_headers, db: Session):
+        """?item_type=note with no q returns note-type items."""
+        note_id = client.post(
+            "/api/v1/items",
+            json={"title": "Filter Note", "content": "filter note content", "item_type": "note"},
+            headers=auth_headers,
+        ).json()["id"]
+        url_id = _seed_item(client, auth_headers, url="https://filter-url.com", title="URL Item2", content="url content2")
+
+        for iid in (note_id, url_id):
+            item = db.get(KnowledgeItem, uuid.UUID(iid))
+            index_item(db, item)
+
+        response = client.get("/api/v1/search?item_type=note", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        assert len(results) >= 1
+        assert all(r["item_type"] == "note" for r in results)
+
+    def test_filter_only_result_shape_has_snippet_keys(self, client, auth_headers, db: Session):
+        """Filter-only results include title_snippet and content_snippet keys (shape parity)."""
+        note_id = client.post(
+            "/api/v1/items",
+            json={"title": "Shape Test", "content": "shape content", "item_type": "note"},
+            headers=auth_headers,
+        ).json()["id"]
+        item = db.get(KnowledgeItem, uuid.UUID(note_id))
+        index_item(db, item)
+
+        response = client.get("/api/v1/search?item_type=note", headers=auth_headers)
+        assert response.status_code == 200
+        results = response.json()
+        assert len(results) >= 1
+        first = results[0]
+        assert "title_snippet" in first
+        assert "content_snippet" in first
+        assert "id" in first
+        assert "title" in first
 
 
 class TestSearchInlineFilters:
