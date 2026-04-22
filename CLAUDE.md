@@ -156,6 +156,7 @@ Item Created → enrich_item_v2()
 ## Key Patterns
 
 - **Config**: pydantic-settings with `FDP_` env prefix. Admin panel overrides via `InstanceSettings.extra["ai_config"]`
+- **Config precedence rule**: admin-panel overrides (`InstanceSettings.extra`) > `.env` defaults > pydantic defaults. Both `get_resolved_ai_config()` (ai/factory.py) and `get_resolved_search_config()` (search/admin_config.py) follow this: env values populate `base`, then DB overrides are merged on top. Any new resolver must honor the same order.
 - **AI config precedence**: .env defaults < admin panel overrides. User-level controls only preferences (auto_tag, auto_summarize)
 - **Sync enrichment**: Items are AI-enriched inline if Huey worker is not running (tagging + summarization, skips embedding)
 - **Login**: Accepts both email and username (OR query on User table)

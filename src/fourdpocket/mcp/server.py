@@ -18,6 +18,7 @@ from pydantic import AnyHttpUrl
 from sqlmodel import Session
 
 from fourdpocket.api.api_token_utils import resolve_token
+from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_engine
 from fourdpocket.mcp import tools as tools_mod
 from fourdpocket.mcp.auth import PATTokenVerifier
@@ -29,8 +30,9 @@ logger = logging.getLogger(__name__)
 
 def _build_mcp() -> FastMCP:
     verifier = PATTokenVerifier()
-    issuer = AnyHttpUrl("http://localhost:4040")
-    resource = AnyHttpUrl("http://localhost:4040")
+    public_url = get_settings().server.public_url
+    issuer = AnyHttpUrl(public_url)
+    resource = AnyHttpUrl(public_url)
     return FastMCP(
         "4dpocket",
         instructions=(
