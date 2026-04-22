@@ -68,7 +68,6 @@ class StorageSettings(BaseSettings):
 
     base_path: str = "./data"
     max_archive_size_mb: int = 50
-    screenshot_quality: int = 80
 
 
 class SearchSettings(BaseSettings):
@@ -127,6 +126,7 @@ class EnrichmentSettings(BaseSettings):
     extract_entities: bool = False
     max_entities_per_chunk: int = 20
     max_relations_per_chunk: int = 15
+    max_attempts: int = 5  # Max retries per enrichment stage before permanent failure
     # Entity synthesis — Karpathy-style LLM-maintained wiki pages per entity.
     synthesis_enabled: bool = True
     synthesis_min_item_count: int = 3  # Don't synthesize entities mentioned in < N items

@@ -8,9 +8,9 @@ from sqlmodel import Column, Field, SQLModel, UniqueConstraint
 from fourdpocket.models.base import utc_now
 
 try:
-    from sqlalchemy import DateTime
+    from sqlalchemy import DateTime, ForeignKey, Uuid
 except ImportError:
-    from sqlmodel import DateTime
+    from sqlmodel import DateTime, ForeignKey, Uuid
 
 
 class EntityRelation(SQLModel, table=True):
@@ -20,9 +20,15 @@ class EntityRelation(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
-    source_id: uuid.UUID = Field(foreign_key="entities.id", index=True)
-    target_id: uuid.UUID = Field(foreign_key="entities.id", index=True)
+    user_id: uuid.UUID = Field(
+        sa_column=Column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
+    source_id: uuid.UUID = Field(
+        sa_column=Column(Uuid, ForeignKey("entities.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
+    target_id: uuid.UUID = Field(
+        sa_column=Column(Uuid, ForeignKey("entities.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
     keywords: str | None = Field(default=None)
     description: str | None = Field(default=None)
     weight: float = Field(default=1.0)

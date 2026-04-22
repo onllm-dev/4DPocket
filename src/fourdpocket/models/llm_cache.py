@@ -1,9 +1,16 @@
 """LLM response cache model — avoids redundant LLM calls for identical inputs."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, Field, SQLModel
+
+from fourdpocket.models.base import utc_now
+
+try:
+    from sqlalchemy import DateTime
+except ImportError:
+    from sqlmodel import DateTime
 
 
 class LLMCache(SQLModel, table=True):
@@ -14,4 +21,7 @@ class LLMCache(SQLModel, table=True):
     cache_type: str = Field(index=True)  # "extraction", "summary", "tagging", "keywords"
     response: str  # JSON string of the cached response
     model_name: str = ""  # Which model produced this response
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

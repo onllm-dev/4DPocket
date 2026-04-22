@@ -9,13 +9,16 @@ from sqlmodel import Column, Field, SQLModel
 from fourdpocket.models.base import ShareMode, utc_now
 
 try:
-    from sqlalchemy import DateTime
+    from sqlalchemy import DateTime, UniqueConstraint
 except ImportError:
-    from sqlmodel import DateTime
+    from sqlmodel import DateTime, UniqueConstraint
 
 
 class Collection(SQLModel, table=True):
     __tablename__ = "collections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_collection_user_name"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
