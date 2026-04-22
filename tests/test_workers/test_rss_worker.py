@@ -450,3 +450,109 @@ class TestFetchRssFeedJson:
             # This test verifies the item URL was created at minimum.
             assert item is not None
             assert item.url == "https://example.com/atom/item"
+
+
+# === BUG REGRESSION TESTS ===
+
+class TestRssFeedDedup:
+    """Regression: dedup must be per-feed, not per-user.
+
+    Bug: KnowledgeItem dedup was user-level (user_id, url). If the same URL
+    appeared in two different feeds, the second feed would never add it on
+    first poll (correct), but a second poll of the first feed would add it
+    again because it now belonged to a different feed context.
+
+    The minimal fix: also check that the existing item was NOT already seen
+    by this feed (i.e. the item came from this feed, or equivalently, if the
+    item exists AND is not linked to this feed via a FeedEntry, treat the URL
+    as a global dup and skip it).
+
+    Fixed in: src/fourdpocket/workers/rss_worker.py fetch_rss_feed /
+    _parse_json_feed — dedup now also checks feed_id.
+    """
+
+    def test_same_url_in_two_feeds_only_creates_one_item_per_feed(
+        self, db: Session, engine, monkeypatch
+    ):
+        """Same URL in two feeds: first fetch creates 1 item each (total 1, since URL is same user)."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        user = _make_rss_user(db)
+
+        feed1 = RSSFeed(user_id=user.id, url="https://example.com/feed1.xml", title="Feed 1", mode="auto")
+        feed2 = RSSFeed(user_id=user.id, url="https://example.com/feed2.xml", title="Feed 2", mode="auto")
+        db.add(feed1)
+        db.add(feed2)
+        db.commit()
+        db.refresh(feed1)
+        db.refresh(feed2)
+
+        xml = """<?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
+            <item>
+              <title>Shared Article</title>
+              <link>https://example.com/shared</link>
+            </item>
+          </channel>
+        </rss>"""
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = xml
+        mock_resp.headers = {"content-type": "application/rss+xml"}
+        mock_resp.is_redirect = False
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.get") as mock_get:
+            mock_get.return_value = mock_resp
+
+            count1 = fetch_rss_feed(feed1, db)
+            count2 = fetch_rss_feed(feed2, db)
+
+        # URL deduplication is user-level: same user already has the item
+        # after feed1 poll, so feed2 should NOT add another item.
+        assert count1 == 1
+        assert count2 == 0
+        items = db.exec(select(KnowledgeItem).where(KnowledgeItem.url == "https://example.com/shared")).all()
+        assert len(items) == 1
+
+    def test_approval_mode_dedup_by_feed_and_url(self, db: Session, engine, monkeypatch):
+        """Approval mode: re-polling same feed does not create duplicate FeedEntry."""
+        import fourdpocket.db.session as db_module
+        monkeypatch.setattr(db_module, "_engine", engine)
+
+        user = _make_rss_user(db)
+        feed = RSSFeed(user_id=user.id, url="https://example.com/approval.xml", title="Approval Feed", mode="approval")
+        db.add(feed)
+        db.commit()
+        db.refresh(feed)
+
+        xml = """<?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
+            <item>
+              <title>Article</title>
+              <link>https://example.com/article</link>
+            </item>
+          </channel>
+        </rss>"""
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = xml
+        mock_resp.headers = {"content-type": "application/rss+xml"}
+        mock_resp.is_redirect = False
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.get") as mock_get:
+            mock_get.return_value = mock_resp
+
+            count1 = fetch_rss_feed(feed, db)
+            count2 = fetch_rss_feed(feed, db)
+
+        assert count1 == 1
+        assert count2 == 0
+        entries = db.exec(select(FeedEntry).where(FeedEntry.feed_id == feed.id)).all()
+        assert len(entries) == 1

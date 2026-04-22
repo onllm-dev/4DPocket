@@ -7,6 +7,7 @@ import httpx
 
 from fourdpocket.processors.base import BaseProcessor, ProcessorResult, ProcessorStatus
 from fourdpocket.processors.registry import register_processor
+from fourdpocket.processors.sections import Section, make_section_id
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,31 @@ class SpotifyProcessor(BaseProcessor):
 
         description = f"{item_subtype.capitalize()} by {author}" if author else item_subtype.capitalize()
 
+        sections: list[Section] = []
+        order = 0
+        if title:
+            sections.append(Section(
+                id=make_section_id(url, order), kind="title", order=order,
+                role="main", text=title,
+            ))
+            order += 1
+        body_parts = [title, f"by {author}" if author else "", item_subtype.capitalize()]
+        body_text = "\n".join(p for p in body_parts if p)
+        if body_text:
+            sections.append(Section(
+                id=make_section_id(url, order), kind="paragraph", order=order,
+                role="main", text=body_text,
+            ))
+            order += 1
+        oembed_html = data.get("html", "")
+        if oembed_html:
+            plain = re.sub(r"<[^>]+>", " ", oembed_html).strip()
+            if plain:
+                sections.append(Section(
+                    id=make_section_id(url, order), kind="metadata_block", order=order,
+                    role="supplemental", text=plain,
+                ))
+
         return ProcessorResult(
             title=title,
             description=description,
@@ -79,4 +105,5 @@ class SpotifyProcessor(BaseProcessor):
             source_platform="spotify",
             item_type="url",
             status=ProcessorStatus.success,
+            sections=sections,
         )

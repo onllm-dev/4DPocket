@@ -136,16 +136,20 @@ class TestExtract:
         """Platform-specific metadata extracted correctly."""
         proc = MediumProcessor()
 
+        import sys
+        # curl_cffi is patched out so _try_json_endpoint falls back to httpx,
+        # which respx can intercept.
         with patch("fourdpocket.processors.medium._try_internal_api", return_value=None):
-            with respx.mock(assert_all_called=False) as r:
-                prefix = "])}while(1);</x>"
-                body = prefix + json.dumps({"payload": MEDIUM_PAYLOAD})
-                r.get(url__regex=r"https://medium\.com/@user/why-python.*\?format=json").mock(
-                    return_value=httpx.Response(200, text=body)
-                )
-                result = asyncio.run(
-                    proc.process("https://medium.com/@user/why-python-rocks-abc123def")
-                )
+            with patch.dict(sys.modules, {"curl_cffi": None, "curl_cffi.requests": None}):
+                with respx.mock(assert_all_called=False) as r:
+                    prefix = "])}while(1);</x>"
+                    body = prefix + json.dumps({"payload": MEDIUM_PAYLOAD})
+                    r.get(url__regex=r"https://medium\.com/@user/why-python.*\?format=json").mock(
+                        return_value=httpx.Response(200, text=body)
+                    )
+                    result = asyncio.run(
+                        proc.process("https://medium.com/@user/why-python-rocks-abc123def")
+                    )
 
         assert result.metadata.get("author") == "Python Author"
         assert result.metadata.get("clap_count") == 500
@@ -159,16 +163,18 @@ class TestExtract:
         """Extracted sections have correct kind, depth, author fields."""
         proc = MediumProcessor()
 
+        import sys
         with patch("fourdpocket.processors.medium._try_internal_api", return_value=None):
-            with respx.mock(assert_all_called=False) as r:
-                prefix = "])}while(1);</x>"
-                body = prefix + json.dumps({"payload": MEDIUM_PAYLOAD})
-                r.get(url__regex=r"https://medium\.com/@user/why-python.*\?format=json").mock(
-                    return_value=httpx.Response(200, text=body)
-                )
-                result = asyncio.run(
-                    proc.process("https://medium.com/@user/why-python-rocks-abc123def")
-                )
+            with patch.dict(sys.modules, {"curl_cffi": None, "curl_cffi.requests": None}):
+                with respx.mock(assert_all_called=False) as r:
+                    prefix = "])}while(1);</x>"
+                    body = prefix + json.dumps({"payload": MEDIUM_PAYLOAD})
+                    r.get(url__regex=r"https://medium\.com/@user/why-python.*\?format=json").mock(
+                        return_value=httpx.Response(200, text=body)
+                    )
+                    result = asyncio.run(
+                        proc.process("https://medium.com/@user/why-python-rocks-abc123def")
+                    )
 
         sections = result.sections
         assert len(sections) >= 4

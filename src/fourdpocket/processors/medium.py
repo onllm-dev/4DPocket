@@ -98,23 +98,41 @@ def _try_internal_api(url: str) -> dict | None:
 
 
 def _try_json_endpoint(url: str) -> dict | None:
-    """Fallback: try the public ?format=json endpoint with Chrome UA."""
+    """Fallback: try the public ?format=json endpoint with Chrome UA.
+
+    Attempts curl_cffi TLS impersonation first (Medium inspects TLS fingerprint);
+    falls back to plain httpx if curl_cffi is unavailable.
+    """
     from fourdpocket.processors.base import _is_safe_url
 
     json_url = url.rstrip("/") + "?format=json"
     if not _is_safe_url(json_url):
         return None
+
+    _headers = {
+        "User-Agent": _CHROME_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
     try:
-        resp = httpx.get(
-            json_url,
-            headers={
-                "User-Agent": _CHROME_UA,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-            },
-            follow_redirects=True,
-            timeout=15,
-        )
+        from curl_cffi import requests as cffi_requests
+
+        resp = cffi_requests.get(json_url, headers=_headers, impersonate="chrome", timeout=15)
+        if resp.status_code != 200:
+            return None
+        text = resp.text
+        if text.startswith("])}while(1);</x>"):
+            text = text[len("])}while(1);</x>"):]
+        return json.loads(text).get("payload", {})
+    except ImportError:
+        logger.debug("curl_cffi not installed — falling back to httpx for %s", url)
+    except Exception as e:
+        logger.debug("Medium JSON endpoint (curl_cffi) failed for %s: %s", url, e)
+        return None
+
+    try:
+        resp = httpx.get(json_url, headers=_headers, follow_redirects=True, timeout=15)
         if resp.status_code != 200:
             return None
         text = resp.text
@@ -122,7 +140,7 @@ def _try_json_endpoint(url: str) -> dict | None:
             text = text[len("])}while(1);</x>"):]
         return json.loads(text).get("payload", {})
     except Exception as e:
-        logger.debug("Medium JSON endpoint failed for %s: %s", url, e)
+        logger.debug("Medium JSON endpoint (httpx) failed for %s: %s", url, e)
         return None
 
 

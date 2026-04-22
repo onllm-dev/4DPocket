@@ -93,22 +93,27 @@ MEDIUM_PAYLOAD = {
 
 
 def test_medium_json_endpoint_emits_typed_sections():
+    import sys
+    from unittest.mock import patch
     from fourdpocket.processors.medium import MediumProcessor
 
     proc = MediumProcessor()
 
-    # The Medium JSON endpoint uses sync httpx.get inside a helper;
-    # respx.mock(using="httpx") patches both the sync and async client.
-    with respx.mock(assert_all_called=False) as r:
-        # JSON has the anti-JSONP prefix
-        prefix = "])}while(1);</x>"
-        body = prefix + __import__("json").dumps(MEDIUM_PAYLOAD)
-        r.get(url__regex=r"https://medium\.com/@me/why-x-matters\?format=json").mock(
-            return_value=httpx.Response(200, text=body)
-        )
-        result = asyncio.run(proc.process(
-            "https://medium.com/@me/why-x-matters"
-        ))
+    # Patch out curl_cffi so _try_json_endpoint falls back to httpx,
+    # which respx can intercept. Also patch _try_internal_api since the
+    # URL has no hex post ID but the patch avoids any live network call.
+    with patch("fourdpocket.processors.medium._try_internal_api", return_value=None):
+        with patch.dict(sys.modules, {"curl_cffi": None, "curl_cffi.requests": None}):
+            with respx.mock(assert_all_called=False) as r:
+                # JSON has the anti-JSONP prefix
+                prefix = "])}while(1);</x>"
+                body = prefix + __import__("json").dumps(MEDIUM_PAYLOAD)
+                r.get(url__regex=r"https://medium\.com/@me/why-x-matters\?format=json").mock(
+                    return_value=httpx.Response(200, text=body)
+                )
+                result = asyncio.run(proc.process(
+                    "https://medium.com/@me/why-x-matters"
+                ))
 
     sections = result.sections
     titles = [s for s in sections if s.kind == "title"]
