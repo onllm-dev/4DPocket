@@ -14,6 +14,7 @@ from fourdpocket.api.api_token_utils import (
     generate_token,
 )
 from fourdpocket.api.deps import get_current_user, get_db, require_jwt_session
+from fourdpocket.api.rate_limit import check_rate_limit, record_attempt
 from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
 from fourdpocket.models.base import ApiTokenRole, UserRole
 from fourdpocket.models.collection import Collection
@@ -110,6 +111,11 @@ def create_token(
     _: None = Depends(require_jwt_session),
 ):
     """Create a new PAT. Returns the plaintext token exactly once."""
+    # Per-user rate limit: max 10 new tokens per hour.
+    rl_key = f"pat-create:{current_user.id}"
+    check_rate_limit(db, key=rl_key, action="pat_create", max_attempts=10, window_seconds=3600, lockout_minutes=60)
+    record_attempt(db, key=rl_key, action="pat_create")
+
     # Only admins may mint admin-scoped tokens.
     if data.admin_scope and current_user.role != UserRole.admin:
         raise HTTPException(

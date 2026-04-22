@@ -92,7 +92,8 @@ def resolve_token(db: Session, plaintext: str) -> ApiToken | None:
     """
     prefix = _parse_prefix(plaintext)
     if prefix is None:
-        hmac.compare_digest(_DUMMY_HASH, _DUMMY_HASH)
+        # Timing is tied to actual input length, not a fixed constant.
+        hmac.compare_digest(_hash(plaintext[:min(len(plaintext), 50)]), _DUMMY_HASH)
         return None
 
     token_row = db.exec(select(ApiToken).where(ApiToken.token_prefix == prefix)).first()

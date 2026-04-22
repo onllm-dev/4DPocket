@@ -5,6 +5,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, field_validator
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import text
 from sqlmodel import Session, func, select
 
@@ -16,6 +17,7 @@ from fourdpocket.api.deps import (
     require_jwt_session,
 )
 from fourdpocket.api.rate_limit import check_rate_limit, record_attempt, reset_rate_limit
+from fourdpocket.models.api_token import ApiToken
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
 
@@ -219,18 +221,34 @@ def update_me(
     return current_user
 
 
+class DeleteMeRequest(BaseModel):
+    current_password: str
+
+
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_me(
+    data: DeleteMeRequest,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_jwt_session),
 ):
-    """Self-service account deletion. Cascades through owned items, tokens, etc.
-    Clears the auth cookie so the client lands on /login."""
+    """Self-service account deletion. Requires current password for confirmation.
+    Cascades through owned items, tokens, etc. Clears the auth cookie."""
+    if not verify_password(data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password is incorrect",
+        )
+    user_id = current_user.id
     db.delete(current_user)
     db.commit()
     response.delete_cookie(key="4dp_token")
+    try:
+        from fourdpocket.storage.local import LocalStorage
+        LocalStorage().delete_user_dir(user_id)
+    except Exception:
+        pass
     return None
 
 
@@ -268,4 +286,7 @@ def change_password(
     current_user.password_hash = hash_password(data.new_password)
     current_user.password_changed_at = datetime.now(timezone.utc)
     db.add(current_user)
+    # Invalidate all existing PATs so stolen tokens cannot be reused after a
+    # password change (session invalidation on credential rotation).
+    db.exec(sql_delete(ApiToken).where(ApiToken.user_id == current_user.id))
     db.commit()

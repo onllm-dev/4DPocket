@@ -64,3 +64,9 @@ class LocalStorage:
     def file_exists(self, relative_path: str) -> bool:
         """Check if a file exists."""
         return self._safe_path(relative_path).exists()
+
+    def delete_user_dir(self, user_id: uuid.UUID) -> None:
+        """Remove the entire on-disk directory for a user (best-effort)."""
+        import shutil
+        user_dir = self._base / str(user_id)
+        shutil.rmtree(user_dir, ignore_errors=True)

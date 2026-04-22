@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from fourdpocket.api.deps import (
     get_db,
@@ -14,6 +14,7 @@ from fourdpocket.api.deps import (
     require_admin,
     require_jwt_session,
 )
+from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
 from fourdpocket.models.base import UserRole
 from fourdpocket.models.collection import Collection
 from fourdpocket.models.entity import Entity
@@ -135,6 +136,18 @@ def update_user(
     if user.id == admin.id and data.role and data.role != UserRole.admin:
         raise HTTPException(status_code=400, detail="Cannot demote yourself")
 
+    # Prevent demoting the last admin — would lock everyone out.
+    if data.role and data.role != UserRole.admin and user.role == UserRole.admin:
+        remaining_admins = db.exec(
+            select(func.count()).select_from(User).where(
+                User.role == UserRole.admin, User.id != user.id
+            )
+        ).one()
+        if remaining_admins == 0:
+            raise HTTPException(
+                status_code=409, detail="Cannot demote the last admin"
+            )
+
     update_dict = data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         setattr(user, key, value)
@@ -244,7 +257,12 @@ def delete_user(
         db.delete(row)
     for row in db.exec(select(SavedFilter).where(SavedFilter.user_id == uid)).all():
         db.delete(row)
-    for row in db.exec(select(KnowledgeFeed).where(KnowledgeFeed.user_id == uid)).all():
+    # KnowledgeFeed has no user_id — delete rows where user is subscriber OR publisher.
+    for row in db.exec(
+        select(KnowledgeFeed).where(
+            or_(KnowledgeFeed.subscriber_id == uid, KnowledgeFeed.publisher_id == uid)
+        )
+    ).all():
         db.delete(row)
     # Also delete comments on others' items
     for row in db.exec(select(Comment).where(Comment.user_id == uid)).all():
@@ -261,8 +279,23 @@ def delete_user(
     except Exception:
         pass
 
+    # 8. Delete PAT collections and PATs for this user
+    for token in db.exec(select(ApiToken).where(ApiToken.user_id == uid)).all():
+        for atc in db.exec(
+            select(ApiTokenCollection).where(ApiTokenCollection.token_id == token.id)
+        ).all():
+            db.delete(atc)
+        db.delete(token)
+
     db.delete(user)
     db.commit()
+
+    # 9. Remove on-disk media (best-effort, after DB commit)
+    try:
+        from fourdpocket.storage.local import LocalStorage
+        LocalStorage().delete_user_dir(uid)
+    except Exception:
+        pass
 
 
 # ─── AI Settings (admin-controlled) ─────────────────────────────

@@ -293,13 +293,33 @@ def test_update_me_email_conflict(client, auth_headers, second_user_headers):
     assert response.status_code in (200, 409)
 
 
+def _delete_me(client, headers, password=None):
+    """Helper: send DELETE /auth/me with an optional JSON body."""
+    import json as _json
+    h = {**headers, "Content-Type": "application/json"}
+    body = _json.dumps({"current_password": password}).encode() if password is not None else b""
+    return client.request("DELETE", "/api/v1/auth/me", content=body, headers=h)
+
+
 def test_delete_me(client, auth_headers):
-    """DELETE /auth/me → 204, then GET /auth/me → 401."""
-    delete_resp = client.delete("/api/v1/auth/me", headers=auth_headers)
+    """DELETE /auth/me with correct password → 204, then GET /auth/me → 401."""
+    delete_resp = _delete_me(client, auth_headers, password="TestPass123!")
     assert delete_resp.status_code == 204
 
     me_resp = client.get("/api/v1/auth/me", headers=auth_headers)
     assert me_resp.status_code == 401
+
+
+def test_delete_me_wrong_password(client, auth_headers):
+    """DELETE /auth/me with wrong password → 403."""
+    delete_resp = _delete_me(client, auth_headers, password="WrongPass1!")
+    assert delete_resp.status_code == 403
+
+
+def test_delete_me_no_password(client, auth_headers):
+    """DELETE /auth/me without password body → 422."""
+    delete_resp = _delete_me(client, auth_headers, password=None)
+    assert delete_resp.status_code == 422
 
 
 def test_change_password_success(client, auth_headers):

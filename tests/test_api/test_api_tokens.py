@@ -146,6 +146,77 @@ def test_allow_deletion_flag_stored(client, auth_headers):
     assert res.json()["allow_deletion"] is True
 
 
+def test_pats_invalidated_after_password_change(client, auth_headers, db):
+    """PATs must be deleted when the user changes their password.
+
+    Regression test for: PATs not invalidated on password change.
+    Root cause: change_password only updated password_hash, left ApiToken rows alive.
+    Fixed in: src/fourdpocket/api/auth.py change_password
+    """
+    from sqlmodel import select
+
+    from fourdpocket.models.api_token import ApiToken
+    from fourdpocket.models.user import User
+
+    # Create a PAT
+    res = _create_token(client, auth_headers, name="should-be-killed")
+    assert res.status_code == 201
+    raw_token = res.json()["token"]
+
+    # Verify it works before password change
+    pre = client.get("/api/v1/items", headers={"Authorization": f"Bearer {raw_token}"})
+    assert pre.status_code == 200
+
+    # Change password
+    pw_resp = client.patch(
+        "/api/v1/auth/password",
+        json={"current_password": "TestPass123!", "new_password": "NewPass456!"},
+        headers=auth_headers,
+    )
+    assert pw_resp.status_code == 204
+
+    # PAT must no longer work
+    post = client.get("/api/v1/items", headers={"Authorization": f"Bearer {raw_token}"})
+    assert post.status_code == 401
+
+    # DB must have zero tokens for this user
+    user = db.exec(select(User).where(User.email == "test@example.com")).first()
+    remaining = db.exec(select(ApiToken).where(ApiToken.user_id == user.id)).all()
+    assert remaining == []
+
+
+def test_dummy_timing_compare_uses_input(monkeypatch):
+    """Constant-time dummy compare must hash the actual input, not a fixed constant.
+
+    Regression test for: compare_digest(_DUMMY_HASH, _DUMMY_HASH) leaks nothing
+    about input — replaced with hash(input[:50]) vs _DUMMY_HASH.
+    Fixed in: src/fourdpocket/api/api_token_utils.py resolve_token
+    """
+    import hmac as _hmac
+
+    import fourdpocket.api.api_token_utils as utils
+
+    calls = []
+    original = _hmac.compare_digest
+
+    def _spy(a, b):
+        calls.append((a, b))
+        return original(a, b)
+
+    monkeypatch.setattr(_hmac, "compare_digest", _spy)
+
+    # Pass a totally invalid token (no fdp_pat_ prefix) — must fall through to dummy branch
+    from unittest.mock import MagicMock
+    db = MagicMock()
+    utils.resolve_token(db, "not_a_valid_token_at_all")
+
+    assert len(calls) == 1
+    # a must NOT equal b (we're comparing a real hash against _DUMMY_HASH)
+    a, b = calls[0]
+    assert b == utils._DUMMY_HASH
+    assert a != b  # hash of input[:50] won't match "0"*64
+
+
 def test_generated_tokens_always_parse():
     """Regression: prior urlsafe-base64 prefixes could contain ``_``, which
     collided with the ``fdp_pat_<prefix>_<secret>`` separator and made
