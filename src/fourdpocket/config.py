@@ -23,6 +23,15 @@ def _get_or_create_secret_key() -> str:
 
     Uses file locking to prevent TOCTOU race conditions when multiple
     processes start simultaneously.
+
+    Key location precedence:
+    1. FDP_AUTH__SECRET_KEY env var (not persisted).
+    2. FDP_AUTH__SECRET_KEY_DIR env var → persisted there.
+    3. FDP_STORAGE__BASE_PATH env var → persisted at <base>/.secret/.
+       This is what deployments should rely on: the storage base_path is
+       typically a mounted volume (e.g. /data in Docker), so the key
+       survives container restarts and JWTs stay valid.
+    4. Fallback: ~/.4dpocket/secret_key.
     """
     import fcntl
     import os
@@ -30,7 +39,15 @@ def _get_or_create_secret_key() -> str:
     env_key = os.environ.get("FDP_AUTH__SECRET_KEY")
     if env_key:
         return env_key
-    key_dir = Path.home() / ".4dpocket"
+    explicit_dir = os.environ.get("FDP_AUTH__SECRET_KEY_DIR")
+    if explicit_dir:
+        key_dir = Path(explicit_dir)
+    else:
+        storage_base = os.environ.get("FDP_STORAGE__BASE_PATH")
+        if storage_base:
+            key_dir = Path(storage_base) / ".secret"
+        else:
+            key_dir = Path.home() / ".4dpocket"
     key_dir.mkdir(parents=True, exist_ok=True)
     key_file = key_dir / "secret_key"
     lock_file = key_dir / "secret_key.lock"
