@@ -76,7 +76,8 @@ export function useChangePassword() {
 export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.del("/api/v1/auth/me"),
+    mutationFn: (data: { current_password: string }) =>
+      api.del("/api/v1/auth/me", data),
     onSuccess: () => {
       qc.clear();
       window.location.href = "/login";

@@ -74,6 +74,7 @@ export default function Settings() {
   const [confirmPwd, setConfirmPwd] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [tagThreshold, setTagThreshold] = useState<number | null>(null);
 
@@ -121,11 +122,15 @@ export default function Settings() {
 
   function handleDeleteAccount() {
     if (deleteConfirm !== "DELETE") return;
-    deleteAccount.mutate(undefined, {
-      onSuccess: () => {
-        logout.mutate();
+    if (!deletePassword) return;
+    deleteAccount.mutate(
+      { current_password: deletePassword },
+      {
+        onSuccess: () => {
+          logout.mutate();
+        },
       },
-    });
+    );
   }
 
   const { data: settings } = useQuery<ApiSettings>({
@@ -559,16 +564,27 @@ export default function Settings() {
                 placeholder="DELETE"
                 className="w-full px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-red-500 focus:outline-none"
               />
+              <label className="block text-xs text-red-700 dark:text-red-300">
+                Re-enter your password
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Current password"
+                autoComplete="current-password"
+                className="w-full px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-red-500 focus:outline-none"
+              />
               <div className="flex gap-2">
                 <button
                   onClick={handleDeleteAccount}
-                  disabled={deleteConfirm !== "DELETE" || deleteAccount.isPending}
+                  disabled={deleteConfirm !== "DELETE" || !deletePassword || deleteAccount.isPending}
                   className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {deleteAccount.isPending ? "Deleting..." : "Permanently delete account"}
                 </button>
                 <button
-                  onClick={() => { setShowDeleteForm(false); setDeleteConfirm(""); }}
+                  onClick={() => { setShowDeleteForm(false); setDeleteConfirm(""); setDeletePassword(""); }}
                   className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                 >
                   Cancel
