@@ -200,8 +200,9 @@ def test_summarize_item_skips_when_disabled(db, monkeypatch):
     monkeypatch.setattr("fourdpocket.ai.summarizer.get_chat_provider", lambda: fake)
 
     class FakeSettings:
-        class ai:
+        class Ai:  # pydantic-style nested settings
             auto_summarize = False
+        ai = Ai
 
     monkeypatch.setattr("fourdpocket.ai.summarizer.get_settings", lambda: FakeSettings())
 
@@ -212,7 +213,7 @@ def test_summarize_item_skips_when_disabled(db, monkeypatch):
 
 def test_summarize_item_nonexistent_item(db, monkeypatch):
     """summarize_item with non-existent item_id returns None."""
-    user = _user(db, email="nonexistent@test.com")
+    _user(db, email="nonexistent@test.com")
 
     fake = _FakeChat("summary")
     monkeypatch.setattr("fourdpocket.ai.summarizer.get_chat_provider", lambda: fake)
@@ -248,7 +249,7 @@ def test_summarize_note_writes_to_note(db, monkeypatch):
 
 def test_summarize_note_nonexistent(db, monkeypatch):
     """summarize_note with non-existent note returns None."""
-    user = _user(db, email="nonote@test.com")
+    _user(db, email="nonote@test.com")
 
     fake = _FakeChat("summary")
     monkeypatch.setattr("fourdpocket.ai.summarizer.get_chat_provider", lambda: fake)

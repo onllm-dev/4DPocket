@@ -345,10 +345,11 @@ def test_auto_tag_item_skips_when_disabled(db, monkeypatch):
 
     # Patch settings to disable auto_tag
     class FakeSettings:
-        class ai:  # lowercase to match what get_settings().ai accesses
+        class Ai:  # pydantic-style nested settings
             auto_tag = False
             tag_confidence_threshold = 0.5
             tag_suggestion_threshold = 0.3
+        ai = Ai
 
     monkeypatch.setattr("fourdpocket.ai.tagger.get_settings", lambda: FakeSettings())
 

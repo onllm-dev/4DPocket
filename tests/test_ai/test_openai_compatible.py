@@ -40,7 +40,7 @@ class TestOpenAICompatibleProviderInit:
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
-            provider = OpenAICompatibleProvider(provider="ollama")
+            OpenAICompatibleProvider(provider="ollama")
             mock_openai.assert_called_once()
             call_kwargs = mock_openai.call_args.kwargs
             assert "base_url" in call_kwargs
@@ -52,7 +52,7 @@ class TestOpenAICompatibleProviderInit:
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
-            provider = OpenAICompatibleProvider(provider="groq")
+            OpenAICompatibleProvider(provider="groq")
             mock_openai.assert_called_once()
             call_kwargs = mock_openai.call_args.kwargs
             assert "api_key" in call_kwargs
@@ -64,7 +64,7 @@ class TestOpenAICompatibleProviderInit:
 
         with patch("fourdpocket.ai.openai_compatible.OpenAI") as mock_openai:
             from fourdpocket.ai.openai_compatible import OpenAICompatibleProvider
-            provider = OpenAICompatibleProvider(provider="nvidia")
+            OpenAICompatibleProvider(provider="nvidia")
             mock_openai.assert_called_once()
 
     def test_custom_with_anthropic_api_type(self, monkeypatch):
@@ -312,7 +312,7 @@ class TestAnthropicPath:
         from httpx import Response
 
         with respx.mock(assert_all_called=False):
-            mock_route = respx.post("https://api.anthropic.com/messages").mock(
+            respx.post("https://api.anthropic.com/messages").mock(
                 return_value=Response(500, json={"error": "internal error"})
             )
 
