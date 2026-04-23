@@ -765,11 +765,17 @@ def cmd_db(args):
 
 def cmd_services(args):
     """Docker service management."""
+    action = args.action
+
+    # `status` is Docker-agnostic (it prints general app status); route early
+    # so it works on machines without Docker installed.
+    if action == "status":
+        cmd_status(args)
+        return
+
     if not _docker_available():
         _error("Docker is required but not installed or not running.")
         return
-
-    action = args.action
 
     if action == "up":
         targets = args.targets or []
@@ -818,9 +824,6 @@ def cmd_services(args):
                 _stop_docker_service(MEILI_CONTAINER)
                 _stop_docker_service(CHROMA_CONTAINER)
                 _stop_docker_service(OLLAMA_CONTAINER)
-
-    elif action == "status":
-        cmd_status(args)
 
     else:
         print("Usage: 4dpocket services <up|down|status> [service...]")
