@@ -14,7 +14,7 @@ from fourdpocket.models.rss_feed import RSSFeed
 from fourdpocket.models.user import User
 from fourdpocket.utils.ssrf import is_safe_url
 
-router = APIRouter(prefix="/rss", tags=["rss"])
+router = APIRouter(prefix="/rss", tags=["Feeds & RSS"])
 
 
 class RSSFeedCreate(BaseModel):

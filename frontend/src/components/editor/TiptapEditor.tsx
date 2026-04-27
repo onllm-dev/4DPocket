@@ -45,6 +45,8 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className={`p-1.5 rounded transition-colors ${
         active
           ? "bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400"

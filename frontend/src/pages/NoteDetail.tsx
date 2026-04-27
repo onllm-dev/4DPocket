@@ -144,10 +144,10 @@ export default function NoteDetail() {
           </button>
           {confirmDelete ? (
             <div className="flex items-center gap-1 ml-1">
-              <button onClick={handleDelete} className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/30">
+              <button onClick={handleDelete} aria-label="Confirm delete" className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/30">
                 <Check className="w-4 h-4 text-red-500" />
               </button>
-              <button onClick={() => setConfirmDelete(false)} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+              <button onClick={() => setConfirmDelete(false)} aria-label="Cancel delete" className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>

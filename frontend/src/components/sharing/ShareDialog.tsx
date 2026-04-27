@@ -1,7 +1,10 @@
+import { useRef } from "react";
 import { useState } from "react";
 import { Share2, Link2, Copy, Check, X, Loader2, Users } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { useEscapeKey } from "@/hooks/use-escape-key";
 
 interface ShareDialogProps {
   itemId?: string;
@@ -31,6 +34,9 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   const [copyError, setCopyError] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const qc = useQueryClient();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
+  useEscapeKey(true, onClose);
 
   const createShare = useMutation<ShareResponse, Error, SharePayload>({
     mutationFn: (data: SharePayload) => api.post<ShareResponse>("/api/v1/shares", data),
@@ -84,15 +90,19 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={onClose}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-dialog-title"
         className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-6 max-w-md w-full animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Share2 className="w-5 h-5 text-sky-600" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Share</h2>
+            <h2 id="share-dialog-title" className="text-lg font-bold text-gray-900 dark:text-gray-100">Share</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
+          <button onClick={onClose} aria-label="Close share dialog" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
@@ -147,6 +157,7 @@ export function ShareDialog({ itemId, collectionId, onClose }: ShareDialogProps)
               />
               <button
                 onClick={copyLink}
+                aria-label={copied ? "Link copied" : "Copy link"}
                 className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition-all"
               >
                 {copied ? (

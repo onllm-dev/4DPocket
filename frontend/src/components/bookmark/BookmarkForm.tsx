@@ -125,7 +125,7 @@ export function BookmarkForm({ onClose, onCreated }: BookmarkFormProps) {
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Add to Pocket</h2>
         {onClose && (
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
             <X className="w-5 h-5 text-gray-400" />
           </button>
         )}
@@ -186,6 +186,7 @@ export function BookmarkForm({ onClose, onCreated }: BookmarkFormProps) {
                 <button
                   type="button"
                   onClick={() => removeExtraUrl(index)}
+                  aria-label="Remove URL"
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -308,6 +309,7 @@ export function EditBookmarkForm({ item, onClose, onUpdated }: EditBookmarkFormP
         {onClose && (
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5 text-gray-400" />

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, X } from "lucide-react";
 import type { CreateTokenResponse } from "@/hooks/use-api-tokens";
 import { McpSetupPanel } from "./McpSetupPanel";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 export function ShowTokenOnceDialog({
   token,
@@ -11,6 +12,8 @@ export function ShowTokenOnceDialog({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -29,13 +32,13 @@ export function ShowTokenOnceDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="show-token-dialog-title" ref={dialogRef}>
       <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+          <h3 id="show-token-dialog-title" className="text-base font-bold text-gray-900 dark:text-gray-100">
             Token created — copy it now
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
+          <button onClick={onClose} aria-label="Close dialog" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
             <X className="h-4 w-4 text-gray-500" />
           </button>
         </div>

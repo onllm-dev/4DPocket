@@ -26,7 +26,7 @@ from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.note import Note, NoteRead
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/collections", tags=["collections"])
+router = APIRouter(prefix="/collections", tags=["Collections"])
 
 
 def _check_pat_collection_scope(
@@ -513,7 +513,7 @@ def list_collection_notes(
 
 # --- Item collections convenience endpoint ---
 
-item_collections_router = APIRouter(tags=["collections"])
+item_collections_router = APIRouter(tags=["Collections"])
 
 
 @item_collections_router.get("/items/{item_id}/collections", response_model=list[CollectionRead])

@@ -22,7 +22,7 @@ from fourdpocket.models.note_tag import NoteTag
 from fourdpocket.models.tag import Tag, TagRead
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/notes", tags=["notes"])
+router = APIRouter(prefix="/notes", tags=["Notes"])
 
 
 @router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -370,7 +370,7 @@ def generate_note_title(
 
 
 # Item-attached notes endpoints
-item_notes_router = APIRouter(tags=["notes"])
+item_notes_router = APIRouter(tags=["Notes"])
 
 
 @item_notes_router.post(

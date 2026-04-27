@@ -1,6 +1,10 @@
 """Models package - import all models for Alembic discovery."""
 
 from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
+from fourdpocket.models.email_verification import EmailVerificationToken
+from fourdpocket.models.password_reset import PasswordResetToken
+from fourdpocket.models.pat_event import PatEvent
+from fourdpocket.models.quota import UserQuota
 from fourdpocket.models.base import (
     ApiTokenRole,
     ItemType,
@@ -35,6 +39,10 @@ from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
 
 __all__ = [
+    "EmailVerificationToken",
+    "PasswordResetToken",
+    "PatEvent",
+    "UserQuota",
     "ApiToken",
     "ApiTokenCollection",
     "ApiTokenRole",

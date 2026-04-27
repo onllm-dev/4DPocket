@@ -23,7 +23,7 @@ from fourdpocket.sharing.share_manager import (
     validate_public_token,
 )
 
-router = APIRouter(prefix="/shares", tags=["sharing"])
+router = APIRouter(prefix="/shares", tags=["Sharing"])
 
 
 # --- Schemas ---
@@ -360,7 +360,7 @@ def share_history(
 
 # Public link access - no authentication required
 
-public_router = APIRouter(prefix="/public", tags=["sharing"])
+public_router = APIRouter(prefix="/public", tags=["Sharing"])
 
 
 @public_router.get("/{token}", response_model=PublicItemResponse)

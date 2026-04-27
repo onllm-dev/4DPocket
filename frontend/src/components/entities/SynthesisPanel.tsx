@@ -84,6 +84,7 @@ export function SynthesisPanel({
             disabled={regenerating}
             className="p-1 rounded hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors cursor-pointer"
             title="Regenerate synthesis"
+            aria-label="Regenerate synthesis"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-sky-600 dark:text-sky-400 ${regenerating ? "animate-spin" : ""}`} />
           </button>

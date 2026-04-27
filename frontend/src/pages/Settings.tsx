@@ -351,6 +351,7 @@ export default function Settings() {
               <button
                 role="switch"
                 aria-checked={settings?.auto_tag ?? false}
+                aria-label="Auto-tag"
                 onClick={() =>
                   updateSettings.mutate({ auto_tag: !(settings?.auto_tag) })
                 }
@@ -380,6 +381,7 @@ export default function Settings() {
               <button
                 role="switch"
                 aria-checked={settings?.auto_summarize ?? false}
+                aria-label="Auto-summarize"
                 onClick={() =>
                   updateSettings.mutate({
                     auto_summarize: !(settings?.auto_summarize),
@@ -447,6 +449,7 @@ export default function Settings() {
             <button
               role="switch"
               aria-checked={settings?.media_download ?? false}
+              aria-label="Download media"
               onClick={() =>
                 updateSettings.mutate({
                   media_download: !(settings?.media_download),

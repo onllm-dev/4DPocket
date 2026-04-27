@@ -9,7 +9,7 @@ from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.user import User
 from fourdpocket.sharing.feed_manager import get_feed_items, subscribe, unsubscribe
 
-router = APIRouter(prefix="/feeds", tags=["feeds"])
+router = APIRouter(prefix="/feeds", tags=["Feeds & RSS"])
 
 
 @router.post("/subscribe/{user_id}", status_code=status.HTTP_201_CREATED)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Session, col, select
 
@@ -18,9 +18,10 @@ from fourdpocket.api.rate_limit import check_rate_limit, record_attempt
 from fourdpocket.models.api_token import ApiToken, ApiTokenCollection
 from fourdpocket.models.base import ApiTokenRole, UserRole
 from fourdpocket.models.collection import Collection
+from fourdpocket.models.pat_event import PatEvent
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/auth/tokens", tags=["auth"])
+router = APIRouter(prefix="/auth/tokens", tags=["API Tokens"])
 
 
 # ─── Schemas ──────────────────────────────────────────────────
@@ -68,6 +69,20 @@ class TokenRead(BaseModel):
 
 class TokenCreateResponse(TokenRead):
     token: str = Field(description="Plaintext token — shown ONCE. Store securely.")
+
+
+class PatEventRead(BaseModel):
+    id: uuid.UUID
+    pat_id: uuid.UUID
+    user_id: uuid.UUID
+    action: str
+    resource: str | None
+    ip: str | None
+    user_agent: str | None
+    status_code: int | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ─── Helpers ──────────────────────────────────────────────────
@@ -164,6 +179,16 @@ def create_token(
             db.add(ApiTokenCollection(token_id=token.id, collection_id=cid))
         db.commit()
 
+    # Audit: record token mint event
+    db.add(PatEvent(
+        pat_id=token.id,
+        user_id=current_user.id,
+        action="mint",
+        resource=token.name,
+        status_code=201,
+    ))
+    db.commit()
+
     read = _to_read(db, token)
     return TokenCreateResponse(**read.model_dump(), token=generated.plaintext)
 
@@ -199,7 +224,41 @@ def revoke_token(
         token.revoked_at = datetime.now(timezone.utc)
         db.add(token)
         db.commit()
+
+    # Audit: record revoke event (idempotent — always record even if already revoked)
+    db.add(PatEvent(
+        pat_id=token.id,
+        user_id=current_user.id,
+        action="revoke",
+        resource=str(token_id),
+        status_code=204,
+    ))
+    db.commit()
+
     return None
+
+
+@router.get("/{token_id}/events", response_model=list[PatEventRead])
+def list_token_events(
+    token_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    """Return the most recent *limit* audit events for a token (owner-scoped)."""
+    token = db.get(ApiToken, token_id)
+    if token is None or token.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token not found or access denied",
+        )
+    events = db.exec(
+        select(PatEvent)
+        .where(PatEvent.pat_id == token_id)
+        .order_by(col(PatEvent.created_at).desc())
+        .limit(limit)
+    ).all()
+    return events
 
 
 @router.post("/revoke-all", status_code=status.HTTP_204_NO_CONTENT)

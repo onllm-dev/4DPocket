@@ -1,0 +1,73 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Python dependencies
+        run: uv sync --all-extras
+
+      - name: Run pip-audit (Python)
+        run: uv run pip-audit --format=json --output=pip-audit-results.json || true
+
+      - name: Display pip-audit results
+        run: |
+          if [ -s pip-audit-results.json ]; then
+            echo "=== pip-audit results ==="
+            cat pip-audit-results.json
+          else
+            echo "No pip-audit output."
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Audit frontend npm dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile && pnpm audit --json > ../npm-audit-frontend.json || true
+
+      - name: Audit extension npm dependencies
+        working-directory: extension
+        run: pnpm install --frozen-lockfile && pnpm audit --json > ../npm-audit-extension.json || true
+
+      - name: Display npm audit results
+        run: |
+          for f in npm-audit-frontend.json npm-audit-extension.json; do
+            if [ -s "$f" ]; then
+              echo "=== $f ==="
+              cat "$f"
+            fi
+          done
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-reports
+          path: |
+            pip-audit-results.json
+            npm-audit-frontend.json
+            npm-audit-extension.json
+          retention-days: 30

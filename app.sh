@@ -1117,6 +1117,18 @@ do_db() {
             fi
             ;;
 
+        backup)
+            info "Creating database backup..."
+            cd "$SCRIPT_DIR"
+            uv run python -m fourdpocket.cli db backup "$@"
+            ;;
+
+        restore)
+            info "Restoring from backup..."
+            cd "$SCRIPT_DIR"
+            uv run python -m fourdpocket.cli db restore "$@"
+            ;;
+
         *)
             echo "Usage: ./app.sh db <command>"
             echo ""
@@ -1125,6 +1137,56 @@ do_db() {
             echo "  reset     Drop and recreate database (DESTRUCTIVE)"
             echo "  migrate   Run Alembic migrations"
             echo "  shell     Open interactive database CLI (psql / sqlite3)"
+            echo "  backup    Snapshot DB + uploads + secret key (SQLite only)"
+            echo "  restore   Restore from a backup archive (requires --force)"
+            ;;
+    esac
+}
+
+# ─── Embedding Management ────────────────────────────────────────
+
+do_embed() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+
+    load_env
+
+    case "$cmd" in
+        reindex)
+            info "Re-indexing embeddings..."
+            cd "$SCRIPT_DIR"
+            uv run python -m fourdpocket.cli embed reindex "$@"
+            ;;
+        *)
+            echo "Usage: ./app.sh embed <command>"
+            echo ""
+            echo "Commands:"
+            echo "  reindex   Clear and re-enqueue embedding for all items"
+            echo "            Options: --user EMAIL  --dry-run"
+            ;;
+    esac
+}
+
+# ─── Auth Management ─────────────────────────────────────────────
+
+do_auth() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+
+    load_env
+
+    case "$cmd" in
+        rotate-key)
+            info "Rotating secret key..."
+            cd "$SCRIPT_DIR"
+            uv run python -m fourdpocket.cli auth rotate-key "$@"
+            ;;
+        *)
+            echo "Usage: ./app.sh auth <command>"
+            echo ""
+            echo "Commands:"
+            echo "  rotate-key   Generate new secret key, move old to .previous"
+            echo "               Options: --grace-days N  (default: 7)"
             ;;
     esac
 }
@@ -1248,6 +1310,14 @@ ${CYAN}DATABASE:${NC}
     ${BOLD}db reset${NC}                              Drop + recreate database (DESTRUCTIVE)
     ${BOLD}db migrate${NC}                            Run Alembic migrations
     ${BOLD}db shell${NC}                              Open psql or sqlite3 CLI
+    ${BOLD}db backup${NC}   [--out PATH]              Snapshot DB + uploads + secret key (SQLite only)
+    ${BOLD}db restore${NC}  --from PATH [--force]     Restore from backup (DESTRUCTIVE)
+
+${CYAN}EMBEDDINGS:${NC}
+    ${BOLD}embed reindex${NC} [--user EMAIL] [--dry-run]  Re-embed all items (or filter by user)
+
+${CYAN}AUTH:${NC}
+    ${BOLD}auth rotate-key${NC} [--grace-days N]      Rotate secret key (old key saved to .previous)
 
 ${CYAN}DOCKER SERVICES:${NC} ${DIM}(individual containers)${NC}
     ${BOLD}services up${NC}   [postgres meili chroma ollama all]
@@ -1336,6 +1406,14 @@ case "${1:-start}" in
     db)
         shift 2>/dev/null || true
         do_db "$@"
+        ;;
+    embed)
+        shift 2>/dev/null || true
+        do_embed "$@"
+        ;;
+    auth)
+        shift 2>/dev/null || true
+        do_auth "$@"
         ;;
     services)
         shift 2>/dev/null || true

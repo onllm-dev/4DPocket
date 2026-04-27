@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Keyboard, X } from "lucide-react";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["Cmd/Ctrl", "K"], label: "Open command palette" },
@@ -11,6 +12,8 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
 
 export function ShortcutsHelpDialog() {
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
 
   useEffect(() => {
     const handleOpen = () => setOpen(true);
@@ -29,10 +32,11 @@ export function ShortcutsHelpDialog() {
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Keyboard shortcuts"
+      aria-labelledby="shortcuts-dialog-title"
       onClick={() => setOpen(false)}
     >
       <div
@@ -42,7 +46,7 @@ export function ShortcutsHelpDialog() {
         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2">
             <Keyboard className="h-4 w-4 text-sky-600" />
-            <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+            <h3 id="shortcuts-dialog-title" className="text-base font-bold text-gray-900 dark:text-gray-100">
               Keyboard shortcuts
             </h3>
           </div>

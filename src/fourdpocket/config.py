@@ -75,6 +75,7 @@ class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_AUTH__")
 
     secret_key: str = Field(default_factory=_get_or_create_secret_key)
+    secret_key_previous: str = ""  # Grace-period key after rotation; see ops/rotate_key.py
     algorithm: str = "HS256"  # Hardcoded in auth_utils — do not change
     token_expire_minutes: int = 10080  # 7 days
     mode: str = "single"  # "single" or "multi"
@@ -152,6 +153,20 @@ class EnrichmentSettings(BaseSettings):
     synthesis_max_context_items: int = 20  # Cap evidence fed to the LLM per regen
 
 
+class EmailSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FDP_EMAIL__")
+
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    from_address: str = ""
+    from_name: str = "4dpocket"
+    # When smtp_host is empty the sender logs to stdout only.
+    # Self-hosters set FDP_EMAIL__SMTP_HOST (and friends) to enable real delivery.
+
+
 class ServerSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FDP_SERVER__")
 
@@ -161,6 +176,7 @@ class ServerSettings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4040"]
     secure_cookies: bool = False  # Set True behind HTTPS in production
     trust_proxy: bool = False  # Set True when behind a reverse proxy (nginx, caddy, etc.)
+    json_logs: bool = False  # Set True to emit structured JSON log lines (e.g. for Loki/Datadog)
 
 
 class Settings(BaseSettings):
@@ -174,6 +190,7 @@ class Settings(BaseSettings):
     rerank: RerankSettings = Field(default_factory=RerankSettings)
     enrichment: EnrichmentSettings = Field(default_factory=EnrichmentSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
 
     @model_validator(mode="after")
     def validate_search_db_compat(self) -> "Settings":

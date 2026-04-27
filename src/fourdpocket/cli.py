@@ -759,8 +759,89 @@ def cmd_db(args):
             _info("Opening SQLite shell...")
             os.execvp("sqlite3", ["sqlite3", db_path])
 
+    elif args.db_command == "backup":
+        from fourdpocket.config import get_settings
+        from fourdpocket.ops.backup import run_backup
+
+        settings = get_settings()
+        out = Path(args.out) if args.out else (
+            Path("./data/backups") /
+            f"4dpocket-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.tar.gz"
+        )
+        _info(f"Backing up to: {out}")
+        db_url_resolved = os.environ.get("FDP_DATABASE__URL", db_url)
+        vec = settings.search.vector_backend
+        if vec == "auto":
+            vec = "pgvector" if db_url_resolved.startswith("postgresql") else "chroma"
+        run_backup(
+            db_url=db_url_resolved,
+            storage_base=settings.storage.base_path,
+            out_path=out,
+            vector_backend=vec,
+        )
+
+    elif args.db_command == "restore":
+        from fourdpocket.config import get_settings
+        from fourdpocket.ops.restore import run_restore
+
+        settings = get_settings()
+        if not args.from_path:
+            _error("--from PATH is required for restore.")
+            sys.exit(1)
+        backup_dir = Path("./data/backups")
+        _info(f"Restoring from: {args.from_path}")
+        run_restore(
+            archive_path=Path(args.from_path),
+            db_url=os.environ.get("FDP_DATABASE__URL", db_url),
+            storage_base=settings.storage.base_path,
+            backup_dir=backup_dir,
+            force=args.force,
+        )
+
     else:
-        print("Usage: 4dpocket db <init|reset|migrate|shell>")
+        print("Usage: 4dpocket db <init|reset|migrate|shell|backup|restore>")
+
+
+def cmd_embed(args):
+    """Embedding management."""
+    _load_env()
+
+    if args.embed_command == "reindex":
+        from fourdpocket.config import get_settings
+        from fourdpocket.db.session import get_engine
+        from fourdpocket.ops.reembed import run_reembed
+
+        settings = get_settings()
+        db_url = os.environ.get("FDP_DATABASE__URL", "sqlite:///./data/4dpocket.db")
+        vec = settings.search.vector_backend
+        if vec == "auto":
+            vec = "pgvector" if db_url.startswith("postgresql") else "chroma"
+
+        _info("Re-indexing embeddings...")
+        run_reembed(
+            engine=get_engine(),
+            user_email=getattr(args, "user", None),
+            dry_run=args.dry_run,
+            vector_backend=vec,
+        )
+        if not args.dry_run:
+            _success("Re-embedding tasks enqueued.")
+    else:
+        print("Usage: 4dpocket embed <reindex>")
+
+
+def cmd_auth(args):
+    """Auth management."""
+    _load_env()
+
+    if args.auth_command == "rotate-key":
+        from fourdpocket.ops.rotate_key import _resolve_key_dir, run_rotate_key
+
+        key_dir = _resolve_key_dir()
+        _info(f"Rotating secret key in: {key_dir}")
+        run_rotate_key(key_dir=key_dir, grace_days=args.grace_days)
+    else:
+        print("Usage: 4dpocket auth <rotate-key>")
 
 
 def cmd_services(args):
@@ -893,6 +974,14 @@ HELP_TEXT = f"""\
     {_C.BOLD}db reset{_C.NC}                             Drop + recreate database (DESTRUCTIVE)
     {_C.BOLD}db migrate{_C.NC}                           Run Alembic migrations
     {_C.BOLD}db shell{_C.NC}                             Open psql or sqlite3 CLI
+    {_C.BOLD}db backup{_C.NC}   [--out PATH]             Snapshot DB + uploads + secret key (SQLite only)
+    {_C.BOLD}db restore{_C.NC}  --from PATH [--force]   Restore from backup (DESTRUCTIVE, requires --force)
+
+{_C.CYAN}EMBEDDINGS:{_C.NC}
+    {_C.BOLD}embed reindex{_C.NC} [--user EMAIL] [--dry-run]  Re-embed all items (or one user's)
+
+{_C.CYAN}AUTH:{_C.NC}
+    {_C.BOLD}auth rotate-key{_C.NC} [--grace-days N]    Generate new secret key (moves old to .previous)
 
 {_C.CYAN}DOCKER SERVICES:{_C.NC}
     {_C.BOLD}services up{_C.NC}   [postgres meili chroma ollama all]
@@ -967,10 +1056,33 @@ def main():
 
     # db
     p_db = sub.add_parser("db", help="Database management")
-    p_db.add_argument("db_command", choices=["init", "reset", "migrate", "shell"],
+    p_db.add_argument("db_command",
+                      choices=["init", "reset", "migrate", "shell", "backup", "restore"],
                       help="Database operation")
     p_db.add_argument("-y", "--yes", action="store_true",
                       help="Skip confirmation prompts")
+    p_db.add_argument("--out", default=None,
+                      help="[backup] Output archive path (default: ./data/backups/4dpocket-<ts>.tar.gz)")
+    p_db.add_argument("--from", dest="from_path", default=None,
+                      help="[restore] Archive to restore from (required)")
+    p_db.add_argument("--force", action="store_true",
+                      help="[restore] Required flag to confirm destructive restore")
+
+    # embed
+    p_embed = sub.add_parser("embed", help="Embedding management")
+    p_embed.add_argument("embed_command", choices=["reindex"],
+                         help="Embedding operation")
+    p_embed.add_argument("--user", default=None,
+                         help="[reindex] Scope to this user's email only")
+    p_embed.add_argument("--dry-run", action="store_true",
+                         help="[reindex] Print plan without making changes")
+
+    # auth
+    p_auth = sub.add_parser("auth", help="Auth management")
+    p_auth.add_argument("auth_command", choices=["rotate-key"],
+                        help="Auth operation")
+    p_auth.add_argument("--grace-days", type=int, default=7,
+                        help="[rotate-key] Days to mention in grace-period reminder (default: 7)")
 
     # services
     p_svc = sub.add_parser("services", help="Docker service management")
@@ -1008,6 +1120,10 @@ def main():
         cmd_logs(args)
     elif args.command == "db":
         cmd_db(args)
+    elif args.command == "embed":
+        cmd_embed(args)
+    elif args.command == "auth":
+        cmd_auth(args)
     elif args.command == "services":
         cmd_services(args)
     elif args.command == "clean":

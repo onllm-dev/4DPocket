@@ -15,7 +15,7 @@ from fourdpocket.api.deps import (
 from fourdpocket.models.saved_filter import SavedFilter
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/filters", tags=["filters"])
+router = APIRouter(prefix="/filters", tags=["Saved Filters"])
 
 
 class FilterCreate(BaseModel):

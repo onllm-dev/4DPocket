@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Main bundle (gzip)",
+    "path": "dist/assets/index-*.js",
+    "limit": "78 KB"
+  },
+  {
+    "name": "Main CSS (gzip)",
+    "path": "dist/assets/index-*.css",
+    "limit": "16 KB"
+  }
+]

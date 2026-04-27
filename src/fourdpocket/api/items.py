@@ -32,11 +32,12 @@ from fourdpocket.models.item import (
 )
 from fourdpocket.models.tag import ItemTag, Tag
 from fourdpocket.models.user import User
+from fourdpocket.quotas.enforcement import check_quota
 from fourdpocket.utils.ssrf import is_safe_url
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/items", tags=["items"])
+router = APIRouter(prefix="/items", tags=["Items"])
 
 
 def _is_safe_proxy_url(url: str) -> bool:
@@ -147,6 +148,8 @@ def create_item(
                 status.HTTP_409_CONFLICT,
                 detail="You already saved this URL",
             )
+
+    check_quota(db, current_user.id, "items")
 
     item = KnowledgeItem(
         user_id=current_user.id,

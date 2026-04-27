@@ -12,7 +12,7 @@ from fourdpocket.api.deps import get_current_user, get_db, require_pat_editor
 from fourdpocket.models.rule import Rule
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/rules", tags=["rules"])
+router = APIRouter(prefix="/rules", tags=["Rules"])
 
 
 class RuleCondition(BaseModel):

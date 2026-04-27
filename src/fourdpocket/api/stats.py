@@ -13,7 +13,7 @@ from fourdpocket.models.note import Note
 from fourdpocket.models.tag import Tag
 from fourdpocket.models.user import User
 
-router = APIRouter(tags=["stats"])
+router = APIRouter(tags=["Stats"])
 
 
 @router.get("/stats")

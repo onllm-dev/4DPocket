@@ -23,6 +23,7 @@ from fourdpocket.db.session import get_engine
 from fourdpocket.mcp import tools as tools_mod
 from fourdpocket.mcp.auth import PATTokenVerifier
 from fourdpocket.models.api_token import ApiToken
+from fourdpocket.models.pat_event import PatEvent
 from fourdpocket.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,36 @@ def _tool_ctx(db=None):
         yield user, pat, session
 
 
+def _call_tool(tool_fn, db: Session, user: User, pat: ApiToken, **kwargs) -> Any:
+    """Invoke *tool_fn* via tools_mod.call and record a PatEvent afterward.
+
+    Always records the event (success or failure) then re-raises on error.
+    """
+    tool_name = getattr(tool_fn, "__name__", str(tool_fn))
+    status_code = 200
+    try:
+        result = tools_mod.call(tool_fn, db, user, pat, **kwargs)
+        return result
+    except tools_mod.ToolError:
+        status_code = 400
+        raise
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        try:
+            db.add(PatEvent(
+                pat_id=pat.id,
+                user_id=user.id,
+                action="mcp_tool_call",
+                resource=tool_name,
+                status_code=status_code,
+            ))
+            db.commit()
+        except Exception as audit_err:
+            logger.warning("Failed to record MCP tool audit event: %s", audit_err)
+
+
 # ─── Tool registration ────────────────────────────────────────────────────
 
 
@@ -110,7 +141,7 @@ def search_knowledge(
     (after/before, ISO-8601), collection_id.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.search_knowledge,
             db,
             user,
@@ -142,7 +173,7 @@ def search_in_collection(
     same result shape plus a resolved ``collection`` pointer for the caller.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.search_in_collection,
             db,
             user,
@@ -162,7 +193,7 @@ def get_knowledge(knowledge_id: str) -> dict[str, Any]:
     """Fetch full detail for a single knowledge item (title, content, tags,
     entities, collections, chunks)."""
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.get_knowledge,
             db,
             user,
@@ -187,7 +218,7 @@ def save_knowledge(
     Requires an editor-role PAT.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.save_knowledge,
             db,
             user,
@@ -216,7 +247,7 @@ def update_knowledge(
     Requires an editor-role PAT.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.update_knowledge,
             db,
             user,
@@ -242,7 +273,7 @@ def refresh_knowledge(
     Requires an editor-role PAT.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.refresh_knowledge,
             db,
             user,
@@ -260,7 +291,7 @@ def delete_knowledge(knowledge_id: str) -> dict[str, Any]:
     Requires an editor-role PAT with ``allow_deletion=true``.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.delete_knowledge,
             db,
             user,
@@ -273,7 +304,7 @@ def delete_knowledge(knowledge_id: str) -> dict[str, Any]:
 def list_collections() -> dict[str, Any]:
     """List collections the current PAT has access to."""
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(tools_mod.list_collections, db, user, pat)
+        return _call_tool(tools_mod.list_collections, db, user, pat)
 
 
 @mcp.tool()
@@ -284,7 +315,7 @@ def add_to_collection(
 
     Requires an editor-role PAT."""
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.add_to_collection,
             db,
             user,
@@ -301,7 +332,7 @@ def get_entity(id_or_name: str) -> dict[str, Any]:
     Accepts either the entity UUID or its canonical name / alias.
     """
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.get_entity,
             db,
             user,
@@ -317,7 +348,7 @@ def get_related_entities(
     """Return entities connected to the given one via the concept graph,
     ranked by relation weight (repeated co-occurrence)."""
     with _tool_ctx() as (user, pat, db):
-        return tools_mod.call(
+        return _call_tool(
             tools_mod.get_related_entities,
             db,
             user,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -8,6 +8,7 @@ import {
   type CreateTokenResponse,
   type CreateTokenRequest,
 } from "@/hooks/use-api-tokens";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const EXPIRY_OPTIONS: { label: string; value: number | null }[] = [
   { label: "Never", value: null },
@@ -46,6 +47,9 @@ export function CreateTokenDialog({
   const [adminScope, setAdminScope] = useState(false);
   const [expiryDays, setExpiryDays] = useState<number | null>(null);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
+
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", esc);
@@ -78,13 +82,13 @@ export function CreateTokenDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="create-token-dialog-title" ref={dialogRef}>
       <div className="w-full max-w-lg rounded-xl bg-white dark:bg-gray-900 shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+          <h3 id="create-token-dialog-title" className="text-base font-bold text-gray-900 dark:text-gray-100">
             Generate new token
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
+          <button onClick={onClose} aria-label="Close dialog" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
             <X className="h-4 w-4 text-gray-500" />
           </button>
         </div>

@@ -1061,7 +1061,7 @@ export default function ItemDetail() {
       )}
 
       {editOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Edit item">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setEditOpen(false)}
@@ -1117,6 +1117,7 @@ function ItemLinksSection({ itemId }: { itemId: string }) {
         </h2>
         <button
           onClick={() => setShowAdd(!showAdd)}
+          aria-label={showAdd ? "Cancel adding link" : "Add related link"}
           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-sky-500 transition-colors"
         >
           <Plus className="w-4 h-4" />

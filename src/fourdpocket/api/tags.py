@@ -12,7 +12,7 @@ from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.tag import ItemTag, Tag, TagCreate, TagRead, TagUpdate
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/tags", tags=["tags"])
+router = APIRouter(prefix="/tags", tags=["Tags"])
 
 
 def _slugify(name: str) -> str:

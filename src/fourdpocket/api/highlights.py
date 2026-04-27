@@ -15,7 +15,7 @@ from fourdpocket.models.note import Note
 from fourdpocket.models.user import User
 from fourdpocket.sharing.permissions import can_view_item
 
-router = APIRouter(prefix="/highlights", tags=["highlights"])
+router = APIRouter(prefix="/highlights", tags=["Highlights"])
 
 
 _ALLOWED_POSITION_KEYS = {"start", "end", "paragraph", "sentence"}

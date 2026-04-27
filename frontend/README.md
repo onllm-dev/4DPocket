@@ -2,6 +2,23 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Bundle Size Budget
+
+The main bundle is tracked with [size-limit](https://github.com/ai/size-limit). Limits are defined in `.size-limit.json`.
+
+| Bundle | Limit (gzip) | Actual (brotli) |
+|--------|-------------|-----------------|
+| `dist/assets/index-*.js` | 78 KB | ~58 KB |
+| `dist/assets/index-*.css` | 16 KB | ~11 KB |
+
+```bash
+pnpm build      # rebuild first
+pnpm size       # check against limits
+pnpm size:why   # detailed breakdown
+```
+
+If a change pushes the bundle over budget, either optimize the code or raise the limit in `.size-limit.json` with a justification comment.
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)

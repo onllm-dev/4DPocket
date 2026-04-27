@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Home, BookOpen, FolderOpen, Tags, FileText, Settings, Plus } from "lucide-react";
 import { api } from "@/api/client";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/", icon: Home },
@@ -25,7 +26,9 @@ export function CommandPalette() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  useFocusTrap(dialogRef, open);
 
   // Open/close with Cmd+K
   useEffect(() => {
@@ -113,12 +116,14 @@ export function CommandPalette() {
     >
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         role="dialog"
-        aria-label="Command palette"
+        aria-labelledby="command-palette-title"
         aria-modal="true"
         className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        <span id="command-palette-title" className="sr-only">Command palette</span>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
           <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />

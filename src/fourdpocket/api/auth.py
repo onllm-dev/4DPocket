@@ -1,6 +1,7 @@
 """Authentication endpoints."""
 
 import re
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -17,17 +18,66 @@ from fourdpocket.api.deps import (
     require_jwt_session,
 )
 from fourdpocket.api.rate_limit import check_rate_limit, record_attempt, reset_rate_limit
+from fourdpocket.auth.email import send_email
+from fourdpocket.auth.tokens import generate_token, hash_token, is_expired
 from fourdpocket.models.api_token import ApiToken
 from fourdpocket.models.base import UserRole
+from fourdpocket.models.email_verification import EmailVerificationToken
+from fourdpocket.models.password_reset import PasswordResetToken
 from fourdpocket.models.user import User, UserCreate, UserRead, UserUpdate
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # Constant-time padding: always run a password verification even when the user
 # does not exist, preventing timing side-channels that reveal registered emails.
 _DUMMY_HASH: str = hash_password("dummy-constant-time-padding-xT9qZ")
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATIONS = [5, 10, 20, 40, 80]  # Minutes for consecutive failures
+
+_RESET_TOKEN_TTL_MINUTES = 15
+_VERIFY_TOKEN_TTL_HOURS = 24
+
+
+def _send_password_reset_email(user: User, raw_token: str) -> None:
+    from fourdpocket.config import get_settings
+    public_url = get_settings().server.public_url.rstrip("/")
+    link = f"{public_url}/reset-password?token={raw_token}"
+    send_email(
+        to=user.email,
+        subject="Reset your 4dpocket password",
+        body_text=f"Click the link below to reset your password (expires in {_RESET_TOKEN_TTL_MINUTES} minutes):\n\n{link}\n\nIf you did not request a reset, ignore this email.",
+    )
+
+
+def _send_verification_email(user: User, raw_token: str) -> None:
+    from fourdpocket.config import get_settings
+    public_url = get_settings().server.public_url.rstrip("/")
+    link = f"{public_url}/api/v1/auth/email/verify?token={raw_token}"
+    send_email(
+        to=user.email,
+        subject="Verify your 4dpocket email address",
+        body_text=f"Click the link below to verify your email address:\n\n{link}\n\nThis link expires in {_VERIFY_TOKEN_TTL_HOURS} hours.",
+    )
+
+
+def _create_verification_token(db: Session, user_id) -> str:
+    """Invalidate old tokens, create a new one, persist hash. Returns raw token."""
+    # Delete any prior unused tokens for this user
+    db.exec(
+        sql_delete(EmailVerificationToken).where(
+            EmailVerificationToken.user_id == user_id,
+            EmailVerificationToken.used_at == None,  # noqa: E711
+        )
+    )
+    raw, token_hash = generate_token()
+    token = EmailVerificationToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=_VERIFY_TOKEN_TTL_HOURS),
+    )
+    db.add(token)
+    db.flush()
+    return raw
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -94,6 +144,15 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Send verification email (best-effort — never block registration on failure)
+    try:
+        raw = _create_verification_token(db, user.id)
+        db.commit()
+        _send_verification_email(user, raw)
+    except Exception:
+        pass
+
     return user
 
 
@@ -282,7 +341,6 @@ def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
-    from datetime import datetime, timezone
     current_user.password_hash = hash_password(data.new_password)
     current_user.password_changed_at = datetime.now(timezone.utc)
     db.add(current_user)
@@ -290,3 +348,148 @@ def change_password(
     # password change (session invalidation on credential rotation).
     db.exec(sql_delete(ApiToken).where(ApiToken.user_id == current_user.id))
     db.commit()
+
+
+# ── Password reset ────────────────────────────────────────────────────────────
+
+class PasswordResetRequest(BaseModel):
+    email_or_username: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
+
+
+@router.post("/password-reset/request")
+def request_password_reset(
+    data: PasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Request a password reset link. Always returns 200 to avoid leaking whether an account exists."""
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(db, key=client_ip, action="password_reset", max_attempts=3, window_seconds=3600, lockout_minutes=60)
+    record_attempt(db, key=client_ip, action="password_reset")
+    db.commit()
+
+    identifier = data.email_or_username
+    user = db.exec(
+        select(User).where((User.email == identifier) | (User.username == identifier))
+    ).first()
+
+    if user:
+        raw, token_hash = generate_token()
+        token = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=_RESET_TOKEN_TTL_MINUTES),
+        )
+        db.add(token)
+        db.commit()
+        _send_password_reset_email(user, raw)
+
+    return {"sent": True}
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
+def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    """Consume a password-reset token and update the user's password."""
+    token_hash = hash_token(data.token)
+    record = db.exec(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unknown reset token")
+    if record.used_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token has already been used")
+    if is_expired(record):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token has expired")
+
+    user = db.get(User, record.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
+
+    # Update password and bump password_changed_at so existing JWTs are invalidated
+    user.password_hash = hash_password(data.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+    record.used_at = datetime.now(timezone.utc)
+    db.add(user)
+    db.add(record)
+    # Invalidate PATs as well (credential rotation)
+    db.exec(sql_delete(ApiToken).where(ApiToken.user_id == user.id))
+    db.commit()
+    return None
+
+
+# ── Email verification ────────────────────────────────────────────────────────
+
+@router.post("/email/resend", status_code=status.HTTP_204_NO_CONTENT)
+def resend_verification_email(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a new verification token and (re-)send the verification email."""
+    # Rate-limit per user (not per IP) to prevent spam via account takeover
+    check_rate_limit(db, key=str(current_user.id), action="email_resend", max_attempts=2, window_seconds=60, lockout_minutes=5)
+    record_attempt(db, key=str(current_user.id), action="email_resend")
+
+    if current_user.email_verified:
+        return None  # Already verified — silently succeed
+
+    raw = _create_verification_token(db, current_user.id)
+    db.commit()
+    _send_verification_email(current_user, raw)
+    return None
+
+
+@router.get("/email/verify")
+def verify_email(token: str, request: Request, db: Session = Depends(get_db)):
+    """Verify an email address using the token from the verification email."""
+    token_hash = hash_token(token)
+    record = db.exec(
+        select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash)
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unknown verification token")
+    if record.used_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification token has already been used")
+    if is_expired(record):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification token has expired")
+
+    user = db.get(User, record.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
+
+    user.email_verified = True
+    user.email_verified_at = datetime.now(timezone.utc)
+    record.used_at = datetime.now(timezone.utc)
+    db.add(user)
+    db.add(record)
+    db.commit()
+
+    # Respond with JSON or redirect based on Accept header
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        from fourdpocket.config import get_settings
+        public_url = get_settings().server.public_url.rstrip("/")
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"{public_url}/verified", status_code=302)
+
+    return {"verified": True}

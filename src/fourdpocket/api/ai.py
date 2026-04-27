@@ -16,7 +16,7 @@ from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.tag import ItemTag
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["AI"])
 
 
 @router.get("/status")

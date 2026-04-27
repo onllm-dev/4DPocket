@@ -13,7 +13,7 @@ from fourdpocket.models.base import ItemType, SourcePlatform
 from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.user import User
 
-router = APIRouter(tags=["import-export"])
+router = APIRouter(tags=["Import & Export"])
 
 
 MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB

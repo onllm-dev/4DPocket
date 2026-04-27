@@ -9,9 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from fourdpocket import __version__
-from fourdpocket.api.middleware import RateLimitMiddleware, RequestIDMiddleware
+from fourdpocket.api.middleware import RateLimitMiddleware
 from fourdpocket.config import get_settings
 from fourdpocket.db.session import get_engine, init_db
+from fourdpocket.logging_config import configure_logging
+from fourdpocket.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
+
+# Configure logging before the app is created so all startup messages use the
+# chosen formatter.
+configure_logging(get_settings().server.json_logs)
 
 logger = logging.getLogger(__name__)
 
@@ -108,26 +114,25 @@ app.add_middleware(
 )
 
 app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60, trust_proxy=settings.server.trust_proxy)
-app.add_middleware(RequestIDMiddleware)
 
-@app.middleware("http")
-async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
-    return response
+# Middleware is applied in LIFO order in Starlette/FastAPI.
+# Add order: SecurityHeaders first so it wraps everything, then RequestID.
+# Effective execution order: SecurityHeaders → RequestID → RateLimit → CORS → handler.
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(SecurityHeadersMiddleware, secure=settings.server.secure_cookies)
 
 
 @app.get("/api/v1/health")
 def health_check():
+    """Simple liveness ping — always returns 200."""
     return {"status": "ok"}
 
 
 # Import and include API router after app creation to avoid circular imports
+from fourdpocket.api.health import router as health_router  # noqa: E402
 from fourdpocket.api.router import api_router  # noqa: E402
 
+app.include_router(health_router, prefix="/api/v1")
 app.include_router(api_router)
 
 # Mount the MCP server at /mcp. Import-time attachment is safe because the

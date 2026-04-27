@@ -269,6 +269,7 @@ function FeedCard({ feed, onReview }: { feed: FeedType; onReview: (feedId: strin
               onClick={() => onReview(feed.id)}
               className="p-2 rounded-lg text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors cursor-pointer"
               title="Review pending entries"
+              aria-label="Review pending entries"
             >
               <ListFilter className="w-4 h-4" />
             </button>
@@ -278,6 +279,7 @@ function FeedCard({ feed, onReview }: { feed: FeedType; onReview: (feedId: strin
             disabled={deleteFeed.isPending}
             className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer disabled:opacity-50"
             title="Delete feed"
+            aria-label="Delete feed"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -517,6 +519,7 @@ function ApprovalQueue({ feedId, onBack }: { feedId: string; onBack: () => void 
                     disabled={approveMut.isPending}
                     className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer disabled:opacity-50"
                     title="Approve"
+                    aria-label="Approve feed entry"
                   >
                     <Check className="w-4 h-4" />
                   </button>
@@ -525,6 +528,7 @@ function ApprovalQueue({ feedId, onBack }: { feedId: string; onBack: () => void 
                     disabled={rejectMut.isPending}
                     className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer disabled:opacity-50"
                     title="Reject"
+                    aria-label="Reject feed entry"
                   >
                     <X className="w-4 h-4" />
                   </button>

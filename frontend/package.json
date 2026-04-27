@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.1",
@@ -48,6 +50,8 @@
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.0",
-    "vite": "^8.0.5"
+    "vite": "^8.0.5",
+    "@size-limit/preset-app": "*",
+    "size-limit": "*"
   }
 }

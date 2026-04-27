@@ -13,7 +13,7 @@ from fourdpocket.models.note import Note, NoteRead
 from fourdpocket.models.user import User
 from fourdpocket.search.filters import parse_filters
 
-router = APIRouter(prefix="/search", tags=["search"])
+router = APIRouter(prefix="/search", tags=["Search"])
 
 logger = logging.getLogger(__name__)
 

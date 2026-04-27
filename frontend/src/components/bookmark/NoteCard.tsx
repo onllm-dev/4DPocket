@@ -66,6 +66,7 @@ export default function NoteCard({ note, variant = "grid" }: NoteCardProps) {
           </div>
           <button
             onClick={toggleFavorite}
+            aria-label={note.is_favorite ? "Unfavorite" : "Favorite"}
             className="shrink-0 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Star

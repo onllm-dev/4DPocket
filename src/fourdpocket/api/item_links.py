@@ -12,7 +12,7 @@ from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.item_link import ItemLink, ItemLinkCreate, ItemLinkRead
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/items", tags=["item-links"])
+router = APIRouter(prefix="/items", tags=["Item Links"])
 
 
 @router.get("/{item_id}/links", response_model=list[ItemLinkRead])

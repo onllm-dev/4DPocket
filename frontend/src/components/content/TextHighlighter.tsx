@@ -249,10 +249,12 @@ export default function TextHighlighter({ itemId, noteId, highlights = [], child
                 saving ? "opacity-50" : ""
               }`}
               title={c.name}
+              aria-label={`Highlight ${c.name}`}
             />
           ))}
           <button
             onClick={handleDismiss}
+            aria-label="Dismiss highlight picker"
             className="ml-1 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <X className="w-3.5 h-3.5" />

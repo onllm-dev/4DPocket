@@ -288,6 +288,7 @@ export default function Admin() {
                         : "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                     }`}
                     title={user.is_active ? "Deactivate" : "Activate"}
+                    aria-label={user.is_active ? "Deactivate user" : "Activate user"}
                   >
                     {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
                   </button>
@@ -455,7 +456,7 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
                 placeholder="gsk_..."
                 className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
               />
-              <button onClick={() => toggleKey("groq")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+              <button onClick={() => toggleKey("groq")} aria-label={showKeys.groq ? "Hide API key" : "Show API key"} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
                 {showKeys.groq ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -474,7 +475,7 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
                 placeholder="nvapi-..."
                 className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
               />
-              <button onClick={() => toggleKey("nvidia")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+              <button onClick={() => toggleKey("nvidia")} aria-label={showKeys.nvidia ? "Hide API key" : "Show API key"} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
                 {showKeys.nvidia ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -516,7 +517,7 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
                   placeholder="sk-..."
                   className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-10"
                 />
-                <button onClick={() => toggleKey("custom")} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
+                <button onClick={() => toggleKey("custom")} aria-label={showKeys.custom ? "Hide API key" : "Show API key"} className="absolute right-2 top-1.5 text-gray-400 cursor-pointer">
                   {showKeys.custom ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -546,6 +547,9 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Automatically tag items with AI</p>
           </div>
           <button
+            role="switch"
+            aria-checked={effective.auto_tag}
+            aria-label="Auto-tag"
             onClick={() => updateLocal({ auto_tag: !effective.auto_tag })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
               effective.auto_tag ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
@@ -564,6 +568,9 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Generate summaries for new items</p>
           </div>
           <button
+            role="switch"
+            aria-checked={effective.auto_summarize}
+            aria-label="Auto-summarize"
             onClick={() => updateLocal({ auto_summarize: !effective.auto_summarize })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
               effective.auto_summarize ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
@@ -582,6 +589,9 @@ function AIConfigSection({ config, onUpdate }: { config?: AIConfig; onUpdate: (d
             <p className="text-xs text-gray-500 dark:text-gray-400">Run AI inline when background worker is not running</p>
           </div>
           <button
+            role="switch"
+            aria-checked={effective.sync_enrichment}
+            aria-label="Sync enrichment"
             onClick={() => updateLocal({ sync_enrichment: !effective.sync_enrichment })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
               effective.sync_enrichment ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"
@@ -695,6 +705,9 @@ function SearchConfigSection({ config, onUpdate }: { config?: SearchConfig; onUp
             </p>
           </div>
           <button
+            role="switch"
+            aria-checked={effective.graph_ranker_enabled}
+            aria-label="Enable graph ranker"
             onClick={() => updateLocal({ graph_ranker_enabled: !effective.graph_ranker_enabled })}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer ${
               effective.graph_ranker_enabled ? "bg-sky-600" : "bg-gray-200 dark:bg-gray-700"

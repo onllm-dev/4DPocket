@@ -16,7 +16,7 @@ from fourdpocket.models.entity_relation import EntityRelation
 from fourdpocket.models.item import ItemRead, KnowledgeItem
 from fourdpocket.models.user import User
 
-router = APIRouter(prefix="/entities", tags=["entities"])
+router = APIRouter(prefix="/entities", tags=["Entities"])
 
 
 def _synthesis_payload(entity: Entity) -> dict | None:

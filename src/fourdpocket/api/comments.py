@@ -14,7 +14,7 @@ from fourdpocket.models.item import KnowledgeItem
 from fourdpocket.models.user import User
 from fourdpocket.sharing.permissions import can_view_item
 
-router = APIRouter(prefix="/items/{item_id}/comments", tags=["comments"])
+router = APIRouter(prefix="/items/{item_id}/comments", tags=["Comments"])
 
 
 # --- Schemas ---

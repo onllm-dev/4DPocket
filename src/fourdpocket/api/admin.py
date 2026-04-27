@@ -19,10 +19,11 @@ from fourdpocket.models.base import UserRole
 from fourdpocket.models.collection import Collection
 from fourdpocket.models.entity import Entity
 from fourdpocket.models.item import KnowledgeItem
+from fourdpocket.models.quota import UserQuota
 from fourdpocket.models.tag import Tag
 from fourdpocket.models.user import User, UserRead
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.get("/stats")
@@ -504,3 +505,120 @@ def update_instance_settings(
     db.commit()
     db.refresh(settings)
     return settings
+
+
+# ─── Quota management (admin-only) ──────────────────────────────────────────
+
+
+class QuotaRead(BaseModel):
+    user_id: uuid.UUID
+    items_max: int | None
+    storage_bytes_max: int | None
+    daily_api_calls_max: int | None
+    daily_api_calls_used: int
+    items_used: int
+    storage_bytes_used: int
+
+    model_config = {"from_attributes": True}
+
+
+class QuotaUpdate(BaseModel):
+    items_max: int | None = None
+    storage_bytes_max: int | None = None
+    daily_api_calls_max: int | None = None
+
+
+@router.get("/quotas", response_model=list[QuotaRead])
+def list_quotas(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    """List all user quota rows (admin only)."""
+    rows = db.exec(select(UserQuota).offset(offset).limit(limit)).all()
+    return rows
+
+
+@router.get("/quotas/{user_id}", response_model=QuotaRead)
+def get_quota(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get quota for a specific user (admin only)."""
+    quota = db.get(UserQuota, user_id)
+    if quota is None:
+        raise HTTPException(status_code=404, detail="Quota not found for user")
+    return quota
+
+
+@router.patch("/quotas/{user_id}", response_model=QuotaRead)
+def update_quota(
+    user_id: uuid.UUID,
+    data: QuotaUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
+):
+    """Create or update quota for a user (admin only).
+
+    Creating a new quota row is idempotent — if no row exists it is created
+    with sensible defaults (all counters at 0).
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from fourdpocket.models.base import utc_now
+
+    quota = db.get(UserQuota, user_id)
+    if quota is None:
+        quota = UserQuota(user_id=user_id, daily_window_start=utc_now())
+        db.add(quota)
+        db.flush()
+
+    update_dict = data.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(quota, key, value)
+    db.add(quota)
+    db.commit()
+    db.refresh(quota)
+    return quota
+
+
+@router.post("/quotas/{user_id}/recompute", response_model=QuotaRead)
+def recompute_quota(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _: None = Depends(require_jwt_session),
+):
+    """Recompute items_used and storage_bytes_used from authoritative tables.
+
+    items_used   = COUNT(*) on knowledge_items WHERE user_id = user_id
+    storage_bytes_used is intentionally left as-is (no reliable byte-size
+    column on knowledge_items in the current schema). Extend when a
+    file_size_bytes column is available.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from fourdpocket.models.base import utc_now
+
+    quota = db.get(UserQuota, user_id)
+    if quota is None:
+        quota = UserQuota(user_id=user_id, daily_window_start=utc_now())
+        db.add(quota)
+        db.flush()
+
+    items_count = db.exec(
+        select(func.count()).select_from(KnowledgeItem).where(KnowledgeItem.user_id == user_id)
+    ).one()
+
+    quota.items_used = items_count
+    db.add(quota)
+    db.commit()
+    db.refresh(quota)
+    return quota
