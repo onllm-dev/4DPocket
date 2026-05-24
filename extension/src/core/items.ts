@@ -8,22 +8,33 @@ export async function saveItem(
   | { status: "saved"; item: ItemRead }
   | { status: "duplicate"; existingId: string; title: string | null }
 > {
-  const res = await apiRequest("/api/v1/items", {
-    method: "POST",
-    body: JSON.stringify({ url, title }),
-  });
+  let step = "apiRequest";
+  try {
+    const res = await apiRequest("/api/v1/items", {
+      method: "POST",
+      body: JSON.stringify({ url, title }),
+    });
 
-  if (res.status === 409) {
-    const data = await res.json();
-    return {
-      status: "duplicate",
-      existingId: data.detail.existing_id,
-      title: data.detail?.title || null,
-    };
+    if (res.status === 409) {
+      step = "res.json-409";
+      const data = await res.json();
+      const detail = typeof data.detail === "object" && data.detail !== null
+        ? data.detail
+        : null;
+      return {
+        status: "duplicate",
+        existingId: detail?.existing_id ?? "",
+        title: detail?.title ?? null,
+      };
+    }
+
+    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+    step = "res.json-200";
+    const item = await res.json();
+    return { status: "saved", item };
+  } catch (err) {
+    throw new Error(`save failed at ${step}: ${(err as Error).message}`);
   }
-
-  if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-  return { status: "saved", item: await res.json() };
 }
 
 export async function checkUrl(url: string): Promise<CheckUrlResponse> {

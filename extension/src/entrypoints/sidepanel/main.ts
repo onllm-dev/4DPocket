@@ -1,15 +1,12 @@
 import { setStorageAdapter, getStoredAuth } from "../../core/api-client";
+import { createStorageAdapter } from "../../core/storage-adapter";
 import { validateToken } from "../../core/auth";
 import { checkUrl } from "../../core/items";
 import { getHighlightsForItem } from "../../core/highlights";
 import type { HighlightRead } from "../../core/types";
 
-// Initialize storage adapter for Chrome
-setStorageAdapter({
-  get: (keys) => chrome.storage.local.get(keys),
-  set: (items) => chrome.storage.local.set(items),
-  remove: (keys) => chrome.storage.local.remove(keys),
-});
+// Initialize storage adapter — prefers browser.storage.local (Firefox)
+setStorageAdapter(createStorageAdapter());
 
 // State elements
 const states = {

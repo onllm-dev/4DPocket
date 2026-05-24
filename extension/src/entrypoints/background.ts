@@ -1,26 +1,25 @@
 import { setStorageAdapter, getStoredAuth } from "../core/api-client";
+import { createStorageAdapter } from "../core/storage-adapter";
+import { setBadgeText, setBadgeBackgroundColor } from "../core/action-adapter";
 import { saveItem, checkUrl } from "../core/items";
 import { createHighlight } from "../core/highlights";
 
 export default defineBackground(() => {
-  // Initialize storage adapter for Chrome (must happen before any core calls)
-  setStorageAdapter({
-    get: (keys) => chrome.storage.local.get(keys),
-    set: (items) => chrome.storage.local.set(items),
-    remove: (keys) => chrome.storage.local.remove(keys),
-  });
+  // Initialize storage adapter — prefers browser.storage.local (Firefox)
+  // over chrome.storage.local (Chrome MV3)
+  setStorageAdapter(createStorageAdapter());
 
   // --- Badge helpers ---
 
   function showBadge(text: string, color: string, tabId?: number) {
-    const opts: chrome.action.BadgeTextDetails = { text };
+    const opts = { text };
     if (tabId !== undefined) opts.tabId = tabId;
-    chrome.action.setBadgeText(opts);
-    chrome.action.setBadgeBackgroundColor({ color, ...(tabId !== undefined ? { tabId } : {}) });
+    setBadgeText(opts);
+    setBadgeBackgroundColor({ color, ...(tabId !== undefined ? { tabId } : {}) });
     setTimeout(() => {
-      const clearOpts: chrome.action.BadgeTextDetails = { text: "" };
+      const clearOpts = { text: "" };
       if (tabId !== undefined) clearOpts.tabId = tabId;
-      chrome.action.setBadgeText(clearOpts);
+      setBadgeText(clearOpts);
     }, 2000);
   }
 
@@ -145,7 +144,7 @@ export default defineBackground(() => {
 
   async function updateBadgeForTab(tabId: number, url: string) {
     if (!url.startsWith("http")) {
-      chrome.action.setBadgeText({ text: "", tabId });
+      setBadgeText({ text: "", tabId });
       transientBadgeTabs.delete(tabId);
       return;
     }
@@ -158,18 +157,18 @@ export default defineBackground(() => {
       // Success path — clear any lingering "?" badge first
       transientBadgeTabs.delete(tabId);
       if (result.exists) {
-        chrome.action.setBadgeText({ text: "\u2713", tabId });
-        chrome.action.setBadgeBackgroundColor({ color: "#16a34a", tabId });
+        setBadgeText({ text: "\u2713", tabId });
+        setBadgeBackgroundColor({ color: "#16a34a", tabId });
       } else {
-        chrome.action.setBadgeText({ text: "", tabId });
+        setBadgeText({ text: "", tabId });
       }
     } catch (err) {
       // Network error / 5xx / auth error — log and show "?" with gray.
       // Mark this tab so the badge is cleared on the next success.
       console.warn("[4dp] badge update failed", err);
       transientBadgeTabs.add(tabId);
-      chrome.action.setBadgeText({ text: "?", tabId });
-      chrome.action.setBadgeBackgroundColor({ color: "#6b7280", tabId });
+      setBadgeText({ text: "?", tabId });
+      setBadgeBackgroundColor({ color: "#6b7280", tabId });
     }
   }
 

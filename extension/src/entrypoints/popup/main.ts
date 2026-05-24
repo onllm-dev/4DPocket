@@ -1,13 +1,10 @@
 import { setStorageAdapter, getStoredAuth } from "../../core/api-client";
+import { createStorageAdapter } from "../../core/storage-adapter";
 import { validateToken } from "../../core/auth";
 import { checkUrl, saveItem } from "../../core/items";
 
-// Initialize storage adapter for Chrome
-setStorageAdapter({
-  get: (keys) => chrome.storage.local.get(keys),
-  set: (items) => chrome.storage.local.set(items),
-  remove: (keys) => chrome.storage.local.remove(keys),
-});
+// Initialize storage adapter — prefers browser.storage.local (Firefox)
+setStorageAdapter(createStorageAdapter());
 
 function must<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -105,7 +102,8 @@ async function doSave() {
       showState("saved");
     }
   } catch (err) {
-    errorDetail.textContent = err instanceof Error ? err.message : "An unexpected error occurred";
+    const msg = err instanceof Error ? err.message : "An unexpected error occurred";
+    errorDetail.textContent = `doSave: ${msg}`;
     showState("error");
   } finally {
     saveBtn.disabled = false;

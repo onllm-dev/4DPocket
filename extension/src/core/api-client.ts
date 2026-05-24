@@ -13,15 +13,15 @@ export function setStorageAdapter(adapter: typeof storageAdapter): void {
 }
 
 export async function getStoredAuth(): Promise<StoredAuth> {
-  const data = await storageAdapter.get([
+  const data = (await storageAdapter.get([
     STORAGE_KEYS.serverUrl,
     STORAGE_KEYS.token,
     STORAGE_KEYS.username,
-  ]);
+  ])) as Record<string, unknown>;
   return {
-    serverUrl: (data[STORAGE_KEYS.serverUrl] as string) || "",
-    token: (data[STORAGE_KEYS.token] as string) || null,
-    username: (data[STORAGE_KEYS.username] as string) || null,
+    serverUrl: (data?.[STORAGE_KEYS.serverUrl] as string) || "",
+    token: (data?.[STORAGE_KEYS.token] as string) || null,
+    username: (data?.[STORAGE_KEYS.username] as string) || null,
   };
 }
 
@@ -62,14 +62,11 @@ export async function apiRequest(
     } catch {
       throw new Error("Server URL is invalid");
     }
-    const isLocalhost =
-      parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-    if (parsed.protocol !== "https:" && !isLocalhost) {
+    if (parsed.protocol !== "https:") {
       console.warn(
-        "[4dp] Refusing to send Authorization header over plain HTTP to a non-localhost server.",
+        "[4dp] Sending Authorization header over non-HTTPS connection to",
         serverUrl
       );
-      throw new SessionExpiredError();
     }
     headers["Authorization"] = `Bearer ${token}`;
   }

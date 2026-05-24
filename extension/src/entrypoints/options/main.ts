@@ -1,13 +1,10 @@
 import { setStorageAdapter, getStoredAuth, setStoredAuth } from "../../core/api-client";
+import { createStorageAdapter } from "../../core/storage-adapter";
 import { testConnection, login, validateToken, logout } from "../../core/auth";
 import { DEFAULT_SERVER_URL } from "../../core/constants";
 
-// Initialize storage adapter for Chrome
-setStorageAdapter({
-  get: (keys) => chrome.storage.local.get(keys),
-  set: (items) => chrome.storage.local.set(items),
-  remove: (keys) => chrome.storage.local.remove(keys),
-});
+// Initialize storage adapter — prefers browser.storage.local (Firefox)
+setStorageAdapter(createStorageAdapter());
 
 // DOM elements
 const serverUrlInput = document.getElementById("server-url") as HTMLInputElement;
