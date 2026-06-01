@@ -13,70 +13,7 @@ import asyncio
 import httpx
 import respx
 
-# ─── Reddit ─────────────────────────────────────────────────
-
-
-REDDIT_PAYLOAD = [
-    {  # post listing
-        "data": {"children": [{
-            "kind": "t3",
-            "data": {
-                "id": "abc",
-                "title": "Why does dict ordering matter?",
-                "selftext": "Question body here.",
-                "subreddit": "python",
-                "author": "op_user",
-                "score": 42,
-                "num_comments": 2,
-                "permalink": "/r/python/comments/abc/why/",
-                "created_utc": 1700000000,
-                "url": "https://reddit.com/r/python/comments/abc/why/",
-                "is_self": True,
-                "link_flair_text": "Discussion",
-            },
-        }]},
-    },
-    {  # comments listing
-        "data": {"children": [
-            {
-                "kind": "t1",
-                "data": {
-                    "id": "c1",
-                    "author": "raymond_h",
-                    "body": "It's a CPython implementation detail.",
-                    "score": 311,
-                    "permalink": "/r/python/comments/abc/why/c1/",
-                    "replies": {"data": {"children": [
-                        {
-                            "kind": "t1",
-                            "data": {
-                                "id": "c2",
-                                "author": "curious_dev",
-                                "body": "PEP 468 also relies on this.",
-                                "score": 42,
-                                "permalink": "/r/python/comments/abc/why/c2/",
-                            },
-                        },
-                    ]}},
-                },
-            },
-            {
-                "kind": "t1",
-                "data": {
-                    "id": "c3",
-                    "author": "another",
-                    "body": "Worth reading the PEP discussion.",
-                    "score": 88,
-                    "permalink": "/r/python/comments/abc/why/c3/",
-                },
-            },
-            # deleted comment should be skipped
-            {"kind": "t1", "data": {"id": "c4", "author": "x", "body": "[deleted]", "score": 0}},
-            # 'more' continuation should be ignored
-            {"kind": "more", "data": {"children": ["c5", "c6"]}},
-        ]},
-    },
-]
+from tests.test_processors.test_reddit import REDDIT_HTML_POST  # noqa: F401
 
 
 def test_reddit_emits_sectioned_post_and_threaded_comments():
@@ -85,12 +22,11 @@ def test_reddit_emits_sectioned_post_and_threaded_comments():
     proc = RedditProcessor()
 
     with respx.mock(assert_all_called=False) as r:
-        # _fetch_reddit_json hits the .json endpoint with our query string
-        r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/abc/why\.json.*").mock(
-            return_value=httpx.Response(200, json=REDDIT_PAYLOAD)
+        r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title/").mock(
+            httpx.Response(200, text=REDDIT_HTML_POST)
         )
         result = asyncio.run(
-            proc.process("https://www.reddit.com/r/python/comments/abc/why/")
+            proc.process("https://www.reddit.com/r/python/comments/post1/title/")
         )
 
     assert result.source_platform == "reddit"
@@ -103,19 +39,19 @@ def test_reddit_emits_sectioned_post_and_threaded_comments():
     assert sum(1 for s in sections if s.kind == "reply") == 1
 
     post = next(s for s in sections if s.kind == "post")
-    assert post.author == "op_user"
-    assert post.score == 42
+    assert post.author == "python_newbie"
+    assert post.score == 150
     assert post.parent_id is None
 
     # Top-scored comment first (score-weighted DFS)
     comments = [s for s in sections if s.kind == "comment"]
-    assert comments[0].author == "raymond_h"
-    assert comments[0].score == 311
+    assert comments[0].author == "another_user"
+    assert comments[0].score == 200
     assert comments[0].parent_id == post.id
 
     reply = next(s for s in sections if s.kind == "reply")
     assert reply.depth == 2
-    assert reply.parent_id == comments[0].id
+    assert reply.parent_id == comments[1].id
 
 
 # ─── Hacker News ─────────────────────────────────────────────

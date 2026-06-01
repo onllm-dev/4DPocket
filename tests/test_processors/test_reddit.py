@@ -28,72 +28,95 @@ class TestURLPatternMatching:
         assert matches, f"URL did not match: {url}"
 
 
-REDDIT_POST_PAYLOAD = [
-    {
-        "data": {
-            "children": [{
-                "kind": "t3",
-                "data": {
-                    "id": "post1",
-                    "title": "Best Python tips for beginners?",
-                    "selftext": "I'm learning Python and would love tips.",
-                    "subreddit": "python",
-                    "author": "python_newbie",
-                    "score": 150,
-                    "num_comments": 25,
-                    "permalink": "/r/python/comments/post1/title/",
-                    "created_utc": 1700000000,
-                    "is_self": True,
-                    "link_flair_text": "Question",
-                },
-            }],
-        },
-    },
-    {
-        "data": {
-            "children": [
-                {
-                    "kind": "t1",
-                    "data": {
-                        "id": "c1",
-                        "author": "senior_dev",
-                        "body": "Read the official tutorial first.",
-                        "score": 80,
-                        "permalink": "/r/python/comments/post1/title/c1/",
-                        "created_utc": 1700000100,
-                        "replies": {"data": {"children": [
-                            {
-                                "kind": "t1",
-                                "data": {
-                                    "id": "r1",
-                                    "author": "python_newbie",
-                                    "body": "Thanks! Will do.",
-                                    "score": 5,
-                                    "permalink": "/r/python/comments/post1/title/r1/",
-                                },
-                            },
-                        ]}},
-                    },
-                },
-                {
-                    "kind": "t1",
-                    "data": {
-                        "id": "c2",
-                        "author": "another_user",
-                        "body": "I recommend the book 'Fluent Python'.",
-                        "score": 200,
-                        "permalink": "/r/python/comments/post1/title/c2/",
-                        "created_utc": 1700000200,
-                    },
-                },
-                # deleted comment should be skipped
-                {"kind": "t1", "data": {"id": "del1", "author": "x", "body": "[deleted]", "score": 0}},
-                # 'more' continuation should be ignored
-                {"kind": "more", "data": {"children": ["c5", "c6"]}},
-            ],
-        },
-    },
-]
+# ─── HTML fixtures ──────────────────────────────────────────────────────────
+
+REDDIT_HTML_POST = """<!DOCTYPE html>
+<html>
+<head><title>Best Python tips for beginners? : r/python</title></head>
+<body>
+<div class="sitetable">
+  <div class="entry" data-fullname="t3_post1" data-parent="">
+    <a class="author">python_newbie</a>
+    <a class="subreddit">r/python</a>
+    <span class="score" data-score="150">150 points</span>
+    <a class="comments" data-num-comments="25" href="/r/python/comments/post1/title/">25 comments</a>
+    <span class="linkflairtext">Question</span>
+    <div class="usertext-body">
+      <p>I'm learning Python and would love tips.</p>
+    </div>
+    <a data-event-action="title" href="/r/python/comments/post1/title/">link</a>
+    <time datetime="2023-11-14T12:00:00+00:00">2023-11-14</time>
+  </div>
+ <!-- comment1: senior_dev, score 80 -->
+  <div class="entry" data-fullname="t1_c1" data-parent="post1">
+    <a class="author">senior_dev</a>
+    <span class="score" data-score="80">80 points</span>
+    <div class="usertext-body"><p>Read the official tutorial first.</p></div>
+    <a data-permalink="true" href="/r/python/comments/post1/title/c1/">permalink</a>
+    <time datetime="2023-11-14T12:01:00+00:00">2023-11-14</time>
+    <!-- nested reply: python_newbie, score 5 -->
+    <div class="entry" data-fullname="t1_r1" data-parent="c1">
+      <a class="author">python_newbie</a>
+      <span class="score" data-score="5">5 points</span>
+      <div class="usertext-body"><p>Thanks! Will do.</p></div>
+      <a data-permalink="true" href="/r/python/comments/post1/title/r1/">permalink</a>
+      <time datetime="2023-11-14T12:02:00+00:00">2023-11-14</time>
+    </div>
+  </div>
+  <!-- comment 2: another_user, score 200 (top scored) -->
+  <div class="entry" data-fullname="t1_c2" data-parent="post1">
+    <a class="author">another_user</a>
+    <span class="score" data-score="200">200 points</span>
+    <div class="usertext-body"><p>I recommend the book 'Fluent Python'.</p></div>
+    <a data-permalink="true" href="/r/python/comments/post1/title/c2/">permalink</a>
+    <time datetime="2023-11-14T12:03:00+00:00">2023-11-14</time>
+  </div>
+  <!-- deleted comment should be skipped -->
+  <div class="entry" data-fullname="t1_del1" data-parent="post1">
+    <a class="author">deleted</a>
+    <span class="score" data-score="0">0 points</span>
+    <div class="usertext-body"><p>[deleted]</p></div>
+  </div>
+</div>
+<link rel="canonical" href="https://www.reddit.com/r/python/comments/post1/title/">
+</body></html>"""
+
+REDDIT_HTML_THUMB = """<!DOCTYPE html>
+<html>
+<head><title>Check out this image : r/pics</title></head>
+<body>
+<div class="sitetable">
+  <div class="entry" data-fullname="t3_post2" data-parent="">
+    <a class="author">user1</a>
+    <a class="subreddit">r/pics</a>
+    <span class="score" data-score="10">10 points</span>
+    <a class="comments" data-num-comments="1" href="/r/pics/comments/post2/title/">1 comment</a>
+    <a class="thumbnail"><img src="https://i.redd.it/thumb.jpg"></a>
+    <a data-event-action="title" href="https://i.redd.it/image.jpg">link</a>
+    <time datetime="2023-11-14T12:00:00+00:00">2023-11-14</time>
+  </div>
+</div>
+<link rel="canonical" href="https://www.reddit.com/r/pics/comments/post2/title/">
+</body></html>"""
+
+REDDIT_HTML_CROSSPOST = """<!DOCTYPE html>
+<html>
+<head><title>Interesting find : r/Programming</title></head>
+<body>
+<div class="sitetable">
+  <div class="entry" data-fullname="t3_xpost1" data-parent="">
+    <a class="author">user1</a>
+    <a class="subreddit">r/Programming</a>
+    <span class="score" data-score="50">50 points</span>
+    <a class="comments" data-num-comments="5" href="/r/Programming/comments/xpost1/title/">5 comments</a>
+    <span class="linkflairtext">Crosspost</span>
+    <span class="crosspost">r/original</span>
+    <div class="usertext-body"><p>See original post.</p></div>
+    <time datetime="2023-11-14T12:00:00+00:00">2023-11-14</time>
+  </div>
+</div>
+<link rel="canonical" href="https://www.reddit.com/r/Programming/comments/xpost1/title/">
+</body></html>"""
 
 
 class TestExtract:
@@ -105,8 +128,8 @@ class TestExtract:
         proc = RedditProcessor()
 
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title\.json.*").mock(
-                return_value=httpx.Response(200, json=REDDIT_POST_PAYLOAD)
+            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_POST)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/python/comments/post1/title/")
@@ -123,7 +146,7 @@ class TestExtract:
         proc = RedditProcessor()
 
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/notfound.*\.json.*").mock(
+            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/notfound/").mock(
                 return_value=httpx.Response(404)
             )
             result = asyncio.run(
@@ -155,8 +178,8 @@ class TestExtract:
         proc = RedditProcessor()
 
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title\.json.*").mock(
-                return_value=httpx.Response(200, json=REDDIT_POST_PAYLOAD)
+            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_POST)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/python/comments/post1/title/")
@@ -175,8 +198,8 @@ class TestExtract:
         proc = RedditProcessor()
 
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title\.json.*").mock(
-                return_value=httpx.Response(200, json=REDDIT_POST_PAYLOAD)
+            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_POST)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/python/comments/post1/title/")
@@ -211,8 +234,8 @@ class TestExtract:
         proc = RedditProcessor()
 
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title\.json.*").mock(
-                return_value=httpx.Response(200, json=REDDIT_POST_PAYLOAD)
+            r.get(url__regex=r"https://old\.reddit\.com/r/python/comments/post1/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_POST)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/python/comments/post1/title/")
@@ -226,35 +249,9 @@ class TestExtract:
         """Media (thumbnail) is extracted into ProcessorResult.media."""
         proc = RedditProcessor()
 
-        # Payload with thumbnail
-        payload_with_thumb = [
-            {
-                "data": {
-                    "children": [{
-                        "kind": "t3",
-                        "data": {
-                            "id": "post2",
-                            "title": "Check out this image",
-                            "selftext": "",
-                            "subreddit": "pics",
-                            "author": "user1",
-                            "score": 10,
-                            "num_comments": 1,
-                            "permalink": "/r/pics/comments/post2/title/",
-                            "created_utc": 1700000000,
-                            "is_self": False,
-                            "thumbnail": "https://i.redd.it/thumb.jpg",
-                            "url": "https://i.redd.it/image.jpg",
-                        },
-                    }],
-                },
-            },
-            {"data": {"children": []}},
-        ]
-
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/pics/comments/post2/title\.json.*").mock(
-                return_value=httpx.Response(200, json=payload_with_thumb)
+            r.get(url__regex=r"https://old\.reddit\.com/r/pics/comments/post2/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_THUMB)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/pics/comments/post2/title/")
@@ -270,35 +267,9 @@ class TestExtract:
         """Crosspost source is captured in metadata."""
         proc = RedditProcessor()
 
-        payload_with_crosspost = [
-            {
-                "data": {
-                    "children": [{
-                        "kind": "t3",
-                        "data": {
-                            "id": "xpost1",
-                            "title": "Interesting find",
-                            "selftext": "",
-                            "subreddit": "r/Programming",
-                            "author": "user1",
-                            "score": 50,
-                            "num_comments": 5,
-                            "permalink": "/r/Programming/comments/xpost1/title/",
-                            "created_utc": 1700000000,
-                            "is_self": True,
-                            "crosspost_parent_list": [
-                                {"subreddit_name_prefixed": "r/original"}
-                            ],
-                        },
-                    }],
-                },
-            },
-            {"data": {"children": []}},
-        ]
-
         with respx.mock(assert_all_called=False) as r:
-            r.get(url__regex=r"https://old\.reddit\.com/r/Programming/comments/xpost1/title\.json.*").mock(
-                return_value=httpx.Response(200, json=payload_with_crosspost)
+            r.get(url__regex=r"https://old\.reddit\.com/r/Programming/comments/xpost1/title/").mock(
+                return_value=httpx.Response(200, text=REDDIT_HTML_CROSSPOST)
             )
             result = asyncio.run(
                 proc.process("https://www.reddit.com/r/Programming/comments/xpost1/title/")
