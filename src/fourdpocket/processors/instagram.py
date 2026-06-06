@@ -15,6 +15,7 @@ Sections:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -23,6 +24,12 @@ from fourdpocket.processors.registry import register_processor
 from fourdpocket.processors.sections import Section, make_section_id
 
 logger = logging.getLogger(__name__)
+
+# Instagram intermittently 403s instaloader's graphql/query (anonymous). Retry
+# the lookup with backoff before degrading to the OG-metadata stub.
+_INSTALOADER_RETRIES = 3
+_INSTALOADER_RETRY_DELAY = 3.0
+_INSTALOADER_MAX_CONN_ATTEMPTS = 5
 
 
 def _extract_shortcode(url: str) -> str | None:
@@ -53,7 +60,10 @@ class InstagramProcessor(BaseProcessor):
                 title=url, source_platform="instagram",
                 status=ProcessorStatus.partial,
                 error=f"{reason}; fetch fallback failed: {str(e)[:120]}",
-                metadata={"url": url, "shortcode": shortcode, "limited_extraction": True},
+                metadata={
+                    "url": url, "shortcode": shortcode,
+                    "limited_extraction": True, "fallback_reason": reason,
+                },
             )
 
         title = og.get("og_title") or "Instagram post"
@@ -91,6 +101,7 @@ class InstagramProcessor(BaseProcessor):
                 "shortcode": shortcode,
                 "fallback": "og_metadata",
                 "limited_extraction": True,
+                "fallback_reason": reason,
             },
             source_platform="instagram",
             item_type="url",
@@ -113,22 +124,32 @@ class InstagramProcessor(BaseProcessor):
         except ImportError:
             return await self._og_fallback(url, shortcode, "instaloader not installed")
 
-        try:
-            loader = instaloader.Instaloader(
-                download_pictures=False,
-                download_videos=False,
-                download_video_thumbnails=False,
-                download_geotags=False,
-                download_comments=False,
-                save_metadata=False,
-                compress_json=False,
-                quiet=True,
-            )
-            post = instaloader.Post.from_shortcode(loader.context, shortcode)
-        except Exception as e:
-            # Common: rate-limited, login-required, deleted post.
+        loader = instaloader.Instaloader(
+            download_pictures=False,
+            download_videos=False,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            compress_json=False,
+            quiet=True,
+            max_connection_attempts=_INSTALOADER_MAX_CONN_ATTEMPTS,
+        )
+        post = None
+        last_err = ""
+        for attempt in range(_INSTALOADER_RETRIES):
+            try:
+                post = instaloader.Post.from_shortcode(loader.context, shortcode)
+                break
+            except Exception as e:
+                # Common: intermittent 403 rate-limit, login-required, deleted post.
+                last_err = str(e)[:120]
+                if attempt < _INSTALOADER_RETRIES - 1:
+                    await asyncio.sleep(_INSTALOADER_RETRY_DELAY * (attempt + 1))
+        if post is None:
             return await self._og_fallback(
-                url, shortcode, f"instaloader failed: {str(e)[:120]}"
+                url, shortcode,
+                f"instaloader failed after {_INSTALOADER_RETRIES} attempts: {last_err}",
             )
 
         caption = post.caption or ""
@@ -198,6 +219,11 @@ class InstagramProcessor(BaseProcessor):
             "hashtags": hashtags,
             "date": post.date.isoformat() if post.date else None,
             "media_count": len(media),
+            # Clear any stale fallback flags from a prior limited extraction so a
+            # successful re-scrape isn't left looking degraded after the merge.
+            "limited_extraction": False,
+            "fallback": None,
+            "fallback_reason": None,
         }
         if alt:
             metadata["alt_text"] = alt
