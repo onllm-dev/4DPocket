@@ -60,7 +60,9 @@ services:
     volumes:
       - 4dp-data:/data
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "fourdpocket.workers.huey_worker"]
+      # The slim runtime image has no `pgrep` (no procps); use a stdlib-python
+      # /proc scan so the worker isn't perpetually marked unhealthy.
+      test: ["CMD", "python", "-c", "import os,sys; sys.exit(0 if any(b'huey_worker' in open('/proc/'+p+'/cmdline','rb').read() for p in os.listdir('/proc') if p.isdigit() and os.path.exists('/proc/'+p+'/cmdline')) else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
