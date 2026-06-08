@@ -132,7 +132,12 @@ class YouTubeProcessor(BaseProcessor):
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
             try:
-                tlist = YouTubeTranscriptApi.list_transcripts(video_id)
+                # youtube-transcript-api v1.x is instance-based (.list); older
+                # releases exposed a static list_transcripts(). Support both.
+                if hasattr(YouTubeTranscriptApi, "list_transcripts"):
+                    tlist = YouTubeTranscriptApi.list_transcripts(video_id)
+                else:
+                    tlist = YouTubeTranscriptApi().list(video_id)
                 t = None
                 try:
                     t = tlist.find_manually_created_transcript(["en"])
@@ -145,13 +150,27 @@ class YouTubeProcessor(BaseProcessor):
                             break
                 if t:
                     fetched = t.fetch()
-                    for entry in fetched:
+                    # v1.x returns a FetchedTranscript of snippet objects;
+                    # to_raw_data() normalizes to the legacy list-of-dicts shape.
+                    entries = (
+                        fetched.to_raw_data()
+                        if hasattr(fetched, "to_raw_data")
+                        else fetched
+                    )
+                    for entry in entries:
                         if isinstance(entry, dict):
-                            transcript_segments.append({
-                                "text": entry.get("text", ""),
-                                "start": float(entry.get("start", 0.0)),
-                                "duration": float(entry.get("duration", 0.0)),
-                            })
+                            text = entry.get("text", "")
+                            start = entry.get("start", 0.0)
+                            duration = entry.get("duration", 0.0)
+                        else:
+                            text = getattr(entry, "text", "")
+                            start = getattr(entry, "start", 0.0)
+                            duration = getattr(entry, "duration", 0.0)
+                        transcript_segments.append({
+                            "text": text,
+                            "start": float(start),
+                            "duration": float(duration),
+                        })
                     metadata["transcript_language"] = t.language
                     metadata["transcript_auto_generated"] = t.is_generated
             except Exception as e:

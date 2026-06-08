@@ -163,7 +163,17 @@ def fetch_and_process_url(item_id: str, url: str, user_id: str) -> dict:
 
         except Exception as e:
             logger.error("Failed to process item %s: %s", item_id, e)
-            item.item_metadata = {**item.item_metadata, "_processing_error": str(e)[:500]}
-            db.add(item)
-            db.commit()
+            # The failure may have left the session in a rolled-back state (e.g.
+            # a DataError mid-flush). Roll back first so recording the error
+            # doesn't itself raise PendingRollbackError and swallow the failure.
+            db.rollback()
+            try:
+                item = db.get(KnowledgeItem, uuid.UUID(item_id))
+                if item is not None:
+                    item.item_metadata = {**item.item_metadata, "_processing_error": str(e)[:500]}
+                    db.add(item)
+                    db.commit()
+            except Exception as record_err:
+                logger.error("Failed to record processing error for %s: %s", item_id, record_err)
+                db.rollback()
             return {"status": "error", "error": str(e)[:500]}

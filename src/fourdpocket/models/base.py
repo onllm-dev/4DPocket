@@ -16,6 +16,7 @@ class ItemType(str, enum.Enum):
     image = "image"
     pdf = "pdf"
     code_snippet = "code_snippet"
+    video = "video"
 
 
 class SourcePlatform(str, enum.Enum):
