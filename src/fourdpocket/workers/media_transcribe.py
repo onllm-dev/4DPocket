@@ -17,8 +17,10 @@ blocks the rest of enrichment.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import shutil
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -28,6 +30,27 @@ import httpx
 from fourdpocket.processors.sections import Section, make_section_id
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _prefer_ipv4():
+    """Force IPv4-only DNS resolution within the block.
+
+    Some hosts (e.g. the DeluxHost VPS) advertise an IPv6 default route that
+    isn't actually routable, so dual-stack targets like Instagram's CDN fail
+    with ``[Errno 101] Network is unreachable`` on the v6 attempt. yt-dlp gets
+    ``-4``; for httpx we constrain ``getaddrinfo`` to A records here.
+    """
+    orig = socket.getaddrinfo
+
+    def _v4(host, port, family=0, *args, **kwargs):
+        return orig(host, port, socket.AF_INET, *args, **kwargs)
+
+    socket.getaddrinfo = _v4
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = orig
 
 _WHISPER_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions"
 _MAX_BYTES = 25 * 1024 * 1024  # Groq Whisper hard limit
@@ -86,8 +109,8 @@ def _download_direct(url: str, dest_dir: str) -> str | None:
     # via ffmpeg afterward when needed.
     hard_cap = _MAX_BYTES * 8
     try:
-        with httpx.stream(
-            "GET", url, timeout=120, follow_redirects=True,
+        with _prefer_ipv4(), httpx.stream(
+            "GET", url, timeout=60, follow_redirects=True,
             headers={"User-Agent": "4DPocket/0.1"},
         ) as r:
             r.raise_for_status()
@@ -113,14 +136,16 @@ def _download_ytdlp(url: str, dest_dir: str) -> str | None:
         logger.warning("SSRF blocked yt-dlp transcription URL: %s", url)
         return None
     out_tmpl = str(Path(dest_dir) / "audio.%(ext)s")
-    base = ["yt-dlp", "--no-playlist", "-f", "bestaudio/best",
-            "--max-filesize", "100M", "-o", out_tmpl, url]
+    # ``-4`` forces IPv4 (this host's IPv6 isn't routable); --socket-timeout
+    # keeps an auth-walled/unreachable source from hanging the worker.
+    base = ["yt-dlp", "-4", "--no-playlist", "--socket-timeout", "30",
+            "-f", "bestaudio/best", "--max-filesize", "100M", "-o", out_tmpl, url]
     # Prefer audio extraction (needs ffmpeg); fall back to the raw bestaudio
     # container if extraction isn't possible.
-    attempts = [base[:5] + ["-x", "--audio-format", "mp3"] + base[5:], base]
+    attempts = [base + ["-x", "--audio-format", "mp3"], base]
     for cmd in attempts:
         try:
-            subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         except Exception as e:
             logger.warning("yt-dlp transcription download failed: %s", e)
             continue
