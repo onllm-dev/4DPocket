@@ -54,6 +54,10 @@ def _prefer_ipv4():
 
 _WHISPER_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions"
 _MAX_BYTES = 25 * 1024 * 1024  # Groq Whisper hard limit
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 _SEGMENT_TARGET_CHARS = 600  # group ASR segments into ~screenful transcript chunks
 _TRANSCRIPT_SECTION_BASE_ORDER = 10_000  # keep ASR/OCR sections after processor sections
 
@@ -97,8 +101,28 @@ def _video_source(item) -> tuple[str, str] | None:
     return None
 
 
-def _download_direct(url: str, dest_dir: str) -> str | None:
-    """Stream a direct media URL to disk (SSRF-guarded, size-capped)."""
+# Hosts that block datacenter IPs and must egress via the residential proxy.
+_PROXIED_HOSTS = ("cdninstagram.com", "instagram.com", "fbcdn.net",
+                  "tiktok.com", "tiktokcdn.com")
+
+
+def _media_proxy_for(url: str, settings) -> str | None:
+    """Return the configured media proxy iff this URL targets a host that needs
+    residential egress (Instagram/TikTok); else None (download directly)."""
+    proxy = (settings.enrichment.media_proxy or "").strip()
+    if not proxy:
+        return None
+    low = (url or "").lower()
+    return proxy if any(h in low for h in _PROXIED_HOSTS) else None
+
+
+def _download_direct(url: str, dest_dir: str, proxy: str | None = None) -> str | None:
+    """Stream a direct media URL to disk (SSRF-guarded, size-capped).
+
+    When ``proxy`` is set, egress + DNS happen proxy-side (socks5h), so the
+    local IPv4-forcing is skipped; otherwise we force IPv4 (this host's v6 is
+    not routable).
+    """
     from fourdpocket.workers.media_downloader import _is_safe_media_url
 
     if not _is_safe_media_url(url):
@@ -108,10 +132,13 @@ def _download_direct(url: str, dest_dir: str) -> str | None:
     # Allow the video to exceed the Whisper limit a bit — we downsize to audio
     # via ffmpeg afterward when needed.
     hard_cap = _MAX_BYTES * 8
+    client_kwargs: dict = {"timeout": 60, "follow_redirects": True}
+    if proxy:
+        client_kwargs["proxy"] = proxy
+    dns_ctx = contextlib.nullcontext() if proxy else _prefer_ipv4()
     try:
-        with _prefer_ipv4(), httpx.stream(
-            "GET", url, timeout=60, follow_redirects=True,
-            headers={"User-Agent": "4DPocket/0.1"},
+        with dns_ctx, httpx.Client(**client_kwargs) as client, client.stream(
+            "GET", url, headers={"User-Agent": _BROWSER_UA},
         ) as r:
             r.raise_for_status()
             total = 0
@@ -128,7 +155,7 @@ def _download_direct(url: str, dest_dir: str) -> str | None:
         return None
 
 
-def _download_ytdlp(url: str, dest_dir: str) -> str | None:
+def _download_ytdlp(url: str, dest_dir: str, proxy: str | None = None) -> str | None:
     """Download bestaudio via yt-dlp (extract to mp3 when ffmpeg is available)."""
     from fourdpocket.workers.media_downloader import _is_safe_media_url
 
@@ -136,10 +163,15 @@ def _download_ytdlp(url: str, dest_dir: str) -> str | None:
         logger.warning("SSRF blocked yt-dlp transcription URL: %s", url)
         return None
     out_tmpl = str(Path(dest_dir) / "audio.%(ext)s")
-    # ``-4`` forces IPv4 (this host's IPv6 isn't routable); --socket-timeout
-    # keeps an auth-walled/unreachable source from hanging the worker.
-    base = ["yt-dlp", "-4", "--no-playlist", "--socket-timeout", "30",
+    # --socket-timeout keeps an auth-walled/unreachable source from hanging the
+    # worker. With a proxy, egress/DNS go proxy-side; without one, force IPv4
+    # (this host's v6 isn't routable).
+    base = ["yt-dlp", "--no-playlist", "--socket-timeout", "30",
             "-f", "bestaudio/best", "--max-filesize", "100M", "-o", out_tmpl, url]
+    if proxy:
+        base += ["--proxy", proxy]
+    else:
+        base.insert(1, "-4")
     # Prefer audio extraction (needs ffmpeg); fall back to the raw bestaudio
     # container if extraction isn't possible.
     attempts = [base + ["-x", "--audio-format", "mp3"], base]
@@ -298,12 +330,15 @@ def transcribe_item(item, settings) -> list[Section]:
     seed = item.url or str(item.id)
     with tempfile.TemporaryDirectory(prefix="fdp_tx_") as tmp:
         media_path = (
-            _download_direct(url, tmp) if mode == "direct"
-            else _download_ytdlp(url, tmp)
+            _download_direct(url, tmp, proxy=_media_proxy_for(url, settings))
+            if mode == "direct"
+            else _download_ytdlp(url, tmp, proxy=_media_proxy_for(url, settings))
         )
         # Direct CDN URLs (e.g. Instagram) expire — fall back to yt-dlp on the page.
         if not media_path and mode == "direct" and item.url:
-            media_path = _download_ytdlp(item.url, tmp)
+            media_path = _download_ytdlp(
+                item.url, tmp, proxy=_media_proxy_for(item.url, settings)
+            )
         if not media_path:
             raise RuntimeError("could not download media for transcription")
 

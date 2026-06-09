@@ -150,6 +150,11 @@ class EnrichmentSettings(BaseSettings):
     transcribe_video: bool = True
     transcribe_model: str = "whisper-large-v3-turbo"  # Groq Whisper model
     ocr_video_frames: bool = True  # OCR sampled video frames for on-screen text
+    # SOCKS/HTTP proxy for media downloads from hosts the server's own IP can't
+    # reach (e.g. Instagram/TikTok CDNs that block datacenter IPs). Applied only
+    # to those platforms; everything else downloads directly. Use socks5h:// so
+    # DNS resolves on the proxy side. Empty = direct (no proxy).
+    media_proxy: str = ""
     # Entity synthesis — Karpathy-style LLM-maintained wiki pages per entity.
     synthesis_enabled: bool = True
     synthesis_min_item_count: int = 3  # Don't synthesize entities mentioned in < N items
