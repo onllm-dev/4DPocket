@@ -13,6 +13,7 @@ from fourdpocket.workers import huey
 logger = logging.getLogger(__name__)
 
 STAGES = [
+    "transcribed",
     "chunked",
     "embedded",
     "tagged",
@@ -20,11 +21,16 @@ STAGES = [
     "entities_extracted",
     "synthesized",
 ]
+# `transcribed` runs first and merges any video transcript/OCR text into the
+# item's content. chunked/tagged/summarized depend on it so they operate on the
+# *full* text (caption + spoken + on-screen). For non-video items the stage is a
+# near-instant no-op, and "done"/"skipped" both satisfy the dependency.
 STAGE_DEPS = {
-    "chunked": [],
+    "transcribed": [],
+    "chunked": ["transcribed"],
     "embedded": ["chunked"],
-    "tagged": [],
-    "summarized": [],
+    "tagged": ["transcribed"],
+    "summarized": ["transcribed"],
     "entities_extracted": ["chunked"],
     "synthesized": ["entities_extracted"],
 }
@@ -129,6 +135,84 @@ def _deps_satisfied(db: Session, item_id: uuid.UUID, stage: str) -> bool:
 
 
 # ─── Stage Handlers ──────────────────────────────────────────
+
+def handle_transcription(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """Transcribe video items (reels/shorts/tiktok, or YouTube w/o a caption
+    transcript): download the media, ASR via Whisper, OCR on-screen text, and
+    merge the result into the item's sections + content so the later stages
+    chunk/tag/summarize the full spoken text.
+
+    Best-effort by design — any failure is recorded on the item and the stage
+    still completes, so a missing transcript never blocks the rest of the
+    pipeline (chunked/tagged/summarized depend on this stage).
+    """
+    from dataclasses import asdict
+
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from fourdpocket.config import get_settings
+    from fourdpocket.models.item import KnowledgeItem
+    from fourdpocket.processors.sections import Section, sections_to_text
+    from fourdpocket.workers.media_transcribe import (
+        TranscriptionUnavailableError,
+        transcribe_item,
+    )
+
+    settings = get_settings()
+    if not settings.enrichment.transcribe_video:
+        return
+
+    item = db.get(KnowledgeItem, item_id)
+    if not item:
+        return
+
+    meta = dict(item.item_metadata or {})
+    existing = list(meta.get("_sections") or [])
+    # Don't double-transcribe: a YouTube API transcript or a prior ASR run
+    # already populated transcript_segment sections.
+    if any(s.get("kind") == "transcript_segment" for s in existing):
+        return
+
+    try:
+        new_sections = transcribe_item(item, settings)
+    except TranscriptionUnavailableError as e:
+        meta["transcript_error"] = str(e)[:300]
+        item.item_metadata = meta
+        flag_modified(item, "item_metadata")
+        db.add(item)
+        db.commit()
+        return
+    except Exception as e:
+        logger.warning("Transcription failed for %s: %s", item_id, e)
+        meta["transcript_error"] = str(e)[:300]
+        item.item_metadata = meta
+        flag_modified(item, "item_metadata")
+        db.add(item)
+        db.commit()
+        return
+
+    if not new_sections:
+        return  # not a video / nothing produced
+
+    merged = existing + [asdict(s) for s in new_sections]
+    meta["_sections"] = merged
+    meta["transcript_source"] = "asr:groq-whisper"
+    meta.pop("transcript_error", None)  # clear any stale failure marker
+
+    rehydrated: list[Section] = []
+    for sd in merged:
+        try:
+            rehydrated.append(Section(**sd))
+        except Exception:
+            pass
+    if rehydrated:
+        item.content = sections_to_text(rehydrated) or item.content
+
+    item.item_metadata = meta
+    flag_modified(item, "item_metadata")
+    db.add(item)
+    db.commit()
+
 
 def handle_chunking(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> None:
     """Chunk item content into ItemChunk rows and index in FTS5.
@@ -595,6 +679,7 @@ def handle_synthesis(db: Session, item_id: uuid.UUID, user_id: uuid.UUID) -> Non
 
 
 STAGE_HANDLERS = {
+    "transcribed": handle_transcription,
     "chunked": handle_chunking,
     "embedded": handle_embedding,
     "tagged": handle_tagging,

@@ -28,8 +28,11 @@ LABEL org.opencontainers.image.licenses="GPL-3.0"
 WORKDIR /app
 
 # System dependencies
+# ffmpeg: audio extraction/downsizing for ASR + frame sampling for video OCR.
+# tesseract-ocr: OCR for scanned PDFs and on-screen text in video frames.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
+    ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

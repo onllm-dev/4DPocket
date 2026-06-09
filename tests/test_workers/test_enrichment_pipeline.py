@@ -121,7 +121,11 @@ class TestStageManagement:
 
 class TestDependencies:
     def test_no_deps_satisfied(self, db: Session, enrich_item):
-        # Stages without deps should always be satisfied
+        # Only "transcribed" has no deps; it is always satisfied.
+        assert _deps_satisfied(db, enrich_item.id, "transcribed") is True
+        # chunked/tagged/summarized now gate on transcribed completing.
+        _get_or_create_stage(db, enrich_item.id, "transcribed")
+        _mark_done(db, enrich_item.id, "transcribed")
         assert _deps_satisfied(db, enrich_item.id, "chunked") is True
         assert _deps_satisfied(db, enrich_item.id, "tagged") is True
         assert _deps_satisfied(db, enrich_item.id, "summarized") is True
@@ -359,6 +363,10 @@ class TestRunStage:
         """Handler raises → rollback + mark_failed."""
         import fourdpocket.db.session as db_module
         monkeypatch.setattr(db_module, "_engine", engine)
+
+        # "tagged" now depends on "transcribed"; mark it done so tagged runs.
+        _get_or_create_stage(db, enrich_item.id, "transcribed")
+        _mark_done(db, enrich_item.id, "transcribed")
 
         def bad_handler(*a, **kw):
             raise RuntimeError("AI failed")

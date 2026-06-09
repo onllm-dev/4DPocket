@@ -535,6 +535,10 @@ class TestRunEnrichmentStage:
 
         from fourdpocket.workers import enrichment_pipeline as ep
 
+        # chunked now depends on transcribed; satisfy it so chunked runs.
+        ep._get_or_create_stage(db, enrich_item.id, "transcribed")
+        ep._mark_done(db, enrich_item.id, "transcribed")
+
         # Replace STAGE_HANDLERS["chunked"] with a no-op so chunking doesn't run
         original_handler = STAGE_HANDLERS["chunked"]
         STAGE_HANDLERS["chunked"] = lambda *a, **k: None
@@ -553,6 +557,11 @@ class TestRunEnrichmentStage:
         """Lines 614-622: handler exception marks stage failed."""
         import fourdpocket.db.session as db_module
         monkeypatch.setattr(db_module, "_engine", engine)
+
+        # chunked now depends on transcribed; satisfy it so chunked runs.
+        from fourdpocket.workers import enrichment_pipeline as _ep
+        _ep._get_or_create_stage(db, enrich_item.id, "transcribed")
+        _ep._mark_done(db, enrich_item.id, "transcribed")
 
         # Make chunking handler raise
         original = STAGE_HANDLERS["chunked"]
@@ -650,8 +659,8 @@ class TestDependencyCoverage:
     """Additional deps_satisfied edge cases."""
 
     def test_stage_with_no_dep_entry(self, db: Session, enrich_item):
-        """STAGE_DEPS lookup for stage with no entry returns empty dep list."""
-        assert _deps_satisfied(db, enrich_item.id, "tagged") is True
+        """A stage with an empty dep list is always satisfied."""
+        assert _deps_satisfied(db, enrich_item.id, "transcribed") is True
 
     def test_all_positive_dep_statuses(self, db: Session, enrich_item):
         """Dep is satisfied when status is 'done'."""
@@ -682,10 +691,11 @@ class TestStageOrdering:
     """Verify stage ordering logic."""
 
     def test_independent_stages_have_no_deps(self):
-        """chunked, tagged, summarized have empty dep lists."""
-        assert STAGE_DEPS["chunked"] == []
-        assert STAGE_DEPS["tagged"] == []
-        assert STAGE_DEPS["summarized"] == []
+        """transcribed is the only no-dep stage; it gates the content stages."""
+        assert STAGE_DEPS["transcribed"] == []
+        assert STAGE_DEPS["chunked"] == ["transcribed"]
+        assert STAGE_DEPS["tagged"] == ["transcribed"]
+        assert STAGE_DEPS["summarized"] == ["transcribed"]
 
     def test_dependent_stages(self):
         """embedded and entities_extracted depend on chunked."""

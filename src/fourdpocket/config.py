@@ -145,6 +145,11 @@ class EnrichmentSettings(BaseSettings):
     max_entities_per_chunk: int = 20
     max_relations_per_chunk: int = 15
     max_attempts: int = 5  # Max retries per enrichment stage before permanent failure
+    # Video transcription (ASR) — turn reels/shorts/tiktok video bodies into
+    # searchable transcript text via Whisper, plus on-screen text via frame OCR.
+    transcribe_video: bool = True
+    transcribe_model: str = "whisper-large-v3-turbo"  # Groq Whisper model
+    ocr_video_frames: bool = True  # OCR sampled video frames for on-screen text
     # Entity synthesis — Karpathy-style LLM-maintained wiki pages per entity.
     synthesis_enabled: bool = True
     synthesis_min_item_count: int = 3  # Don't synthesize entities mentioned in < N items
