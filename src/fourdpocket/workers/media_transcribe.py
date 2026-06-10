@@ -209,17 +209,21 @@ def _ensure_under_limit(path: str, dest_dir: str) -> str | None:
     return None
 
 
-def _whisper_segments(path: str, groq_key: str, model: str) -> list[dict]:
-    """Transcribe via Groq Whisper. Returns [{text,start,end}] segments."""
+def _whisper_segments(path: str, groq_key: str, model: str,
+                      proxy: str | None = None) -> list[dict]:
+    """Transcribe via Groq Whisper. Returns [{text,start,end}] segments.
+
+    Routes through ``proxy`` when set so the ASR call works on hosts whose own
+    egress can't reach the API (the same media_proxy used for downloads)."""
     with open(path, "rb") as f:
         data = f.read()
-    resp = httpx.post(
-        _WHISPER_ENDPOINT,
-        headers={"Authorization": f"Bearer {groq_key}"},
-        files={"file": (Path(path).name, data, "application/octet-stream")},
-        data={"model": model, "response_format": "verbose_json"},
-        timeout=180,
-    )
+    with httpx.Client(timeout=180, proxy=proxy) as client:
+        resp = client.post(
+            _WHISPER_ENDPOINT,
+            headers={"Authorization": f"Bearer {groq_key}"},
+            files={"file": (Path(path).name, data, "application/octet-stream")},
+            data={"model": model, "response_format": "verbose_json"},
+        )
     resp.raise_for_status()
     payload = resp.json()
     out: list[dict] = []
@@ -350,7 +354,10 @@ def transcribe_item(item, settings) -> list[Section]:
         sections: list[Section] = []
         asr_path = _ensure_under_limit(media_path, tmp)
         if asr_path:
-            segments = _whisper_segments(asr_path, groq_key, settings.enrichment.transcribe_model)
+            segments = _whisper_segments(
+                asr_path, groq_key, settings.enrichment.transcribe_model,
+                proxy=(settings.enrichment.media_proxy or None),
+            )
             sections.extend(_group_segments(segments, seed))
         else:
             logger.warning("media too large for transcription and could not be shrunk: %s", seed)
