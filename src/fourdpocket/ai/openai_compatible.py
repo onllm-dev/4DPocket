@@ -2,12 +2,24 @@
 
 import json
 import logging
+import re
 
 from openai import OpenAI
 
 from fourdpocket.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_think(content: str) -> str:
+    """Remove <think>...</think> reasoning blocks emitted by reasoning models."""
+    content = _THINK_RE.sub("", content)
+    # Truncated/unclosed reasoning block: drop everything from the opening tag.
+    if "<think>" in content:
+        content = content.split("<think>", 1)[0]
+    return content.strip()
 
 PROVIDER_CONFIGS = {
     "ollama": {
@@ -144,7 +156,7 @@ class OpenAICompatibleProvider:
                 max_tokens=2000,
                 timeout=30,
             )
-            return response.choices[0].message.content or ""
+            return _strip_think(response.choices[0].message.content or "")
         except Exception as e:
             logger.warning("Chat generation failed (%s): %s", self._provider, e)
             return ""
@@ -187,7 +199,7 @@ class OpenAICompatibleProvider:
 
 def _parse_json(content: str) -> dict:
     """Parse JSON from LLM response, handling markdown code blocks."""
-    content = content.strip()
+    content = _strip_think(content)
     if content.startswith("```"):
         content = content.split("\n", 1)[-1].rsplit("```", 1)[0]
     try:
