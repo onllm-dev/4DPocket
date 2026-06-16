@@ -84,6 +84,9 @@ plans/
 .plans/
 *.scratch
 *.scratch.*
+MEMORY/
+tmp/
+/src/public/
 
 # Credentials / keys (defense in depth — .env already covered)
 *.pem
